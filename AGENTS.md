@@ -51,4 +51,3 @@ winTerm v0.1 must not implement:
 - Tab docking overlays or corner docking
 - AI command generation
 - Remote process persistence
-
