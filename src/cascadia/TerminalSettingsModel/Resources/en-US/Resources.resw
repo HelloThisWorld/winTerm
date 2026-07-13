@@ -522,10 +522,10 @@
     <value>Rename window...</value>
   </data>
   <data name="DisplayWorkingDirectoryCommandKey" xml:space="preserve">
-    <value>Display Terminal's current working directory</value>
+    <value>Display winTerm's current working directory</value>
   </data>
   <data name="GlobalSummonCommandKey" xml:space="preserve">
-    <value>Show/Hide the Terminal window</value>
+    <value>Show/Hide the winTerm window</value>
   </data>
   <data name="QuakeModeCommandKey" xml:space="preserve">
     <value>Show/Hide Quake window</value>
@@ -567,7 +567,7 @@
     <comment>Name describing the usage of the classic windows console as the terminal UI. (`conhost.exe`)</comment>
   </data>
   <data name="QuitCommandKey" xml:space="preserve">
-    <value>Quit the Terminal</value>
+    <value>Quit winTerm</value>
   </data>
   <data name="SetOpacityParentCommandName" xml:space="preserve">
     <value>Set background opacity...</value>

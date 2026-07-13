@@ -22,7 +22,14 @@ namespace winrt::TerminalApp::implementation
         void Close();
         winrt::Microsoft::Terminal::Settings::Model::INewContentArgs GetNewTerminalArgs(const BuildStartupKind kind) const;
 
-        winrt::hstring Title() { return RS_(L"SettingsTab"); }
+        winrt::hstring Title()
+        {
+#if defined(WT_BRANDING_WINTERM)
+            return L"winTerm Settings";
+#else
+            return RS_(L"SettingsTab");
+#endif
+        }
         uint64_t TaskbarState() { return 0; }
         uint64_t TaskbarProgress() { return 0; }
         bool ReadOnly() { return false; }

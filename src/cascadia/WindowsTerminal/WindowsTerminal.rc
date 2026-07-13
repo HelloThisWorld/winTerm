@@ -53,7 +53,11 @@ END
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
 
-#if defined(WT_BRANDING_RELEASE)
+#if defined(WT_BRANDING_WINTERM)
+IDI_APPICON             ICON                    "..\\..\\..\\res\\terminal\\images-WinTerm\\terminal.ico"
+IDI_APPICON_HC_BLACK    ICON                    "..\\..\\..\\res\\terminal\\images-WinTerm\\terminal_contrast-black.ico"
+IDI_APPICON_HC_WHITE    ICON                    "..\\..\\..\\res\\terminal\\images-WinTerm\\terminal_contrast-white.ico"
+#elif defined(WT_BRANDING_RELEASE)
 IDI_APPICON             ICON                    "..\\..\\..\\res\\terminal.ico"
 IDI_APPICON_HC_BLACK    ICON                    "..\\..\\..\\res\\terminal\\images\\terminal_contrast-black.ico"
 IDI_APPICON_HC_WHITE    ICON                    "..\\..\\..\\res\\terminal\\images\\terminal_contrast-white.ico"
@@ -81,8 +85,13 @@ STRINGTABLE
 BEGIN
     IDS_ERROR_DIALOG_TITLE  "Error"
     IDS_HELP_DIALOG_TITLE  "Help"
+#if defined(WT_BRANDING_WINTERM)
+    IDS_ERROR_ARCHITECTURE_FORMAT
+                            "winTerm is designed to run on your system's native architecture (%s).\nYou are currently using the %s version.\n\nPlease use the winTerm version that matches your system's native architecture."
+#else
     IDS_ERROR_ARCHITECTURE_FORMAT
                             "Windows Terminal is designed to run on your system's native architecture (%s).\nYou are currently using the %s version.\n\nPlease use the version of Windows Terminal that matches your system's native architecture."
+#endif
     IDS_X86_ARCHITECTURE    "i386"
 END
 

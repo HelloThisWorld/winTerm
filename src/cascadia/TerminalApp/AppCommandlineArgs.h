@@ -52,7 +52,11 @@ public:
 private:
     static const std::wregex _commandDelimiterRegex;
 
+#if defined(WT_BRANDING_WINTERM)
+    CLI::App _app{ "winterm - winTerm" };
+#else
     CLI::App _app{ "wt - the Windows Terminal" };
+#endif
 
     // This is a helper struct to encapsulate all the options for a subcommand
     // that produces a NewTerminalArgs.

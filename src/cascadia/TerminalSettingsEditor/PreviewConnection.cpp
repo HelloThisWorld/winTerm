@@ -14,12 +14,20 @@ static constexpr std::wstring_view PromptTextPowerline{ L"\x1b[49;34m\xe0b6\x1b[
 static constexpr std::wstring_view PreviewText{
     L"\x001b"
     L"c" // Hard Reset (RIS); on separate lines to avoid becoming 0x01BC
+#if defined(WT_BRANDING_WINTERM)
+    L"winTerm\r\n"
+#else
     L"Windows Terminal\r\n"
+#endif
     L"{0}\x1b[93m" L"git\x1b[m diff \x1b[90m-w\x1b[m\r\n"
     L"\x1b[1m" L"diff --git a/win b/win\x1b[m\r\n"
     L"\x1b[36m@@ -1 +1 @@\x1b[m\r\n"
     L"\x1b[31m-    Windows Console\x1b[m\r\n"
+#if defined(WT_BRANDING_WINTERM)
+    L"\x1b[32m+    winTerm!\x1b[m\r\n"
+#else
     L"\x1b[32m+    Windows Terminal!\x1b[m\r\n"
+#endif
     L"{0}\x1b[93mWrite-Host \x1b[36m\"\xd83c\xdf2f!\"\x1b[1D\x1b[m"
 };
 // clang-format on

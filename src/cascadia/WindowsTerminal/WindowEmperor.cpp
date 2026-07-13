@@ -315,8 +315,10 @@ AppHost* WindowEmperor::_mostRecentWindow() const noexcept
 void WindowEmperor::HandleCommandlineArgs(int nCmdShow)
 {
     std::wstring windowClassName;
-    windowClassName.reserve(64); // "Windows Terminal Preview Admin 0123456789012345 0123456789012345"
-#if defined(WT_BRANDING_RELEASE)
+    windowClassName.reserve(64); // Application branding, elevation state, and optional path hashes.
+#if defined(WT_BRANDING_WINTERM)
+    windowClassName.append(L"winTerm");
+#elif defined(WT_BRANDING_RELEASE)
     windowClassName.append(L"Windows Terminal");
 #elif defined(WT_BRANDING_PREVIEW)
     windowClassName.append(L"Windows Terminal Preview");
@@ -820,7 +822,11 @@ void WindowEmperor::_createMessageWindow(const wchar_t* className)
     WINRT_VERIFY(CreateWindowExW(
         /* dwExStyle    */ 0,
         /* lpClassName  */ className,
+#if defined(WT_BRANDING_WINTERM)
+        /* lpWindowName */ L"winTerm",
+#else
         /* lpWindowName */ L"Windows Terminal",
+#endif
         /* dwStyle      */ 0,
         /* X            */ 0,
         /* Y            */ 0,
@@ -841,7 +847,11 @@ void WindowEmperor::_createMessageWindow(const wchar_t* className)
 
     // AppName happens to be in the ContextMenu's Resources, see GH#12264
     const ScopedResourceLoader loader{ L"TerminalApp/ContextMenu" };
+#if defined(WT_BRANDING_WINTERM)
+    const auto appNameLoc = loader.GetLocalizedString(L"AppNameWinTerm");
+#else
     const auto appNameLoc = loader.GetLocalizedString(L"AppName");
+#endif
     StringCchCopy(_notificationIcon.szTip, ARRAYSIZE(_notificationIcon.szTip), appNameLoc.c_str());
 }
 

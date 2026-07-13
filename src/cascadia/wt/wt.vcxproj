@@ -11,6 +11,9 @@
   </PropertyGroup>
 
   <Import Project="..\..\..\common.openconsole.props" Condition="'$(OpenConsoleDir)'==''" />
+  <PropertyGroup Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+    <VersionInfoFileDescription>winTerm Launcher</VersionInfoFileDescription>
+  </PropertyGroup>
   <Import Project="$(OpenConsoleDir)src\common.build.pre.props" />
   <Import Project="$(OpenConsoleDir)src\common.nugetversions.props" />
 

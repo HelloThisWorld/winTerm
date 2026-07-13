@@ -2846,7 +2846,11 @@ namespace winrt::TerminalApp::implementation
                 return tab.Title();
             }
         }
+#if defined(WT_BRANDING_WINTERM)
+        return { L"winTerm" };
+#else
         return { L"Terminal" };
+#endif
     }
 
     // Method Description:

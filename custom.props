@@ -6,9 +6,11 @@
     <XesBaseYearForStoreVersion>2026</XesBaseYearForStoreVersion>
     <VersionMajor>1</VersionMajor>
     <VersionMinor>25</VersionMinor>
-    <VersionInfoProductName>Windows Terminal</VersionInfoProductName>
+    <VersionInfoProductName Condition="'$(WindowsTerminalBranding)'=='WinTerm'">winTerm</VersionInfoProductName>
+    <VersionInfoProductName Condition="'$(VersionInfoProductName)'==''">Windows Terminal</VersionInfoProductName>
     <VersionInfoCulture>1033</VersionInfoCulture>
     <!-- The default has a spacing problem -->
-    <VersionInfoCopyRight>\xa9 Microsoft Corporation. All rights reserved.</VersionInfoCopyRight>
+    <VersionInfoCopyRight Condition="'$(WindowsTerminalBranding)'=='WinTerm'">Copyright (c) winTerm contributors. Portions copyright Microsoft Corporation.</VersionInfoCopyRight>
+    <VersionInfoCopyRight Condition="'$(VersionInfoCopyRight)'==''">\xa9 Microsoft Corporation. All rights reserved.</VersionInfoCopyRight>
   </PropertyGroup>
 </Project>

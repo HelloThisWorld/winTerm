@@ -1050,6 +1050,9 @@ void CascadiaSettings::UpdateColorSchemeReferences(const winrt::hstring& oldName
 
 winrt::hstring CascadiaSettings::ApplicationDisplayName()
 {
+#if defined(WT_BRANDING_WINTERM)
+    return L"winTerm";
+#else
     try
     {
         const auto package{ winrt::Windows::ApplicationModel::Package::Current() };
@@ -1058,6 +1061,7 @@ winrt::hstring CascadiaSettings::ApplicationDisplayName()
     CATCH_LOG();
 
     return IsPortableMode() ? RS_(L"ApplicationDisplayNamePortable") : RS_(L"ApplicationDisplayNameUnpackaged");
+#endif
 }
 
 winrt::hstring CascadiaSettings::ApplicationVersion()

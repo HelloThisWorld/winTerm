@@ -25,6 +25,9 @@
   </PropertyGroup>
 
   <Import Project="..\..\..\common.openconsole.props" Condition="'$(OpenConsoleDir)'==''" />
+  <PropertyGroup Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+    <VersionInfoFileDescription>winTerm Terminal Host</VersionInfoFileDescription>
+  </PropertyGroup>
   <Import Project="$(OpenConsoleDir)src\common.nugetversions.props" />
   <Import Project="$(OpenConsoleDir)src\cppwinrt.build.pre.props" />
 
