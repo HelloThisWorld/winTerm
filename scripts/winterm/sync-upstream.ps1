@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $gitSafeRepositoryRoot = $repositoryRoot.Replace('\', '/')
+$repositoryExcludeFile = "$gitSafeRepositoryRoot/.git/info/exclude"
 
 function Invoke-Git
 {
@@ -26,7 +27,7 @@ function Invoke-Git
         [string[]]$Arguments
     )
 
-    $output = @(& git -c "safe.directory=$gitSafeRepositoryRoot" -C $repositoryRoot @Arguments 2>&1)
+    $output = @(& git -c "safe.directory=$gitSafeRepositoryRoot" -c "core.excludesFile=$repositoryExcludeFile" -C $repositoryRoot @Arguments 2>&1)
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0)
     {
@@ -91,7 +92,7 @@ try
         }
 
         $null = Invoke-Git -Arguments @('check-ref-format', '--branch', $BranchName)
-        & git -c "safe.directory=$gitSafeRepositoryRoot" -C $repositoryRoot show-ref --verify --quiet "refs/heads/$BranchName"
+        & git -c "safe.directory=$gitSafeRepositoryRoot" -c "core.excludesFile=$repositoryExcludeFile" -C $repositoryRoot show-ref --verify --quiet "refs/heads/$BranchName"
         if ($LASTEXITCODE -eq 0)
         {
             throw "Local branch '$BranchName' already exists. Choose another name."
