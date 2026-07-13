@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) winTerm contributors. Licensed under the MIT license. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">winTerm placeholder icon</title>
+  <desc id="description">A dark rounded square with an amber rail and a cyan and white terminal prompt glyph.</desc>
+  <rect x="16" y="16" width="480" height="480" rx="104" fill="#0B1020" stroke="#23314D" stroke-width="16" />
+  <rect x="72" y="128" width="20" height="256" rx="10" fill="#F59E0B" />
+  <path d="M140 168 L240 256 L140 344" fill="none" stroke="#5EEAD4" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M278 344 H398" fill="none" stroke="#F8FAFC" stroke-width="32" stroke-linecap="round" />
+</svg>

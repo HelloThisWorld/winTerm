@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) winTerm contributors. Licensed under the MIT license. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <WindowsTerminalBranding Condition="'$(WindowsTerminalBranding)'==''">WinTerm</WindowsTerminalBranding>
+    <VersionInfoProductName Condition="'$(WindowsTerminalBranding)'=='WinTerm'">winTerm</VersionInfoProductName>
+    <VersionInfoCopyRight Condition="'$(WindowsTerminalBranding)'=='WinTerm'">Copyright (c) winTerm contributors. Portions copyright Microsoft Corporation.</VersionInfoCopyRight>
+  </PropertyGroup>
+</Project>

@@ -10,4 +10,7 @@
     <OpenConsoleDir>$(MSBuildThisFileDirectory)</OpenConsoleDir>
   </PropertyGroup>
 
+  <Import Project="$(MSBuildThisFileDirectory)src\winterm\Branding\winTerm.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)src\winterm\Branding\winTerm.props')" />
+
 </Project>

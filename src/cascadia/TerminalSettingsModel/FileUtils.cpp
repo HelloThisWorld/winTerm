@@ -8,7 +8,11 @@
 #include <shlobj.h>
 #include <WtExeUtils.h>
 
+#if defined(WT_BRANDING_WINTERM)
+static constexpr std::wstring_view UnpackagedSettingsFolderName{ L"winTerm\\" };
+#else
 static constexpr std::wstring_view UnpackagedSettingsFolderName{ L"Microsoft\\Windows Terminal\\" };
+#endif
 static constexpr std::wstring_view ReleaseSettingsFolder{ L"Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\" };
 static constexpr std::wstring_view PortableModeMarkerFile{ L".portable" };
 static constexpr std::wstring_view PortableModeSettingsFolder{ L"settings" };
@@ -63,6 +67,10 @@ namespace winrt::Microsoft::Terminal::Settings::Model
     // to the path of the stable release settings
     std::filesystem::path GetReleaseSettingsPath()
     {
+#if defined(WT_BRANDING_WINTERM)
+        // winTerm must never migrate from or read Microsoft Terminal package-local state.
+        return GetBaseSettingsPath();
+#else
         static std::filesystem::path baseSettingsPath = []() {
             wil::unique_cotaskmem_string localAppDataFolder;
             // We're using KF_FLAG_NO_PACKAGE_REDIRECTION to ensure that we always get the
@@ -83,5 +91,6 @@ namespace winrt::Microsoft::Terminal::Settings::Model
             return parentDirectoryForSettingsFile;
         }();
         return baseSettingsPath;
+#endif
     }
 }
