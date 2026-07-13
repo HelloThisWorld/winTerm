@@ -1,0 +1,54 @@
+name: winTerm full Windows build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: x64 ${{ matrix.configuration }} build and relevant tests
+    runs-on: [self-hosted, windows, x64, winterm-build]
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Run static and smoke validation
+        shell: pwsh
+        run: .\scripts\winterm\test.ps1 -Suite Smoke -Configuration ${{ matrix.configuration }} -Platform x64
+
+      - name: Build x64
+        shell: pwsh
+        run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64
+
+      - name: Run relevant upstream tests
+        shell: pwsh
+        run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration ${{ matrix.configuration }} -Platform x64
+
+  package:
+    name: x64 Release MSIX
+    needs: build-and-test
+    runs-on: [self-hosted, windows, x64, winterm-build]
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Build and verify unsigned development package
+        shell: pwsh
+        run: .\scripts\winterm\package.ps1 -Platform x64
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: winTerm-x64-Release-unsigned
+          path: src/cascadia/CascadiaPackage/AppPackages/**/*.msix
+          if-no-files-found: error

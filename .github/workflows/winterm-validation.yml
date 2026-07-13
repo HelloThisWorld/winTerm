@@ -1,0 +1,23 @@
+name: winTerm validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Static and smoke validation
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Verify winTerm identity, scripts, assets, and profile foundations
+        shell: powershell
+        run: .\scripts\winterm\test.ps1 -Suite Smoke

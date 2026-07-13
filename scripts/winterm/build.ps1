@@ -76,6 +76,7 @@ try
     if ($GeneratePackage)
     {
         $msbuildArguments += '/p:GenerateAppxPackageOnBuild=true'
+        $msbuildArguments += '/p:AppxPackageSigningEnabled=false'
     }
 
     Write-Host "Building winTerm ($Configuration, $Platform)..."
