@@ -44,16 +44,26 @@ function Test-PowerShellModule
         Set-WinTermCompatibilityMode -Mode Safe | Out-Null
         New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
 
-        touch (Join-Path $temporaryDirectory 'created.txt')
         $createdFile = Join-Path $temporaryDirectory 'created.txt'
-        Assert-Condition -Condition (Test-Path -LiteralPath $createdFile -PathType Leaf) -Message 'touch did not create a file.'
+        $touchCommand = Get-Command -Name touch -ErrorAction Stop
+        if ($touchCommand.ModuleName -eq 'winTerm.Shell')
+        {
+            touch $createdFile
+            Assert-Condition -Condition (Test-Path -LiteralPath $createdFile -PathType Leaf) -Message 'touch did not create a file.'
 
-        Set-Content -LiteralPath $createdFile -Value 'preserved'
-        touch $createdFile
-        Assert-Condition -Condition ((Get-Content -LiteralPath $createdFile -Raw).Trim() -eq 'preserved') -Message 'touch truncated an existing file.'
+            Set-Content -LiteralPath $createdFile -Value 'preserved'
+            touch $createdFile
+            Assert-Condition -Condition ((Get-Content -LiteralPath $createdFile -Raw).Trim() -eq 'preserved') -Message 'touch truncated an existing file.'
+        }
+        else
+        {
+            Write-Host "SKIP: touch resolves to the existing $($touchCommand.CommandType) command."
+        }
 
         $listing = @(ll $temporaryDirectory)
         Assert-Condition -Condition ($listing.Count -gt 0) -Message 'll did not list the requested directory.'
+        $llCommand = Get-Command -Name ll -ErrorAction Stop
+        Assert-Condition -Condition ($llCommand.ModuleName -eq 'winTerm.Shell') -Message 'll was not provided by winTerm Shell.'
 
         $whichCommand = Get-Command -Name which -ErrorAction Stop
         $found = @(which powershell)
@@ -72,13 +82,13 @@ function Test-PowerShellModule
         $disabled = $false
         try
         {
-            touch (Join-Path $temporaryDirectory 'disabled.txt') -ErrorAction Stop
+            ll $temporaryDirectory -ErrorAction Stop
         }
         catch
         {
             $disabled = $true
         }
-        Assert-Condition -Condition $disabled -Message 'Compatibility mode Off did not disable touch.'
+        Assert-Condition -Condition $disabled -Message 'Compatibility mode Off did not disable ll.'
 
         Set-WinTermCompatibilityMode -Mode Safe | Out-Null
         $diagnostics = Get-WinTermShellDiagnostics
