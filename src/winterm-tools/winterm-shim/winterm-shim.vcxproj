@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{3C5DE684-ADFD-4630-BA91-67A1A3B6AF7A}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>wintermshim</RootNamespace>
+    <ProjectName>winterm-shim</ProjectName>
+    <TargetName>winterm-shim</TargetName>
+    <ConfigurationType>Application</ConfigurationType>
+    <VersionInfoFileDescription>winTerm Shell Integration Helper</VersionInfoFileDescription>
+  </PropertyGroup>
+
+  <Import Project="..\..\..\common.openconsole.props" Condition="'$(OpenConsoleDir)'==''" />
+  <Import Project="$(OpenConsoleDir)src\common.build.pre.props" />
+  <Import Project="$(OpenConsoleDir)src\common.nugetversions.props" />
+
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>onecore.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <Import Project="$(OpenConsoleDir)src\common.build.post.props" />
+  <Import Project="$(OpenConsoleDir)src\common.nugetversions.targets" />
+</Project>
