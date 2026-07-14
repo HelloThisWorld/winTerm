@@ -243,6 +243,11 @@ try
         [void]$lines.Add('```')
         [void]$lines.Add('')
     }
+
+    if ($lines.Count -gt 0 -and $lines[$lines.Count - 1].Length -eq 0)
+    {
+        $lines.RemoveAt($lines.Count - 1)
+    }
     $expected = ([string]::Join("`n", $lines) + "`n")
 
     if ($Check)
