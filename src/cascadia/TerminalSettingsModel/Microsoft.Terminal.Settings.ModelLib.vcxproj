@@ -210,6 +210,60 @@
     <ClCompile Include="TestHooks.cpp" />
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
+  <!-- ================= winTerm Appearance Headers ============== -->
+  <ItemGroup>
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeDescriptor.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeLoader.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeMigration.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemePreviewService.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeRegistry.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeSerializer.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeValidator.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\AppleTerminalImporter.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\ITermColorsImporter.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\PlistParser.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\ThemeImporter.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\ThemeImportUtils.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\WindowsTerminalSchemeImporter.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Importers\WinTermThemeImporter.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\FontDescriptor.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\FontDiscovery.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\FontFallbackResolver.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\FontFeatureSettings.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\FontRegistry.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\GlyphCoverageAnalyzer.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Fonts\PrivateFontCollection.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Licensing\AssetLicenseRegistry.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Licensing\AssetManifestValidator.h" />
+    <ClInclude Include="..\..\winterm\Appearance\Licensing\ThirdPartyNoticeGenerator.h" />
+  </ItemGroup>
+  <!-- ================= winTerm Appearance Sources ============== -->
+  <ItemGroup>
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeDescriptor.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeLoader.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeMigration.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemePreviewService.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeRegistry.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeSerializer.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeValidator.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\AppleTerminalImporter.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\ITermColorsImporter.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\PlistParser.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\ThemeImporter.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\ThemeImportUtils.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\WindowsTerminalSchemeImporter.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Importers\WinTermThemeImporter.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\FontDescriptor.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\FontDiscovery.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\FontFallbackResolver.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\FontFeatureSettings.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\FontRegistry.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\GlyphCoverageAnalyzer.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Fonts\PrivateFontCollection.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Licensing\AssetLicenseRegistry.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Licensing\AssetManifestValidator.cpp" />
+    <ClCompile Include="..\..\winterm\Appearance\Licensing\ThirdPartyNoticeGenerator.cpp" />
+  </ItemGroup>
   <!-- ========================= idl Files ======================== -->
   <ItemGroup>
     <Midl Include="ActionArgs.idl" />
