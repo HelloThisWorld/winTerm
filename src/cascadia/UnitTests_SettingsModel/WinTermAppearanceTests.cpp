@@ -258,7 +258,7 @@ namespace SettingsModelUnitTests
             "The selected file contains mismatched XML tags.");
 
         VerifyRuntimeError(
-            [] { PlistParser::Parse(R"xml(<!DOCTYPE plist [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><plist><dict><key>x</key><string>&xxe;</string></dict></plist>)xml"); },
+            [] { PlistParser::Parse(R"xml(<!DOCTYPE plist [<!ENTITY xxe SYSTEM "external.txt">]><plist><dict><key>x</key><string>&xxe;</string></dict></plist>)xml"); },
             "XML document type definitions and entities are not supported.");
 
         const std::string oversize(MaximumThemeFileSize + 1, 'x');

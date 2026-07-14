@@ -53,7 +53,7 @@ Resolution order in the source implementation is:
 
 `ThemePreviewService` owns the temporary value and clears it on cancel or destruction. `Commit` returns the selected descriptor, but persistence and the Settings UI are separate responsibilities and are not currently runtime-validated.
 
-`ThemeMigration` maps a legacy Windows Terminal scheme name to a registered theme ID when a supplied mapping exists. Otherwise it returns the safe fallback and an English migration result. It does not yet constitute an end-to-end settings schema migration.
+`ThemeMigration` maps a legacy Windows Terminal scheme name to a registered theme ID when a supplied mapping exists. Otherwise, it returns the safe fallback and an English migration result. It does not yet constitute an end-to-end settings schema migration.
 
 ## Importer architecture
 

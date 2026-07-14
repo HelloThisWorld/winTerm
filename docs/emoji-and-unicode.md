@@ -4,7 +4,7 @@
 
 winTerm v0.2 reuses the Microsoft Terminal text buffer, Unicode width engine, shaping, cell model, and DirectWrite renderer. The appearance layer does not replace them. This reduces fork risk, but reuse alone is not a rendering pass.
 
-The intended emoji path is system fallback to Segoe UI Emoji and DirectWrite color-glyph drawing. COLR/CPAL, bitmap color glyphs, SVG color glyphs, `sbix`, skin tones, variation selectors, ZWJ sequences, and flags are platform- and font-dependent. Their actual behavior has not been tested in a built winTerm binary.
+The intended emoji path falls back to Segoe UI Emoji and DirectWrite color-glyph drawing. COLR/CPAL, bitmap color glyphs, SVG color glyphs, `sbix`, skin tones, variation selectors, ZWJ sequences, and flags are platform- and font-dependent. Their actual behavior has not been tested in a built winTerm binary.
 
 Emoji must never be converted into permanent bitmap assets by the theme or font layer.
 
