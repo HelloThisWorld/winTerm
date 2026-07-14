@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "dracula.official",
+  "name": "Dracula",
+  "displayName": "Dracula",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "dracula/windows-terminal",
+    "author": "Matt Joiner",
+    "homepage": "https://github.com/dracula/windows-terminal",
+    "license": "MIT",
+    "revision": "06f63714a0477a7b5c12cf0aa94ecf92d78f32ca",
+    "sourceFile": "dracula.json"
+  },
+  "terminal": {
+    "foreground": "#F8F8F2",
+    "background": "#282A36",
+    "cursorColor": "#F8F8F2",
+    "cursorTextColor": "#282A36",
+    "selectionBackground": "#44475A",
+    "selectionForeground": "#F8F8F2",
+    "ansi": [
+      "#21222C",
+      "#FF5555",
+      "#50FA7B",
+      "#F1FA8C",
+      "#BD93F9",
+      "#FF79C6",
+      "#8BE9FD",
+      "#F8F8F2"
+    ],
+    "bright": [
+      "#6272A4",
+      "#FF6E6E",
+      "#69FF94",
+      "#FFFFA5",
+      "#D6ACFF",
+      "#FF92DF",
+      "#A4FFFF",
+      "#FFFFFF"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#21222C",
+    "inactiveTabBackground": "#282A36",
+    "paneBorderColor": "#44475A"
+  }
+}

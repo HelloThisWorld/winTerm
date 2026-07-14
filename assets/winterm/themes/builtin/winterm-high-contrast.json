@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "winterm.high-contrast",
+  "name": "winTerm High Contrast",
+  "displayName": "winTerm High Contrast",
+  "variant": "highContrast",
+  "source": {
+    "type": "builtin",
+    "project": "winTerm",
+    "author": "winTerm contributors",
+    "homepage": null,
+    "license": "MIT",
+    "revision": "0.2.0-dev",
+    "sourceFile": "assets/winterm/themes/builtin/winterm-high-contrast.json"
+  },
+  "terminal": {
+    "foreground": "#FFFFFF",
+    "background": "#000000",
+    "cursorColor": "#FFD800",
+    "cursorTextColor": "#000000",
+    "selectionBackground": "#005FCC",
+    "selectionForeground": "#FFFFFF",
+    "ansi": [
+      "#202020",
+      "#FF4B55",
+      "#3EE65A",
+      "#FFE14A",
+      "#5BA8FF",
+      "#FF66E3",
+      "#50E8E8",
+      "#F2F2F2"
+    ],
+    "bright": [
+      "#808080",
+      "#FF7A82",
+      "#70FF86",
+      "#FFF075",
+      "#8CC4FF",
+      "#FF99EC",
+      "#86FFFF",
+      "#FFFFFF"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#000000",
+    "inactiveTabBackground": "#151515",
+    "paneBorderColor": "#FFFFFF"
+  }
+}

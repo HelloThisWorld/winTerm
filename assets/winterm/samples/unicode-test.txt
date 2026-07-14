@@ -1,0 +1,31 @@
+winTerm Unicode rendering fixture
+
+Box drawing:
+┌────────────┬────────────┐
+│ winTerm    │ Appearance │
+├────────────┼────────────┤
+│ ANSI       │ Unicode    │
+└────────────┴────────────┘
+
+Block elements: ░▒▓█ ▏▎▍▌▋▊▉
+Braille: ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏
+Arrows: ← ↑ → ↓ ↔ ↕ ⇒ ⇐
+Mathematics: ≤ ≥ ≠ ± × ÷ ∑ √ ∞
+Geometric symbols: ■ □ ◆ ◇ ● ○ ▲ △
+Powerline:    
+Nerd Font probes:    
+
+Latin: winTerm 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz
+Cyrillic: Привет, мир
+Hebrew: שלום עולם
+Arabic: مرحبا بالعالم
+Chinese: 中文測試
+Japanese: 日本語テスト
+Korean: 한국어 테스트
+
+Emoji:
+😀 🚀 🔥 ✨ ❤️ 👍🏽
+👨‍👩‍👧‍👦 👩‍💻 🏳️‍🌈 🇸🇬 1️⃣ ☕ ⚙️
+Mixed: 中文😀English 日本語🚀한국어
+
+Copy the lines above and verify that the original Unicode code points and sequences are preserved.

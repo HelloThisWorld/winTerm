@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "rose-pine.moon",
+  "name": "Rosé Pine Moon",
+  "displayName": "Rosé Pine Moon",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "rose-pine/windows-terminal",
+    "author": "Rosé Pine",
+    "homepage": "https://github.com/rose-pine/windows-terminal",
+    "license": "MIT",
+    "revision": "89e1a277e4ac10e06f33b13cddabde3c42d8d411",
+    "sourceFile": "rose-pine-moon.scheme.json"
+  },
+  "terminal": {
+    "foreground": "#E0DEF4",
+    "background": "#232136",
+    "cursorColor": "#6E6A86",
+    "cursorTextColor": "#232136",
+    "selectionBackground": "#44415A",
+    "selectionForeground": "#E0DEF4",
+    "ansi": [
+      "#393552",
+      "#EB6F92",
+      "#3E8FB0",
+      "#F6C177",
+      "#9CCFD8",
+      "#C4A7E7",
+      "#EA9A97",
+      "#E0DEF4"
+    ],
+    "bright": [
+      "#908CAA",
+      "#EB6F92",
+      "#3E8FB0",
+      "#F6C177",
+      "#9CCFD8",
+      "#C4A7E7",
+      "#EA9A97",
+      "#E0DEF4"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#393552",
+    "inactiveTabBackground": "#2A273F",
+    "paneBorderColor": "#44415A"
+  }
+}

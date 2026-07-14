@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "winterm.midnight",
+  "name": "winTerm Midnight",
+  "displayName": "winTerm Midnight",
+  "variant": "dark",
+  "source": {
+    "type": "builtin",
+    "project": "winTerm",
+    "author": "winTerm contributors",
+    "homepage": null,
+    "license": "MIT",
+    "revision": "0.2.0-dev",
+    "sourceFile": "assets/winterm/themes/builtin/winterm-midnight.json"
+  },
+  "terminal": {
+    "foreground": "#D6DCE6",
+    "background": "#11151B",
+    "cursorColor": "#F4F7FB",
+    "cursorTextColor": "#11151B",
+    "selectionBackground": "#33445F",
+    "selectionForeground": "#F8FAFD",
+    "ansi": [
+      "#1B222C",
+      "#D96872",
+      "#7DBA83",
+      "#D6AA62",
+      "#6A9DD4",
+      "#AC82C8",
+      "#5FB6B7",
+      "#C3CBD7"
+    ],
+    "bright": [
+      "#657083",
+      "#F07B84",
+      "#91CF97",
+      "#EBC178",
+      "#82B5ED",
+      "#C199DE",
+      "#76CECF",
+      "#F4F7FB"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#0B0E13",
+    "inactiveTabBackground": "#171C24",
+    "paneBorderColor": "#2C3542"
+  }
+}

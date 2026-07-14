@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "solarized.dark",
+  "name": "Solarized Dark",
+  "displayName": "Solarized Dark",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "altercation/solarized",
+    "author": "Ethan Schoonover",
+    "homepage": "https://github.com/altercation/solarized",
+    "license": "MIT",
+    "revision": "62f656a02f93c5190a8753159e34b385588d5ff3",
+    "sourceFile": "iterm2-colors-solarized/Solarized Dark.itermcolors"
+  },
+  "terminal": {
+    "foreground": "#839496",
+    "background": "#002B36",
+    "cursorColor": "#839496",
+    "cursorTextColor": "#073642",
+    "selectionBackground": "#073642",
+    "selectionForeground": "#93A1A1",
+    "ansi": [
+      "#073642",
+      "#DC322F",
+      "#859900",
+      "#B58900",
+      "#268BD2",
+      "#D33682",
+      "#2AA198",
+      "#EEE8D5"
+    ],
+    "bright": [
+      "#002B36",
+      "#CB4B16",
+      "#586E75",
+      "#657B83",
+      "#839496",
+      "#6C71C4",
+      "#93A1A1",
+      "#FDF6E3"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#073642",
+    "inactiveTabBackground": "#002B36",
+    "paneBorderColor": "#586E75"
+  }
+}
