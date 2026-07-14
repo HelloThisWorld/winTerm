@@ -55,8 +55,18 @@ function Test-PowerShellModule
         $listing = @(ll $temporaryDirectory)
         Assert-Condition -Condition ($listing.Count -gt 0) -Message 'll did not list the requested directory.'
 
-        $found = which powershell
-        Assert-Condition -Condition ($found.Name -eq 'powershell') -Message 'which did not find powershell.'
+        $whichCommand = Get-Command -Name which -ErrorAction Stop
+        $found = @(which powershell)
+        Assert-Condition -Condition ($found.Count -gt 0) -Message 'which did not find powershell.'
+        if ($whichCommand.ModuleName -eq 'winTerm.Shell')
+        {
+            Assert-Condition -Condition ($found[0].Name -eq 'powershell') -Message 'winTerm which did not return the requested command.'
+        }
+        else
+        {
+            $nativeOutput = ($found | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
+            Assert-Condition -Condition ($nativeOutput -match '(?i)powershell') -Message 'The native which command did not report powershell.'
+        }
 
         Set-WinTermCompatibilityMode -Mode Off | Out-Null
         $disabled = $false
