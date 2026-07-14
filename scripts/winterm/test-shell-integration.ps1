@@ -152,7 +152,17 @@ function Test-CmdInitialization
         $output = & cmd.exe /d /c ('call "{0}" & doskey /macros' -f $doskeyScript)
         $outputText = $output -join [Environment]::NewLine
         Assert-Condition -Condition ($outputText -match 'll=dir /a \$\*') -Message 'CMD initialization did not register ll.'
-        Assert-Condition -Condition ($outputText -match 'touch="C:\\Program Files\\winTerm\\ShellAssets\\winterm-shim.exe" touch \$\*') -Message 'CMD touch did not preserve a quoted helper path.'
+
+        & cmd.exe /d /c 'where touch.exe >nul 2>nul'
+        $nativeTouchExitCode = $LASTEXITCODE
+        if ($nativeTouchExitCode -eq 0)
+        {
+            Assert-Condition -Condition ($outputText -notmatch '(?m)^touch=') -Message 'CMD initialization overrode a native touch executable.'
+        }
+        else
+        {
+            Assert-Condition -Condition ($outputText -match 'touch="C:\\Program Files\\winTerm\\ShellAssets\\winterm-shim.exe" touch \$\*') -Message 'CMD touch did not preserve a quoted helper path.'
+        }
 
         & cmd.exe /d /c ('call "{0}" & if not defined WINTERM_CMD_INITIALIZED exit 1 & if not defined WINTERM_INTEGRATION_VERSION exit 1' -f $InitScript)
         Assert-Condition -Condition ($LASTEXITCODE -eq 0) -Message 'CMD initialization did not set its process-local markers.'
