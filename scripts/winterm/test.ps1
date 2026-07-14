@@ -81,11 +81,24 @@ function Test-ProfileFoundations
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$originalLocation = Get-Location
 
 try
 {
     Write-Host "Running winTerm $Suite tests ($Configuration, $Platform)..."
     Test-PowerShellSyntax -Directory $PSScriptRoot
+
+    & (Join-Path $PSScriptRoot 'validate-assets.ps1')
+    if (-not $?)
+    {
+        throw 'Appearance asset validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'generate-third-party-notices.ps1') -Check
+    if (-not $?)
+    {
+        throw 'Third-party notice validation failed.'
+    }
 
     & (Join-Path $PSScriptRoot 'verify-branding.ps1')
     if (-not $?)
@@ -109,7 +122,7 @@ try
 
     if ($Build)
     {
-        & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration -Platform $Platform
+        & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration -Platform $Platform -IncludeTests
         if (-not $?)
         {
             throw 'Build failed.'
@@ -122,6 +135,20 @@ try
         throw "Compiled test output '$binaryDirectory' was not found. Run build.ps1 first or pass -Build."
     }
 
+    $expectedTestBinaries = @(
+        'UnitTests_SettingsModel\SettingsModel.Unit.Tests.dll',
+        'UnitTests_TerminalApp\Terminal.App.Unit.Tests.dll',
+        'UnitTests_Control\Control.Unit.Tests.dll'
+    )
+    foreach ($relativeBinary in $expectedTestBinaries)
+    {
+        $testBinary = Join-Path $binaryDirectory $relativeBinary
+        if (-not (Test-Path -LiteralPath $testBinary -PathType Leaf))
+        {
+            throw "Compiled test binary '$testBinary' was not found. Build the solution with -IncludeTests."
+        }
+    }
+
     Set-Location $repositoryRoot
     Import-Module (Join-Path $repositoryRoot 'tools\OpenConsole.psm1') -Force
     Set-MsBuildDevEnvironment
@@ -132,10 +159,6 @@ try
         {
             Write-Host "Running upstream test group: $testName"
             Invoke-OpenConsoleTests -Test $testName -Platform $Platform -Configuration $Configuration
-            if (-not $?)
-            {
-                throw "Upstream test group '$testName' failed."
-            }
         }
     }
     else
@@ -153,4 +176,8 @@ catch
 {
     Write-Error "winTerm tests failed: $($_.Exception.Message)"
     exit 1
+}
+finally
+{
+    Set-Location $originalLocation
 }

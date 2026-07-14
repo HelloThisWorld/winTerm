@@ -18,6 +18,14 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Verify winTerm identity, scripts, assets, and profile foundations
+      - name: Validate appearance assets and licenses
+        shell: powershell
+        run: .\scripts\winterm\validate-assets.ps1
+
+      - name: Verify generated third-party notices
+        shell: powershell
+        run: .\scripts\winterm\generate-third-party-notices.ps1 -Check
+
+      - name: Verify winTerm identity, scripts, and profile foundations
         shell: powershell
         run: .\scripts\winterm\test.ps1 -Suite Smoke

@@ -12,7 +12,10 @@ param(
     [string]$Platform = 'x64',
 
     [Parameter()]
-    [switch]$GeneratePackage
+    [switch]$GeneratePackage,
+
+    [Parameter()]
+    [switch]$IncludeTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -69,9 +72,13 @@ try
         '/p:WindowsTerminalBranding=WinTerm',
         '/p:AppxSymbolPackageEnabled=false',
         '/p:AppxBundle=Never',
-        '/m',
-        '/t:Terminal\CascadiaPackage'
+        '/m'
     )
+
+    if (-not $IncludeTests)
+    {
+        $msbuildArguments += '/t:Terminal\CascadiaPackage'
+    }
 
     if ($GeneratePackage)
     {
@@ -79,7 +86,8 @@ try
         $msbuildArguments += '/p:AppxPackageSigningEnabled=false'
     }
 
-    Write-Host "Building winTerm ($Configuration, $Platform)..."
+    $scope = if ($IncludeTests) { 'solution and tests' } else { 'package dependency graph' }
+    Write-Host "Building winTerm $scope ($Configuration, $Platform)..."
     Invoke-OpenConsoleBuild @msbuildArguments
     if ($LASTEXITCODE -ne 0)
     {

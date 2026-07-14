@@ -41,6 +41,88 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' must claim winterm.exe and must not claim wt.exe."
     }
+    if ($identity.Version -ne '0.2.0.0')
+    {
+        throw "Package '$Path' must use the winTerm v0.2 package version."
+    }
+}
+
+function Assert-AppearancePayload
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$RepositoryRoot
+    )
+
+    $appearanceRoot = Join-Path $Path 'AppearanceAssets'
+    $themeManifestPath = Join-Path $appearanceRoot 'themes\manifest.json'
+    $fontManifestPath = Join-Path $appearanceRoot 'fonts\manifest.json'
+    $licenseIndexPath = Join-Path $appearanceRoot 'licenses\open-source-licenses.html'
+    $noticesPath = Join-Path $Path 'THIRD_PARTY_NOTICES.md'
+    $inheritedNoticesPath = Join-Path $Path 'NOTICE.md'
+    $projectLicensePath = Join-Path $Path 'LICENSE'
+    foreach ($requiredPath in @($themeManifestPath, $fontManifestPath, $licenseIndexPath, $noticesPath, $inheritedNoticesPath, $projectLicensePath))
+    {
+        if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf))
+        {
+            throw "The package is missing required appearance payload '$requiredPath'."
+        }
+    }
+    foreach ($noticeName in @('LICENSE', 'NOTICE.md', 'THIRD_PARTY_NOTICES.md'))
+    {
+        $sourceNoticePath = Join-Path $RepositoryRoot $noticeName
+        $packagedNoticePath = Join-Path $Path $noticeName
+        $sourceHash = (Get-FileHash -LiteralPath $sourceNoticePath -Algorithm SHA256).Hash
+        $packagedHash = (Get-FileHash -LiteralPath $packagedNoticePath -Algorithm SHA256).Hash
+        if ($sourceHash -cne $packagedHash)
+        {
+            throw "The packaged notice '$noticeName' does not match the repository source."
+        }
+    }
+
+    $themeManifest = Get-Content -LiteralPath $themeManifestPath -Raw | ConvertFrom-Json
+    foreach ($theme in $themeManifest.themes)
+    {
+        $themePath = Join-Path (Split-Path $themeManifestPath) $theme.file
+        if (-not (Test-Path -LiteralPath $themePath -PathType Leaf))
+        {
+            throw "The package is missing theme '$($theme.id)'."
+        }
+        $themeHash = (Get-FileHash -LiteralPath $themePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($themeHash -ne $theme.sha256)
+        {
+            throw "The packaged theme '$($theme.id)' does not match its manifest SHA-256."
+        }
+
+        $licensePath = Join-Path (Split-Path $themeManifestPath) ([string]$theme.licenseFile).Replace('/', '\')
+        if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf))
+        {
+            throw "The package is missing the license for theme '$($theme.id)'."
+        }
+    }
+
+    $fontManifest = Get-Content -LiteralPath $fontManifestPath -Raw | ConvertFrom-Json
+    foreach ($font in $fontManifest.fonts)
+    {
+        $fontPath = Join-Path $Path ([string]$font.packageFile).Replace('/', '\')
+        $licensePath = Join-Path $Path ([string]$font.packageLicenseFile).Replace('/', '\')
+        if (-not (Test-Path -LiteralPath $fontPath -PathType Leaf))
+        {
+            throw "The package is missing bundled font '$($font.id)'."
+        }
+        $fontHash = (Get-FileHash -LiteralPath $fontPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($fontHash -ne $font.sha256)
+        {
+            throw "The packaged font '$($font.id)' does not match its manifest SHA-256."
+        }
+        if (-not (Test-Path -LiteralPath $licensePath -PathType Leaf))
+        {
+            throw "The package is missing the license for font '$($font.id)'."
+        }
+    }
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -91,6 +173,7 @@ try
     }
 
     Assert-WinTermManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml')
+    Assert-AppearancePayload -Path $temporaryDirectory -RepositoryRoot $repositoryRoot
 
     $signature = Get-AuthenticodeSignature -LiteralPath $artifact.FullName
     Write-Host "Package: $($artifact.FullName)"
