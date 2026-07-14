@@ -44,21 +44,71 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+
+        <ContentDialog x:Name="ImportThemeDialog"
+                       x:Uid="ColorScheme_ImportDialog"
+                       DefaultButton="Primary">
+            <StackPanel Spacing="8">
+                <TextBlock x:Name="ImportSummaryText"
+                           TextWrapping="WrapWholeWords" />
+                <ComboBox x:Name="ImportThemeChoice"
+                          x:Uid="ColorScheme_ImportThemeChoice"
+                          HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </ContentDialog>
+
+        <ContentDialog x:Name="ThemeFileErrorDialog"
+                       x:Uid="ColorScheme_ThemeFileErrorDialog"
+                       DefaultButton="Close">
+            <TextBlock x:Name="ThemeFileErrorText"
+                       TextWrapping="WrapWholeWords" />
+        </ContentDialog>
+
         <StackPanel Grid.Row="0"
                     Spacing="8">
             <TextBlock x:Uid="ColorSchemesDisclaimer"
                        Style="{StaticResource DisclaimerStyle}" />
-            <Button x:Name="AddNewButton"
-                    Margin="0"
-                    Click="AddNew_Click"
-                    Style="{StaticResource BrowseButtonStyle}">
-                <StackPanel Orientation="Horizontal">
-                    <FontIcon FontSize="{StaticResource StandardIconSize}"
-                              Glyph="&#xE710;" />
-                    <TextBlock x:Uid="ColorScheme_AddNewButton"
-                               Style="{StaticResource IconButtonTextBlockStyle}" />
-                </StackPanel>
-            </Button>
+            <StackPanel Orientation="Horizontal"
+                        Spacing="8">
+                <Button x:Name="AddNewButton"
+                        Margin="0"
+                        Click="AddNew_Click"
+                        Style="{StaticResource BrowseButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                  Glyph="&#xE710;" />
+                        <TextBlock x:Uid="ColorScheme_AddNewButton"
+                                   Style="{StaticResource IconButtonTextBlockStyle}" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ImportThemeButton"
+                        Margin="0"
+                        Click="Import_Click"
+                        Style="{StaticResource BrowseButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                  Glyph="&#xE8B5;" />
+                        <TextBlock x:Uid="ColorScheme_ImportButton"
+                                   Style="{StaticResource IconButtonTextBlockStyle}" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="ExportThemeButton"
+                        Margin="0"
+                        Click="Export_Click"
+                        IsEnabled="{x:Bind ViewModel.HasCurrentScheme, Mode=OneWay}"
+                        Style="{StaticResource BrowseButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <FontIcon FontSize="{StaticResource StandardIconSize}"
+                                  Glyph="&#xEDE1;" />
+                        <TextBlock x:Uid="ColorScheme_ExportButton"
+                                   Style="{StaticResource IconButtonTextBlockStyle}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <AutoSuggestBox x:Name="ThemeSearchBox"
+                            x:Uid="ColorScheme_SearchBox"
+                            QueryIcon="Find"
+                            TextChanged="SearchBox_TextChanged" />
         </StackPanel>
 
         <ListView x:Name="ColorSchemeListView"

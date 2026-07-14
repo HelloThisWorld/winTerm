@@ -9,6 +9,8 @@
 #include "ViewModelHelpers.h"
 #include "ColorSchemes.h"
 
+#include <json/json.h>
+
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
     struct ColorSchemesPageViewModel : ColorSchemesPageViewModelT<ColorSchemesPageViewModel>, ViewModelHelper<ColorSchemesPageViewModel>
@@ -22,6 +24,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         bool HasCurrentScheme() const noexcept;
 
         Editor::ColorSchemeViewModel RequestAddNew();
+        Editor::ColorSchemeViewModel RequestAddImported(const Json::Value& schemeJson);
+        Json::Value CurrentSchemeJson() const;
         bool RequestRenameCurrentScheme(winrt::hstring newName);
         void RequestDeleteCurrentScheme();
         void RequestEditSelectedScheme();
