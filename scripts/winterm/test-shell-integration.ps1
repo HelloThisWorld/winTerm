@@ -150,8 +150,9 @@ function Test-CmdInitialization
     try
     {
         $output = & cmd.exe /d /c ('call "{0}" & doskey /macros' -f $doskeyScript)
-        Assert-Condition -Condition ($output -match 'll=dir /a \$\*') -Message 'CMD initialization did not register ll.'
-        Assert-Condition -Condition ($output -match 'touch="C:\\Program Files\\winTerm\\ShellAssets\\winterm-shim.exe" touch \$\*') -Message 'CMD touch did not preserve a quoted helper path.'
+        $outputText = $output -join [Environment]::NewLine
+        Assert-Condition -Condition ($outputText -match 'll=dir /a \$\*') -Message 'CMD initialization did not register ll.'
+        Assert-Condition -Condition ($outputText -match 'touch="C:\\Program Files\\winTerm\\ShellAssets\\winterm-shim.exe" touch \$\*') -Message 'CMD touch did not preserve a quoted helper path.'
 
         & cmd.exe /d /c ('call "{0}" & if not defined WINTERM_CMD_INITIALIZED exit 1 & if not defined WINTERM_INTEGRATION_VERSION exit 1' -f $InitScript)
         Assert-Condition -Condition ($LASTEXITCODE -eq 0) -Message 'CMD initialization did not set its process-local markers.'
