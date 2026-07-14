@@ -29,3 +29,13 @@ jobs:
       - name: Verify winTerm identity, scripts, and profile foundations
         shell: powershell
         run: .\scripts\winterm\test.ps1 -Suite Smoke
+
+      - name: Validate Shell Experience assets and safety boundaries
+        shell: powershell
+        run: |
+          .\scripts\winterm\package-shell-assets.ps1
+          .\scripts\winterm\test-paste-protection.ps1
+
+      - name: Test PowerShell and Command Prompt integration
+        shell: powershell
+        run: .\scripts\winterm\test-shell-integration.ps1 -Shell All

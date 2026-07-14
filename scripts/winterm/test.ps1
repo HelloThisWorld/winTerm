@@ -29,7 +29,7 @@ function Test-PowerShellSyntax
         [string]$Directory
     )
 
-    foreach ($scriptFile in Get-ChildItem -LiteralPath $Directory -File -Filter '*.ps1')
+    foreach ($scriptFile in Get-ChildItem -LiteralPath $Directory -Recurse -File -Filter '*.ps1')
     {
         $tokens = $null
         $parseErrors = $null
@@ -80,6 +80,68 @@ function Test-ProfileFoundations
     Write-Host 'PASS: WSL dynamic discovery and missing-WSL guard' -ForegroundColor Green
 }
 
+function Test-ShellExperienceFoundations
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepositoryRoot
+    )
+
+    $moduleManifest = Join-Path $RepositoryRoot 'shell\powershell\winTerm.Shell\winTerm.Shell.psd1'
+    $moduleScript = Join-Path $RepositoryRoot 'shell\powershell\winTerm.Shell\winTerm.Shell.psm1'
+    $cmdInit = Join-Path $RepositoryRoot 'shell\cmd\winterm-init.cmd'
+    $protocol = Join-Path $RepositoryRoot 'src\winterm\Shell\Protocol\ShellIntegrationProtocol.cpp'
+
+    foreach ($path in @($moduleManifest, $moduleScript, $cmdInit, $protocol))
+    {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf))
+        {
+            throw "Shell Experience foundation is missing '$path'."
+        }
+    }
+
+    $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
+    if ($manifest.ModuleVersion -ne '0.3.0' -or $manifest.PowerShellVersion -ne '5.1')
+    {
+        throw 'The winTerm PowerShell module manifest does not declare the supported version boundary.'
+    }
+
+    $moduleContent = Get-Content -LiteralPath $moduleScript -Raw
+    $cmdContent = Get-Content -LiteralPath $cmdInit -Raw
+    $protocolContent = Get-Content -LiteralPath $protocol -Raw
+    if ($moduleContent -match 'ExecutionPolicy|Bypass' -or $cmdContent -match 'AutoRun' -or $protocolContent -notmatch 'MaximumShellProtocolPayloadLength')
+    {
+        throw 'Shell Experience safety boundaries are missing or contain a forbidden policy bypass.'
+    }
+
+    $shellScriptFiles = Get-ChildItem -LiteralPath (Split-Path -Parent $moduleScript) -Recurse -File -Include '*.ps1', '*.psm1'
+    foreach ($shellScriptFile in $shellScriptFiles)
+    {
+        $tokens = $null
+        $parseErrors = $null
+        [System.Management.Automation.Language.Parser]::ParseFile($shellScriptFile.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+        if ($parseErrors.Count -gt 0)
+        {
+            $details = $parseErrors | ForEach-Object { "line $($_.Extent.StartLineNumber): $($_.Message)" }
+            throw "PowerShell syntax failed for '$($shellScriptFile.FullName)': $($details -join '; ')"
+        }
+    }
+
+    & (Join-Path $PSScriptRoot 'package-shell-assets.ps1')
+    if (-not $?)
+    {
+        throw 'Shell asset validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'test-paste-protection.ps1')
+    if (-not $?)
+    {
+        throw 'Paste protection source validation failed.'
+    }
+
+    Write-Host 'PASS: Shell Experience source foundations' -ForegroundColor Green
+}
+
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $originalLocation = Get-Location
 
@@ -107,6 +169,7 @@ try
     }
 
     Test-ProfileFoundations -RepositoryRoot $repositoryRoot
+    Test-ShellExperienceFoundations -RepositoryRoot $repositoryRoot
 
     if ($Suite -eq 'Smoke')
     {
