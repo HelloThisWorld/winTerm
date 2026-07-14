@@ -10,7 +10,8 @@
 | Execution alias | `winterm.exe` |
 | Forbidden alias | `wt.exe` |
 | Development publisher | `CN=winTerm Development` |
-| Package version | `0.1.0.0` |
+| Package version | `0.2.0.0` |
+| Release status | `0.2.0-dev` until v0.2 acceptance is complete |
 | Package description | `Independent open-source terminal based on Microsoft Windows Terminal` |
 
 The WinTerm build brand selects these values without changing Microsoft Terminal Stable, Preview, Canary, or Dev package identities. Unique WinTerm COM handoff and shell-extension identifiers are used so package registration does not replace the upstream application.
