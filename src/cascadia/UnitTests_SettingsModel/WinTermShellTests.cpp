@@ -41,7 +41,7 @@ namespace SettingsModelUnitTests
         ShellSessionRegistry registry;
         ShellSessionMetadata metadata;
         metadata.sessionId = L"pane-1";
-        metadata.currentDirectory = { CurrentDirectoryKind::Remote, L"/srv/app" };
+        metadata.currentDirectory = { CurrentDirectoryKind::Remote, L"/remote/app" };
         registry.Upsert(metadata);
         VERIFY_IS_FALSE(registry.Find(L"pane-1")->currentDirectory.IsTrustedLocalPath());
     }

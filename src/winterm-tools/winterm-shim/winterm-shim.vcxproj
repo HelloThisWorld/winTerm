@@ -3,7 +3,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3C5DE684-ADFD-4630-BA91-67A1A3B6AF7A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>wintermshim</RootNamespace>
+    <RootNamespace>winTermShim</RootNamespace>
     <ProjectName>winterm-shim</ProjectName>
     <TargetName>winterm-shim</TargetName>
     <ConfigurationType>Application</ConfigurationType>
