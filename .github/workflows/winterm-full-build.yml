@@ -32,6 +32,10 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\test.ps1 -Suite Smoke -Configuration ${{ matrix.configuration }} -Platform x64
 
+      - name: Test Shell Experience assets
+        shell: pwsh
+        run: .\scripts\winterm\test-shell-integration.ps1 -Shell All
+
       - name: Build x64
         shell: pwsh
         run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests

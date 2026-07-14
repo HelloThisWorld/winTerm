@@ -45,6 +45,23 @@
       <DeploymentContent>true</DeploymentContent>
       <Link>AppearanceAssets\samples\%(RecursiveDir)%(FileName)%(Extension)</Link>
     </Content>
+    <!-- winTerm Shell Experience assets are installed with the package and never modify global shell configuration. -->
+    <Content Include="$(OpenConsoleDir)shell\powershell\winTerm.Shell\**\*" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>ShellAssets\powershell\winTerm.Shell\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)shell\cmd\**\*" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>ShellAssets\cmd\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)shell\shared\version.json" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>ShellAssets\version.json</Link>
+    </Content>
+    <Content Include="$(OpenConsoleCommonOutDir)winterm-shim.exe" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>ShellAssets\winterm-shim.exe</Link>
+    </Content>
     <Content Include="$(OpenConsoleDir)THIRD_PARTY_NOTICES.md" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
       <DeploymentContent>true</DeploymentContent>
       <Link>THIRD_PARTY_NOTICES.md</Link>

@@ -12,12 +12,14 @@ commandlines
 consvc
 copyable
 dcs
+diskpart
 deselection
 diffing
 Dimidium
 downsides
 Emacspeak
 Fitt
+FNF
 flac
 FTCS
 gantt
@@ -45,6 +47,7 @@ notwrapped
 NTMTo
 overlined
 perlw
+PNF
 postmodern
 Powerline
 ptys

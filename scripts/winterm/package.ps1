@@ -41,9 +41,9 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' must claim winterm.exe and must not claim wt.exe."
     }
-    if ($identity.Version -ne '0.2.0.0')
+    if ($identity.Version -ne '0.3.0.0')
     {
-        throw "Package '$Path' must use the winTerm v0.2 package version."
+        throw "Package '$Path' must use the winTerm v0.3 package version."
     }
 }
 
@@ -174,6 +174,11 @@ try
 
     Assert-WinTermManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml')
     Assert-AppearancePayload -Path $temporaryDirectory -RepositoryRoot $repositoryRoot
+    & (Join-Path $PSScriptRoot 'package-shell-assets.ps1') -PackageRoot $temporaryDirectory
+    if (-not $?)
+    {
+        throw 'Shell asset package validation failed.'
+    }
 
     $signature = Get-AuthenticodeSignature -LiteralPath $artifact.FullName
     Write-Host "Package: $($artifact.FullName)"
