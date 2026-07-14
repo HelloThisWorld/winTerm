@@ -44,6 +44,8 @@
     <ClCompile Include="SerializationTests.cpp" />
     <ClCompile Include="TerminalSettingsTests.cpp" />
     <ClCompile Include="ThemeTests.cpp" />
+    <ClCompile Include="WinTermAppearanceTests.cpp" />
+    <ClCompile Include="WinTermFontAssetTests.cpp" />
     <ClCompile Include="MediaResourceTests.cpp" />
     <ClCompile Include="../TerminalSettingsAppAdapterLib/TerminalSettings.cpp" />
     <ClCompile Include="pch.cpp">
