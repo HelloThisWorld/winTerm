@@ -1,0 +1,13 @@
+winTerm ANSI rendering fixture
+
+Run scripts/winterm/test-rendering.ps1 in winTerm from PowerShell, Command Prompt, and at least one available WSL profile.
+
+Required sections:
+- ANSI 16 colors and bright colors
+- ANSI 256 6 x 6 x 6 color cube
+- ANSI 256 grayscale ramp
+- 24-bit foreground and background
+- Bold, dim, and reverse video
+- Cursor and selection over colored cells
+
+Record Pass, Fail, Partial, or Not tested. Confirm that formatting resets after every section and does not leak into the prompt.

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "rose-pine.dawn",
+  "name": "Rosé Pine Dawn",
+  "displayName": "Rosé Pine Dawn",
+  "variant": "light",
+  "source": {
+    "type": "thirdParty",
+    "project": "rose-pine/windows-terminal",
+    "author": "Rosé Pine",
+    "homepage": "https://github.com/rose-pine/windows-terminal",
+    "license": "MIT",
+    "revision": "89e1a277e4ac10e06f33b13cddabde3c42d8d411",
+    "sourceFile": "rose-pine-dawn.scheme.json"
+  },
+  "terminal": {
+    "foreground": "#575279",
+    "background": "#FAF4ED",
+    "cursorColor": "#9893A5",
+    "cursorTextColor": "#FAF4ED",
+    "selectionBackground": "#DFDAD9",
+    "selectionForeground": "#575279",
+    "ansi": [
+      "#F2E9E1",
+      "#B4637A",
+      "#286983",
+      "#EA9D34",
+      "#56949F",
+      "#907AA9",
+      "#D7827E",
+      "#575279"
+    ],
+    "bright": [
+      "#797593",
+      "#B4637A",
+      "#286983",
+      "#EA9D34",
+      "#56949F",
+      "#907AA9",
+      "#D7827E",
+      "#575279"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#F2E9E1",
+    "inactiveTabBackground": "#FFFAF3",
+    "paneBorderColor": "#DFDAD9"
+  }
+}

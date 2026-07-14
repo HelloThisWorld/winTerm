@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "catppuccin.latte",
+  "name": "Catppuccin Latte",
+  "displayName": "Catppuccin Latte",
+  "variant": "light",
+  "source": {
+    "type": "thirdParty",
+    "project": "catppuccin/windows-terminal",
+    "author": "Catppuccin",
+    "homepage": "https://github.com/catppuccin/windows-terminal",
+    "license": "MIT",
+    "revision": "4d8bb2f00fb86927a98dd3502cdec74a76d25d7b",
+    "sourceFile": "latte.json"
+  },
+  "terminal": {
+    "foreground": "#4C4F69",
+    "background": "#EFF1F5",
+    "cursorColor": "#DC8A78",
+    "cursorTextColor": "#EFF1F5",
+    "selectionBackground": "#ACB0BE",
+    "selectionForeground": "#4C4F69",
+    "ansi": [
+      "#5C5F77",
+      "#D20F39",
+      "#40A02B",
+      "#DF8E1D",
+      "#1E66F5",
+      "#EA76CB",
+      "#179299",
+      "#ACB0BE"
+    ],
+    "bright": [
+      "#ACB0BE",
+      "#D20F39",
+      "#40A02B",
+      "#DF8E1D",
+      "#1E66F5",
+      "#EA76CB",
+      "#179299",
+      "#BCC0CC"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#E6E9EF",
+    "inactiveTabBackground": "#DCE0E8",
+    "paneBorderColor": "#ACB0BE"
+  }
+}

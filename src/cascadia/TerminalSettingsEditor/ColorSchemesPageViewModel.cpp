@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "ColorSchemesPageViewModel.h"
 #include "ColorSchemesPageViewModel.g.cpp"
+#include "../TerminalSettingsModel/ColorScheme.h"
 
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
@@ -108,6 +109,44 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _AllColorSchemes.Append(schemeVM);
         _viewModelToSchemeMap.Insert(schemeVM, scheme);
         return schemeVM;
+    }
+
+    Editor::ColorSchemeViewModel ColorSchemesPageViewModel::RequestAddImported(const Json::Value& schemeJson)
+    {
+        auto schemeImpl{ Model::implementation::ColorScheme::FromJson(schemeJson) };
+        if (!schemeImpl)
+        {
+            throw std::invalid_argument{ "The imported color scheme is incomplete." };
+        }
+
+        const auto baseName{ schemeImpl->Name() };
+        auto uniqueName{ baseName };
+        for (uint32_t suffix = 2; _settings.GlobalSettings().ColorSchemes().HasKey(uniqueName); ++suffix)
+        {
+            uniqueName = winrt::hstring{ fmt::format(FMT_COMPILE(L"{} ({})"), baseName, suffix) };
+        }
+        schemeImpl->Name(uniqueName);
+        schemeImpl->Origin(Model::OriginTag::User);
+
+        const auto scheme{ schemeImpl.as<Model::ColorScheme>() };
+        _settings.GlobalSettings().AddColorScheme(scheme);
+
+        const auto schemeVM{ winrt::make<ColorSchemeViewModel>(scheme, *this, _settings) };
+        _AllColorSchemes.Append(schemeVM);
+        _viewModelToSchemeMap.Insert(schemeVM, scheme);
+        CurrentScheme(schemeVM);
+        return schemeVM;
+    }
+
+    Json::Value ColorSchemesPageViewModel::CurrentSchemeJson() const
+    {
+        if (!_CurrentScheme)
+        {
+            throw std::runtime_error{ "Select a theme before exporting it." };
+        }
+
+        const auto scheme{ _viewModelToSchemeMap.Lookup(_CurrentScheme) };
+        return winrt::get_self<Model::implementation::ColorScheme>(scheme)->ToJson();
     }
 
     bool ColorSchemesPageViewModel::RequestRenameCurrentScheme(hstring newName)

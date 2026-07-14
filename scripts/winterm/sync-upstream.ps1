@@ -1,3 +1,6 @@
+# Copyright (c) winTerm contributors.
+# Licensed under the MIT license.
+
 [CmdletBinding()]
 param(
     [ValidateNotNullOrEmpty()]

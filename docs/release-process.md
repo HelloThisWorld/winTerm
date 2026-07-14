@@ -4,8 +4,8 @@
 
 - Start from a clean, reviewed branch.
 - Record the exact Microsoft Terminal upstream commit.
-- Confirm `git diff` contains no generated build output, certificate, key, credential, font, theme, or downloaded logo.
-- Confirm the release contains no post-v0.1 feature work.
+- Confirm `git diff` contains no generated build output, certificate, key, credential, unmanifested font or theme, or downloaded logo.
+- Confirm the release contains no post-v0.2 or out-of-scope feature work.
 
 Run source validation first:
 
@@ -15,7 +15,7 @@ Run source validation first:
 
 ## 2. Set release identity
 
-For a local development package, the v0.1 manifest uses version `0.1.0.0` and publisher `CN=winTerm Development`.
+For a local development package, the v0.2 manifest uses version `0.2.0.0` and publisher `CN=winTerm Development`.
 
 For a public release:
 
@@ -31,9 +31,9 @@ Do not commit a PFX, private key, password, certificate export, Store credential
 Use a provisioned Windows 11 x64 machine and PowerShell 7:
 
 ```powershell
-.\scripts\winterm\build.ps1 -Configuration Debug -Platform x64
+.\scripts\winterm\build.ps1 -Configuration Debug -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Debug -Platform x64
-.\scripts\winterm\build.ps1 -Configuration Release -Platform x64
+.\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 ```
 
@@ -70,7 +70,7 @@ Add-AppxPackage -Path <path-to-winTerm.msix>
 
 If MSBuild emits an `Add-AppDevPackage.ps1` helper, inspect its certificate and script before running it. The package script never installs a certificate automatically.
 
-Complete every manual item in `docs/v0.1-acceptance.md`, including side-by-side installation with Microsoft Windows Terminal, aliases, first-launch state, profiles, tabs, panes, settings, command palette, clipboard, CJK input, ANSI colors, emoji, Powerline, upgrade, and uninstall behavior.
+Complete every manual item in `docs/v0.2-acceptance.md`, including side-by-side installation with Microsoft Windows Terminal, aliases, first-launch state, profiles, tabs, panes, settings, Theme import and export, app-private fonts, command palette, clipboard, CJK input, ANSI colors, emoji, Powerline, upgrade, and uninstall behavior.
 
 ## 6. Publish deliberately
 

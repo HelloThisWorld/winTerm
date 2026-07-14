@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "nord.official",
+  "name": "Nord",
+  "displayName": "Nord",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "nordtheme/nord",
+    "author": "Sven Greb",
+    "homepage": "https://github.com/nordtheme/nord",
+    "license": "MIT",
+    "revision": "1cef71605416a222e57225b544540ce0fcec18d4",
+    "sourceFile": "src/nord.css"
+  },
+  "terminal": {
+    "foreground": "#D8DEE9",
+    "background": "#2E3440",
+    "cursorColor": "#D8DEE9",
+    "cursorTextColor": "#2E3440",
+    "selectionBackground": "#434C5E",
+    "selectionForeground": "#ECEFF4",
+    "ansi": [
+      "#3B4252",
+      "#BF616A",
+      "#A3BE8C",
+      "#EBCB8B",
+      "#81A1C1",
+      "#B48EAD",
+      "#88C0D0",
+      "#E5E9F0"
+    ],
+    "bright": [
+      "#4C566A",
+      "#BF616A",
+      "#A3BE8C",
+      "#EBCB8B",
+      "#81A1C1",
+      "#B48EAD",
+      "#8FBCBB",
+      "#ECEFF4"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#3B4252",
+    "inactiveTabBackground": "#2E3440",
+    "paneBorderColor": "#4C566A"
+  }
+}

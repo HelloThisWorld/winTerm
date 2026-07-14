@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "catppuccin.mocha",
+  "name": "Catppuccin Mocha",
+  "displayName": "Catppuccin Mocha",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "catppuccin/windows-terminal",
+    "author": "Catppuccin",
+    "homepage": "https://github.com/catppuccin/windows-terminal",
+    "license": "MIT",
+    "revision": "4d8bb2f00fb86927a98dd3502cdec74a76d25d7b",
+    "sourceFile": "mocha.json"
+  },
+  "terminal": {
+    "foreground": "#CDD6F4",
+    "background": "#1E1E2E",
+    "cursorColor": "#F5E0DC",
+    "cursorTextColor": "#1E1E2E",
+    "selectionBackground": "#585B70",
+    "selectionForeground": "#CDD6F4",
+    "ansi": [
+      "#45475A",
+      "#F38BA8",
+      "#A6E3A1",
+      "#F9E2AF",
+      "#89B4FA",
+      "#F5C2E7",
+      "#94E2D5",
+      "#BAC2DE"
+    ],
+    "bright": [
+      "#585B70",
+      "#F38BA8",
+      "#A6E3A1",
+      "#F9E2AF",
+      "#89B4FA",
+      "#F5C2E7",
+      "#94E2D5",
+      "#A6ADC8"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#181825",
+    "inactiveTabBackground": "#11111B",
+    "paneBorderColor": "#585B70"
+  }
+}

@@ -2,9 +2,17 @@
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <!-- License Info -->
-    <Content Include="$(OpenConsoleDir)src\cascadia\CascadiaPackage\NOTICE.html">
+    <Content Include="$(OpenConsoleDir)src\cascadia\CascadiaPackage\NOTICE.html" Condition="'$(WindowsTerminalBranding)'!='WinTerm'">
       <DeploymentContent>true</DeploymentContent>
       <Link>%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)LICENSE" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>LICENSE</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)NOTICE.md" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>NOTICE.md</Link>
     </Content>
     <!-- Images -->
     <Content Include="$(OpenConsoleDir)res\terminal\images$(WindowsTerminalAssetSuffix)\**\*">
@@ -12,9 +20,34 @@
       <Link>Images\%(RecursiveDir)%(FileName)%(Extension)</Link>
     </Content>
     <!-- Fonts -->
-    <Content Include="$(OpenConsoleDir)res\fonts\*.ttf" Condition="'$(WindowsTerminalOfficialBuild)'=='true'">
+    <Content Include="$(OpenConsoleDir)res\fonts\*.ttf" Condition="'$(WindowsTerminalOfficialBuild)'=='true' And '$(WindowsTerminalBranding)'!='WinTerm'">
       <DeploymentContent>true</DeploymentContent>
       <Link>%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)res\fonts\*.ttf;$(OpenConsoleDir)res\fonts\*.otf" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>AppearanceAssets\fonts\bundled\%(FileName)%(Extension)</Link>
+    </Content>
+    <!-- winTerm appearance assets. These are pinned in the checked-in manifests; normal builds never fetch them. -->
+    <Content Include="$(OpenConsoleDir)assets\winterm\themes\**\*.json" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>AppearanceAssets\themes\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)assets\winterm\fonts\manifest.json" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>AppearanceAssets\fonts\manifest.json</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)assets\winterm\licenses\**\*" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>AppearanceAssets\licenses\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)assets\winterm\samples\**\*" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>AppearanceAssets\samples\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </Content>
+    <Content Include="$(OpenConsoleDir)THIRD_PARTY_NOTICES.md" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+      <DeploymentContent>true</DeploymentContent>
+      <Link>THIRD_PARTY_NOTICES.md</Link>
     </Content>
     <!-- Profile Icons -->
     <Content Include="$(OpenConsoleDir)src\cascadia\CascadiaPackage\ProfileIcons\**\*">

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "winterm.slate",
+  "name": "winTerm Slate",
+  "displayName": "winTerm Slate",
+  "variant": "dark",
+  "source": {
+    "type": "builtin",
+    "project": "winTerm",
+    "author": "winTerm contributors",
+    "homepage": null,
+    "license": "MIT",
+    "revision": "0.2.0-dev",
+    "sourceFile": "assets/winterm/themes/builtin/winterm-slate.json"
+  },
+  "terminal": {
+    "foreground": "#D7D5CF",
+    "background": "#202222",
+    "cursorColor": "#F3EEDD",
+    "cursorTextColor": "#202222",
+    "selectionBackground": "#4A4C47",
+    "selectionForeground": "#FFFFFF",
+    "ansi": [
+      "#292B2B",
+      "#C86D6D",
+      "#82A86F",
+      "#C1A55D",
+      "#718FA7",
+      "#A47DA4",
+      "#6FA5A0",
+      "#C5C3BD"
+    ],
+    "bright": [
+      "#666A68",
+      "#E38484",
+      "#9ABD86",
+      "#D7BC72",
+      "#88A9C1",
+      "#BE94BE",
+      "#86BDB7",
+      "#F4F1EA"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#181A1A",
+    "inactiveTabBackground": "#252727",
+    "paneBorderColor": "#3D403F"
+  }
+}

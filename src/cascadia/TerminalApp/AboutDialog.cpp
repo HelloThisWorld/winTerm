@@ -55,7 +55,11 @@ namespace winrt::TerminalApp::implementation
     void AboutDialog::_ThirdPartyNoticesOnClick(const IInspectable& /*sender*/, const Windows::UI::Xaml::RoutedEventArgs& /*eventArgs*/)
     {
         std::filesystem::path currentPath{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
+#if defined(WT_BRANDING_WINTERM)
+        currentPath.replace_filename(L"AppearanceAssets\\licenses\\open-source-licenses.html");
+#else
         currentPath.replace_filename(L"NOTICE.html");
+#endif
         ShellExecute(nullptr, nullptr, currentPath.c_str(), nullptr, nullptr, SW_SHOW);
     }
 

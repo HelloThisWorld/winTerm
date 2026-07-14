@@ -82,7 +82,6 @@ awch
 azurecr
 AZZ
 backgrounded
-Backgrounder
 backgrounding
 backstory
 Bazz
@@ -964,7 +963,6 @@ lsconfig
 lstatus
 lstrcmp
 LTEXT
-lto
 ltsc
 LUID
 luma
@@ -1296,7 +1294,6 @@ pnm
 PNMLINK
 pntm
 POBJECT
-Podcast
 POINTERUPDATE
 POINTSLIST
 policheck
@@ -1576,7 +1573,6 @@ SHOWWINDOW
 sidebyside
 SIF
 SIGDN
-Signtool
 SINGLETHREADED
 siup
 sixel
@@ -1719,7 +1715,6 @@ titlebars
 TITLEISLINKNAME
 TLDP
 TLEN
-Tlgg
 TMAE
 TMPF
 tmultiple

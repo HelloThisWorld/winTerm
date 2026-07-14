@@ -131,7 +131,29 @@ function Invoke-TaefInNewWindow()
         [string[]]$TaefArgs
     )
 
-    Start-Process $OpenConsolePath -Wait -ArgumentList "powershell.exe $TaefPath $TestDll $TaefArgs; Read-Host 'Press enter to continue...'"
+    if (-not (Test-Path -LiteralPath $OpenConsolePath -PathType Leaf))
+    {
+        throw "OpenConsole test host was not found at '$OpenConsolePath'."
+    }
+    if (-not (Test-Path -LiteralPath $TaefPath -PathType Leaf))
+    {
+        throw "TAEF runner was not found at '$TaefPath'."
+    }
+    if (-not (Test-Path -LiteralPath $TestDll -PathType Leaf))
+    {
+        throw "Test binary was not found at '$TestDll'."
+    }
+
+    $quotedTaefPath = "'" + $TaefPath.Replace("'", "''") + "'"
+    $quotedTestDll = "'" + $TestDll.Replace("'", "''") + "'"
+    $quotedArguments = @($TaefArgs | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "'" })
+    $testCommand = "& $quotedTaefPath $quotedTestDll $($quotedArguments -join ' ')"
+    $clientCommand = "powershell.exe -NoLogo -NoProfile -Command `"$testCommand; exit `$LASTEXITCODE`""
+    $process = Start-Process $OpenConsolePath -Wait -PassThru -ArgumentList $clientCommand
+    if ($process.ExitCode -ne 0)
+    {
+        throw "Functional test '$TestDll' failed with exit code $($process.ExitCode)."
+    }
 }
 
 #.SYNOPSIS
@@ -191,8 +213,7 @@ function Invoke-OpenConsoleTests()
 
     if (($AllTests -and $FTOnly) -or ($AllTests -and $Test) -or ($FTOnly -and $Test))
     {
-        Write-Host "Invalid combination of flags" -ForegroundColor Red
-        return
+        throw "Invalid combination of test selection flags."
     }
     $OpenConsolePlatform = $Platform
     if ($Platform -eq 'x86')
@@ -231,6 +252,11 @@ function Invoke-OpenConsoleTests()
         $TestsToRun = $TestConfig.tests.test | Where-Object { $_.type -eq "unit" }
     }
 
+    if (-not $TestsToRun)
+    {
+        throw "No tests matched the requested selection."
+    }
+
     # run selected tests
     foreach ($t in $TestsToRun)
     {
@@ -242,7 +268,20 @@ function Invoke-OpenConsoleTests()
 
         if ($t.type -eq "unit")
         {
+            if (-not (Test-Path -LiteralPath $currentTaefExe -PathType Leaf))
+            {
+                throw "TAEF runner was not found at '$currentTaefExe'."
+            }
+            $testBinary = "$BinDir\$($t.binary)"
+            if (-not (Test-Path -LiteralPath $testBinary -PathType Leaf))
+            {
+                throw "Test binary was not found at '$testBinary'."
+            }
             & $currentTaefExe "$BinDir\$($t.binary)" $TaefArgs
+            if ($LASTEXITCODE -ne 0)
+            {
+                throw "Test '$($t.name)' failed with exit code $LASTEXITCODE."
+            }
         }
         elseif ($t.type -eq "ft")
         {
@@ -250,8 +289,7 @@ function Invoke-OpenConsoleTests()
         }
         else
         {
-            Write-Host "Invalid test type $t.type for test: $t.name" -ForegroundColor Red
-            return
+            throw "Invalid test type '$($t.type)' for test '$($t.name)'."
         }
     }
 
@@ -269,8 +307,20 @@ function Invoke-OpenConsoleBuild()
 {
     $root = Find-OpenConsoleRoot
     & "$root\dep\nuget\nuget.exe" restore "$root\OpenConsole.slnx"
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "NuGet solution restore failed with exit code $LASTEXITCODE."
+    }
     & "$root\dep\nuget\nuget.exe" restore "$root\dep\nuget\packages.config"
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "NuGet dependency restore failed with exit code $LASTEXITCODE."
+    }
     msbuild.exe "$root\OpenConsole.slnx" @args
+    if ($LASTEXITCODE -ne 0)
+    {
+        throw "MSBuild failed with exit code $LASTEXITCODE."
+    }
 }
 
 #.SYNOPSIS

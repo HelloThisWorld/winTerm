@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "winterm.paper",
+  "name": "winTerm Paper",
+  "displayName": "winTerm Paper",
+  "variant": "light",
+  "source": {
+    "type": "builtin",
+    "project": "winTerm",
+    "author": "winTerm contributors",
+    "homepage": null,
+    "license": "MIT",
+    "revision": "0.2.0-dev",
+    "sourceFile": "assets/winterm/themes/builtin/winterm-paper.json"
+  },
+  "terminal": {
+    "foreground": "#30312F",
+    "background": "#FBF7EF",
+    "cursorColor": "#1E5385",
+    "cursorTextColor": "#FFFFFF",
+    "selectionBackground": "#C9DBED",
+    "selectionForeground": "#1F2D3A",
+    "ansi": [
+      "#383A38",
+      "#B33A3A",
+      "#3F7A45",
+      "#8A6414",
+      "#315F9A",
+      "#874A89",
+      "#28757A",
+      "#777872"
+    ],
+    "bright": [
+      "#686B67",
+      "#C94E4E",
+      "#548F59",
+      "#A37822",
+      "#4675B2",
+      "#9E60A0",
+      "#3B8C91",
+      "#50524F"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#E8E0D3",
+    "inactiveTabBackground": "#F0E9DE",
+    "paneBorderColor": "#C0B7A9"
+  }
+}

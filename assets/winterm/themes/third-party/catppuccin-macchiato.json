@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "catppuccin.macchiato",
+  "name": "Catppuccin Macchiato",
+  "displayName": "Catppuccin Macchiato",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "catppuccin/windows-terminal",
+    "author": "Catppuccin",
+    "homepage": "https://github.com/catppuccin/windows-terminal",
+    "license": "MIT",
+    "revision": "4d8bb2f00fb86927a98dd3502cdec74a76d25d7b",
+    "sourceFile": "macchiato.json"
+  },
+  "terminal": {
+    "foreground": "#CAD3F5",
+    "background": "#24273A",
+    "cursorColor": "#F4DBD6",
+    "cursorTextColor": "#24273A",
+    "selectionBackground": "#5B6078",
+    "selectionForeground": "#CAD3F5",
+    "ansi": [
+      "#494D64",
+      "#ED8796",
+      "#A6DA95",
+      "#EED49F",
+      "#8AADF4",
+      "#F5BDE6",
+      "#8BD5CA",
+      "#B8C0E0"
+    ],
+    "bright": [
+      "#5B6078",
+      "#ED8796",
+      "#A6DA95",
+      "#EED49F",
+      "#8AADF4",
+      "#F5BDE6",
+      "#8BD5CA",
+      "#A5ADCB"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#1E2030",
+    "inactiveTabBackground": "#181926",
+    "paneBorderColor": "#5B6078"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "catppuccin.frappe",
+  "name": "Catppuccin Frappé",
+  "displayName": "Catppuccin Frappé",
+  "variant": "dark",
+  "source": {
+    "type": "thirdParty",
+    "project": "catppuccin/windows-terminal",
+    "author": "Catppuccin",
+    "homepage": "https://github.com/catppuccin/windows-terminal",
+    "license": "MIT",
+    "revision": "4d8bb2f00fb86927a98dd3502cdec74a76d25d7b",
+    "sourceFile": "frappe.json"
+  },
+  "terminal": {
+    "foreground": "#C6D0F5",
+    "background": "#303446",
+    "cursorColor": "#F2D5CF",
+    "cursorTextColor": "#303446",
+    "selectionBackground": "#626880",
+    "selectionForeground": "#C6D0F5",
+    "ansi": [
+      "#51576D",
+      "#E78284",
+      "#A6D189",
+      "#E5C890",
+      "#8CAAEE",
+      "#F4B8E4",
+      "#81C8BE",
+      "#B5BFE2"
+    ],
+    "bright": [
+      "#626880",
+      "#E78284",
+      "#A6D189",
+      "#E5C890",
+      "#8CAAEE",
+      "#F4B8E4",
+      "#81C8BE",
+      "#A5ADCE"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#292C3C",
+    "inactiveTabBackground": "#232634",
+    "paneBorderColor": "#626880"
+  }
+}

@@ -20,13 +20,21 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
+      - name: Validate appearance assets and licenses
+        shell: pwsh
+        run: .\scripts\winterm\validate-assets.ps1
+
+      - name: Verify generated third-party notices
+        shell: pwsh
+        run: .\scripts\winterm\generate-third-party-notices.ps1 -Check
+
       - name: Run static and smoke validation
         shell: pwsh
         run: .\scripts\winterm\test.ps1 -Suite Smoke -Configuration ${{ matrix.configuration }} -Platform x64
 
       - name: Build x64
         shell: pwsh
-        run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64
+        run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
 
       - name: Run relevant upstream tests
         shell: pwsh

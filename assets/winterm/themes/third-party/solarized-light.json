@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "solarized.light",
+  "name": "Solarized Light",
+  "displayName": "Solarized Light",
+  "variant": "light",
+  "source": {
+    "type": "thirdParty",
+    "project": "altercation/solarized",
+    "author": "Ethan Schoonover",
+    "homepage": "https://github.com/altercation/solarized",
+    "license": "MIT",
+    "revision": "62f656a02f93c5190a8753159e34b385588d5ff3",
+    "sourceFile": "iterm2-colors-solarized/Solarized Light.itermcolors"
+  },
+  "terminal": {
+    "foreground": "#657B83",
+    "background": "#FDF6E3",
+    "cursorColor": "#657B83",
+    "cursorTextColor": "#EEE8D5",
+    "selectionBackground": "#EEE8D5",
+    "selectionForeground": "#586E75",
+    "ansi": [
+      "#073642",
+      "#DC322F",
+      "#859900",
+      "#B58900",
+      "#268BD2",
+      "#D33682",
+      "#2AA198",
+      "#EEE8D5"
+    ],
+    "bright": [
+      "#002B36",
+      "#CB4B16",
+      "#586E75",
+      "#657B83",
+      "#839496",
+      "#6C71C4",
+      "#93A1A1",
+      "#FDF6E3"
+    ]
+  },
+  "window": {
+    "opacity": 1.0,
+    "useAcrylic": false,
+    "tabBarBackground": "#EEE8D5",
+    "inactiveTabBackground": "#FDF6E3",
+    "paneBorderColor": "#93A1A1"
+  }
+}
