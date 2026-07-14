@@ -77,7 +77,7 @@ function Test-PowerShellModule
         else
         {
             $nativeOutput = ($found | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
-            Assert-Condition -Condition ($nativeOutput -match '(?i)get-childitem') -Message 'The native which command did not report Get-ChildItem.'
+            Assert-Condition -Condition ($nativeOutput -match '(?i)Get-ChildItem') -Message 'The native which command did not report Get-ChildItem.'
         }
 
         Set-WinTermCompatibilityMode -Mode Off | Out-Null
