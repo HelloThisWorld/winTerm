@@ -45,4 +45,3 @@ Acceptance requires checking that cursor movement and backspace do not split sur
 ## Color metadata boundary
 
 ANSI 16, 256, and True Color continue through the upstream VT and renderer paths. The winTerm theme descriptor supplies the base 16-color palette. `cursorTextColor` and `selectionForeground` are stored metadata but are not currently projected into the live Windows Terminal scheme, so their rendering interaction is not an acceptance pass.
-

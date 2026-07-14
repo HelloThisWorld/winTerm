@@ -11,4 +11,3 @@ Required sections:
 - Cursor and selection over colored cells
 
 Record Pass, Fail, Partial, or Not tested. Confirm that formatting resets after every section and does not leak into the prompt.
-

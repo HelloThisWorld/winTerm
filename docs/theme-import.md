@@ -52,4 +52,3 @@ JSON parsing rejects comments, duplicate keys, trailing data, single quotes, spe
 The parser accepts XML outer plists only. A file beginning with `bplist00` returns an English error instructing the user to export XML. This limitation applies to both `.itermcolors` and `.terminal` files.
 
 Only the leaf name of an imported file is retained in theme metadata. A complete UI must avoid displaying exception stacks and must not send full local paths to telemetry.
-

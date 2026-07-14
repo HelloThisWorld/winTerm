@@ -126,4 +126,3 @@ catch
     Write-Error "winTerm rendering fixture failed: $($_.Exception.Message)"
     exit 1
 }
-
