@@ -236,6 +236,9 @@
     <ClInclude Include="..\..\winterm\Appearance\Licensing\AssetLicenseRegistry.h" />
     <ClInclude Include="..\..\winterm\Appearance\Licensing\AssetManifestValidator.h" />
     <ClInclude Include="..\..\winterm\Appearance\Licensing\ThirdPartyNoticeGenerator.h" />
+    <ClInclude Include="..\..\winterm\Shell\Protocol\ShellIntegrationProtocol.h" />
+    <ClInclude Include="..\..\winterm\Shell\Sessions\ShellSessionMetadata.h" />
+    <ClInclude Include="..\..\winterm\Clipboard\PasteRiskAnalyzer.h" />
   </ItemGroup>
   <!-- ================= winTerm Appearance Sources ============== -->
   <ItemGroup>
@@ -263,6 +266,9 @@
     <ClCompile Include="..\..\winterm\Appearance\Licensing\AssetLicenseRegistry.cpp" />
     <ClCompile Include="..\..\winterm\Appearance\Licensing\AssetManifestValidator.cpp" />
     <ClCompile Include="..\..\winterm\Appearance\Licensing\ThirdPartyNoticeGenerator.cpp" />
+    <ClCompile Include="..\..\winterm\Shell\Protocol\ShellIntegrationProtocol.cpp" />
+    <ClCompile Include="..\..\winterm\Shell\Sessions\ShellSessionMetadata.cpp" />
+    <ClCompile Include="..\..\winterm\Clipboard\PasteRiskAnalyzer.cpp" />
   </ItemGroup>
   <!-- ========================= idl Files ======================== -->
   <ItemGroup>
