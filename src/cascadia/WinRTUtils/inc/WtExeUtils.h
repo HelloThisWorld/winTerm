@@ -5,6 +5,7 @@
 
 constexpr std::wstring_view WtExe{ L"wt.exe" };
 constexpr std::wstring_view WtdExe{ L"wtd.exe" };
+constexpr std::wstring_view WinTermExe{ L"winterm.exe" };
 constexpr std::wstring_view WindowsTerminalExe{ L"WindowsTerminal.exe" };
 constexpr std::wstring_view LocalAppDataAppsPath{ L"%LOCALAPPDATA%\\Microsoft\\WindowsApps\\" };
 constexpr std::wstring_view ElevateShimExe{ L"elevate-shim.exe" };
@@ -62,11 +63,11 @@ _TIL_INLINEPREFIX bool IsDevBuild()
 //   it should be a `wtd.exe`, but if we're preview or release, we want to make
 //   sure to get the correct `wt.exe` that corresponds to _us_.
 // - If we're unpackaged, this needs to get us `WindowsTerminal.exe`, because
-//   the `wt*exe` alias won't have been installed for this install.
+//   the packaged execution alias won't have been installed for this install.
 // Arguments:
 // - <none>
 // Return Value:
-// - the full path to the exe, one of `wt.exe`, `wtd.exe`, or `WindowsTerminal.exe`.
+// - the full path to the executable alias, or `WindowsTerminal.exe` when unpackaged.
 _TIL_INLINEPREFIX const std::wstring& GetWtExePath()
 {
     static const auto exePath = []() -> std::wstring {
@@ -88,7 +89,13 @@ _TIL_INLINEPREFIX const std::wstring& GetWtExePath()
                 if (!pfn.empty())
                 {
                     const std::filesystem::path windowsAppsPath{ wil::ExpandEnvironmentStringsW<std::wstring>(LocalAppDataAppsPath.data()) };
-                    const auto wtPath = windowsAppsPath / std::wstring_view{ pfn } / (IsDevBuild() ? WtdExe : WtExe);
+                    const auto alias =
+#if defined(WT_BRANDING_WINTERM)
+                        WinTermExe;
+#else
+                        IsDevBuild() ? WtdExe : WtExe;
+#endif
+                    const auto wtPath = windowsAppsPath / std::wstring_view{ pfn } / alias;
                     return wtPath;
                 }
             }
@@ -106,7 +113,11 @@ _TIL_INLINEPREFIX const std::wstring& GetWtExePath()
         }
         CATCH_LOG();
 
+#if defined(WT_BRANDING_WINTERM)
+        return std::wstring{ WinTermExe };
+#else
         return std::wstring{ WtExe };
+#endif
     }();
     return exePath;
 }

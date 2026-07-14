@@ -493,8 +493,8 @@
     <comment>A hyperlink name for the Terminal's privacy policy</comment>
   </data>
   <data name="AboutDialog_ThirdPartyNoticesLink.Content" xml:space="preserve">
-    <value>Third-Party notices</value>
-    <comment>A hyperlink name for the Terminal's third-party notices</comment>
+    <value>Open-source licenses</value>
+    <comment>A hyperlink name for the terminal's bundled open-source licenses and notices</comment>
   </data>
   <data name="QuitDialog.CloseButtonText" xml:space="preserve">
     <value>Cancel</value>
@@ -592,8 +592,8 @@
     <value>No matching tab name</value>
   </data>
   <data name="CmdPalCommandlinePrompt" xml:space="preserve">
-    <value>Enter a wt commandline to run</value>
-    <comment>{Locked="wt"} </comment>
+    <value>Enter a winTerm command line to run</value>
+    <comment>A prompt for entering a winTerm command line</comment>
   </data>
   <data name="SuggestionsControl_NestedCommandAnnouncement" xml:space="preserve">
     <value>More options for "{}"</value>

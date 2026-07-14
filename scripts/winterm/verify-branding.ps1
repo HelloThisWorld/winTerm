@@ -73,6 +73,7 @@ function Test-Manifest
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -eq 'Kaname.winTerm') -Message "$Path uses package identity Kaname.winTerm"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -notmatch '^Microsoft\.') -Message "$Path does not use a Microsoft package name"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Publisher -eq 'CN=winTerm Development') -Message "$Path uses the documented development publisher placeholder"
+    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '0.2.0.0') -Message "$Path uses package version 0.2.0.0"
     Test-Requirement -Condition ($null -ne $properties -and $properties.DisplayName -eq 'winTerm') -Message "$Path package display name is winTerm"
     Test-Requirement -Condition ($null -ne $application -and $application.Id -eq 'winTerm') -Message "$Path application ID is winTerm"
     Test-Requirement -Condition ($null -ne $visualElements -and $visualElements.DisplayName -eq 'winTerm') -Message "$Path application display name is winTerm"
@@ -146,7 +147,9 @@ try
     $requiredFiles = @(
         'LICENSE',
         'NOTICE.md',
+        'THIRD_PARTY_NOTICES.md',
         'src\cascadia\CascadiaPackage\NOTICE.html',
+        'assets\winterm\licenses\open-source-licenses.html',
         'assets\winterm\icons\winterm.svg',
         'assets\winterm\icons\winterm.ico',
         'res\terminal\images-WinTerm\StoreLogo.png',
@@ -167,12 +170,19 @@ try
     $settingsPaths = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\TerminalSettingsModel\FileUtils.cpp') -Raw
     $terminalProject = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\WindowsTerminal\WindowsTerminal.vcxproj') -Raw
     $launcherProject = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\wt\wt.vcxproj') -Raw
+    $resourceItems = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\CascadiaResources.build.items') -Raw
+    $executablePathHelper = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\WinRTUtils\inc\WtExeUtils.h') -Raw
+    $aboutDialog = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\TerminalApp\AboutDialog.cpp') -Raw
 
     Test-Requirement -Condition ($packageProject.Contains('Package-winTerm.appxmanifest') -and $packageProject.Contains('<OCExecutionAliasName Condition="''$(WindowsTerminalBranding)''==''WinTerm''">winterm</OCExecutionAliasName>')) -Message 'Package project selects the winTerm manifest and launcher alias'
     Test-Requirement -Condition ($brandingTargets.Contains('WT_BRANDING_WINTERM')) -Message 'Dedicated winTerm compile-time branding token exists'
     Test-Requirement -Condition ($settingsPaths.Contains('L"winTerm\\"') -and $settingsPaths.Contains('return GetBaseSettingsPath();')) -Message 'Unpackaged settings and release-migration paths are isolated'
     Test-Requirement -Condition ($terminalProject.Contains('winTerm Terminal Host')) -Message 'Terminal host source metadata uses winTerm'
     Test-Requirement -Condition ($launcherProject.Contains('winTerm Launcher')) -Message 'Launcher source metadata uses winTerm'
+    Test-Requirement -Condition ($resourceItems.Contains('$(OpenConsoleDir)NOTICE.md') -and $resourceItems.Contains('<Link>NOTICE.md</Link>') -and $resourceItems.Contains('$(OpenConsoleDir)LICENSE') -and $resourceItems.Contains('<Link>LICENSE</Link>')) -Message 'winTerm package maps complete offline notices and the repository license'
+    Test-Requirement -Condition ($resourceItems.Contains('AppearanceAssets\fonts\bundled\%(FileName)%(Extension)') -and $resourceItems.Contains('''$(WindowsTerminalBranding)''==''WinTerm''')) -Message 'winTerm package maps bundled fonts to an app-private appearance path'
+    Test-Requirement -Condition ($executablePathHelper -match '(?s)#if defined\(WT_BRANDING_WINTERM\)\s+WinTermExe;' -and $executablePathHelper.Contains('return std::wstring{ WinTermExe };')) -Message 'New-window and jump-list launch paths use winterm.exe for winTerm branding'
+    Test-Requirement -Condition ($aboutDialog.Contains('AppearanceAssets\\licenses\\open-source-licenses.html')) -Message 'winTerm About dialog opens its bundled offline license index'
 
     if (-not [string]::IsNullOrWhiteSpace($PackageOutput))
     {
