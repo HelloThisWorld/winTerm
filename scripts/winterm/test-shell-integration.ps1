@@ -35,7 +35,9 @@ function Test-PowerShellModule
     )
 
     $originalSessionId = $env:WINTERM_SESSION_ID
+    $originalPath = $env:PATH
     $env:WINTERM_SESSION_ID = 'test-shell-integration'
+    $env:PATH = Join-Path $env:SystemRoot 'System32'
     $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('winterm-shell-' + [guid]::NewGuid().ToString('N'))
 
     try
@@ -66,16 +68,16 @@ function Test-PowerShellModule
         Assert-Condition -Condition ($llCommand.ModuleName -eq 'winTerm.Shell') -Message 'll was not provided by winTerm Shell.'
 
         $whichCommand = Get-Command -Name which -ErrorAction Stop
-        $found = @(which powershell)
-        Assert-Condition -Condition ($found.Count -gt 0) -Message 'which did not find powershell.'
+        $found = @(which Get-ChildItem)
+        Assert-Condition -Condition ($found.Count -gt 0) -Message 'which did not find Get-ChildItem.'
         if ($whichCommand.ModuleName -eq 'winTerm.Shell')
         {
-            Assert-Condition -Condition ($found[0].Name -eq 'powershell') -Message 'winTerm which did not return the requested command.'
+            Assert-Condition -Condition ($found[0].Name -eq 'Get-ChildItem') -Message 'winTerm which did not return the requested command.'
         }
         else
         {
             $nativeOutput = ($found | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
-            Assert-Condition -Condition ($nativeOutput -match '(?i)powershell') -Message 'The native which command did not report powershell.'
+            Assert-Condition -Condition ($nativeOutput -match '(?i)get-childitem') -Message 'The native which command did not report Get-ChildItem.'
         }
 
         Set-WinTermCompatibilityMode -Mode Off | Out-Null
@@ -102,6 +104,33 @@ function Test-PowerShellModule
             Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
         }
         $env:WINTERM_SESSION_ID = $originalSessionId
+        $env:PATH = $originalPath
+    }
+}
+
+function Test-PowerShellNativeCommandPrecedence
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$ModulePath
+    )
+
+    $nativeTouch = Get-Command -Name touch -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $nativeTouch)
+    {
+        Write-Host 'SKIP: No native touch application is installed.' -ForegroundColor Yellow
+        return
+    }
+
+    try
+    {
+        Import-Module $ModulePath -Force
+        $resolvedTouch = Get-Command -Name touch -ErrorAction Stop
+        Assert-Condition -Condition ($resolvedTouch.CommandType -eq 'Application') -Message 'winTerm Shell overrode a native touch application.'
+    }
+    finally
+    {
+        Remove-Module -Name winTerm.Shell -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -141,6 +170,7 @@ $cmdInitPath = Join-Path $repositoryRoot 'shell\cmd\winterm-init.cmd'
 if ($Shell -in @('WindowsPowerShell', 'All'))
 {
     Test-PowerShellModule -ModulePath $modulePath
+    Test-PowerShellNativeCommandPrecedence -ModulePath $modulePath
     Write-Host 'PASS: Windows PowerShell shell module' -ForegroundColor Green
 }
 
