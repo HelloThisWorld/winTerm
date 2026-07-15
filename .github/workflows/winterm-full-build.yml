@@ -47,6 +47,48 @@ jobs:
           WINTERM_MSBUILD_DIAGNOSTIC: ${{ matrix.configuration == 'Release' && '1' || '0' }}
         run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
 
+      - name: Summarize XAML compiler diagnostics
+        if: failure() && matrix.configuration == 'Release'
+        shell: pwsh
+        run: |
+          $logPath = Join-Path $PWD 'winterm-msbuild-diag.log'
+          if (-not (Test-Path -LiteralPath $logPath)) {
+            Write-Warning 'The MSBuild diagnostic log was not produced.'
+            exit 0
+          }
+
+          $context = [System.Collections.Generic.Queue[string]]::new()
+          $found = $false
+          foreach ($line in [System.IO.File]::ReadLines($logPath)) {
+            $clipped = if ($line.Length -gt 4000) {
+              $line.Substring(0, 1900) + " ... [$($line.Length - 3800) characters omitted] ... " + $line.Substring($line.Length - 1900)
+            } else {
+              $line
+            }
+            $context.Enqueue($clipped)
+            while ($context.Count -gt 1200) {
+              $null = $context.Dequeue()
+            }
+            if ($line -match 'WMC9999: Illegal characters in path') {
+              $found = $true
+              break
+            }
+          }
+
+          if (-not $found) {
+            Write-Warning 'The expected XAML compiler error was not found in the diagnostic log.'
+            exit 0
+          }
+
+          $lines = @($context)
+          $start = [Math]::Max(0, $lines.Count - 400)
+          for ($index = 0; $index -lt $lines.Count; $index++) {
+            if ($lines[$index] -match 'Task "CompileXaml"') {
+              $start = $index
+            }
+          }
+          $lines[$start..($lines.Count - 1)] | Write-Host
+
       - name: Run relevant upstream tests
         shell: pwsh
         run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration ${{ matrix.configuration }} -Platform x64

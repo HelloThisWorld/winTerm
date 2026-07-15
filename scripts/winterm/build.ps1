@@ -79,7 +79,9 @@ try
 
     if ($env:WINTERM_MSBUILD_DIAGNOSTIC -eq '1')
     {
-        $msbuildArguments += '/v:diagnostic'
+        $diagnosticLog = Join-Path $repositoryRoot 'winterm-msbuild-diag.log'
+        $msbuildArguments += '/fl'
+        $msbuildArguments += "/flp:LogFile=$diagnosticLog;Verbosity=diagnostic"
     }
 
     if ($GeneratePackage)
