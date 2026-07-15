@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>net472;net8.0-windows</TargetFrameworks>
+    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">true</EnableWindowsTargeting>
     <RootNamespace>Microsoft.Terminal.Wpf</RootNamespace>
     <AssemblyName>Microsoft.Terminal.Wpf</AssemblyName>
     <UseWpf>true</UseWpf>
