@@ -54,6 +54,8 @@ try
     Assert-PathExists -Path (Join-Path $repositoryRoot 'tools\OpenConsole.psm1') -Description 'Upstream build module'
     Assert-PathExists -Path (Join-Path $repositoryRoot 'dep\nuget\nuget.exe') -Description 'Repository NuGet client'
     Assert-PathExists -Path (Join-Path $repositoryRoot 'src\cascadia\CascadiaPackage\CascadiaPackage.wapproj') -Description 'Cascadia package project'
+    $settingsModelTests = Join-Path $repositoryRoot 'src\cascadia\UnitTests_SettingsModel\SettingsModel.UnitTests.vcxproj'
+    Assert-PathExists -Path $settingsModelTests -Description 'Settings Model unit test project'
     Assert-PathExists -Path $visualStudioInstaller -Description 'Visual Studio Installer discovery tool'
     Assert-PathExists -Path $windowsSdk -Description 'Windows SDK 10.0.22621.0'
 
@@ -75,23 +77,27 @@ try
         '/m'
     )
 
-    if (-not $IncludeTests)
-    {
-        $msbuildArguments += '/t:Terminal\CascadiaPackage'
-    }
-
     if ($GeneratePackage)
     {
         $msbuildArguments += '/p:GenerateAppxPackageOnBuild=true'
         $msbuildArguments += '/p:AppxPackageSigningEnabled=false'
     }
 
-    $scope = if ($IncludeTests) { 'solution and tests' } else { 'package dependency graph' }
-    Write-Host "Building winTerm $scope ($Configuration, $Platform)..."
-    Invoke-OpenConsoleBuild @msbuildArguments
+    Write-Host "Building winTerm package dependency graph ($Configuration, $Platform)..."
+    Invoke-OpenConsoleBuild @msbuildArguments '/t:Terminal\CascadiaPackage'
     if ($LASTEXITCODE -ne 0)
     {
         throw "MSBuild failed with exit code $LASTEXITCODE."
+    }
+
+    if ($IncludeTests)
+    {
+        Write-Host "Building winTerm Settings Model tests ($Configuration, $Platform)..."
+        msbuild.exe $settingsModelTests /restore @msbuildArguments
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Settings Model test build failed with exit code $LASTEXITCODE."
+        }
     }
 
     Write-Host "winTerm build completed successfully ($Configuration, $Platform)." -ForegroundColor Green
