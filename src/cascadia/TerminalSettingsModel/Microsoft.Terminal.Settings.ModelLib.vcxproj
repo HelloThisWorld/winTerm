@@ -210,7 +210,7 @@
     <ClCompile Include="TestHooks.cpp" />
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
-  <!-- ================= winTerm Appearance Headers ============== -->
+  <!-- ================== winTerm-owned Headers ================== -->
   <ItemGroup>
     <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeDescriptor.h" />
     <ClInclude Include="..\..\winterm\Appearance\Themes\ThemeLoader.h" />
@@ -239,8 +239,23 @@
     <ClInclude Include="..\..\winterm\Shell\Protocol\ShellIntegrationProtocol.h" />
     <ClInclude Include="..\..\winterm\Shell\Sessions\ShellSessionMetadata.h" />
     <ClInclude Include="..\..\winterm\Clipboard\PasteRiskAnalyzer.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceSerializer.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceStore.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceValidator.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Capture\WorkspaceCaptureService.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Restore\WorkspaceResolvers.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Restore\WorkspaceRestoreService.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Runtime\NamedWorkspaceManager.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Runtime\WorkspaceRuntime.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\ImportExport\WorkspaceImportExport.h" />
+    <ClInclude Include="..\..\winterm\Workspaces\Diagnostics\WorkspaceDiagnostics.h" />
+    <ClInclude Include="..\..\winterm\Settings\Workspaces\WorkspaceSettingsModel.h" />
+    <ClInclude Include="..\..\winterm\Startup\StartupWorkspaceResolver.h" />
   </ItemGroup>
-  <!-- ================= winTerm Appearance Sources ============== -->
+  <!-- ================== winTerm-owned Sources ================== -->
   <ItemGroup>
     <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeDescriptor.cpp" />
     <ClCompile Include="..\..\winterm\Appearance\Themes\ThemeLoader.cpp" />
@@ -269,6 +284,20 @@
     <ClCompile Include="..\..\winterm\Shell\Protocol\ShellIntegrationProtocol.cpp" />
     <ClCompile Include="..\..\winterm\Shell\Sessions\ShellSessionMetadata.cpp" />
     <ClCompile Include="..\..\winterm\Clipboard\PasteRiskAnalyzer.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceStore.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceValidator.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Capture\WorkspaceCaptureService.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Restore\WorkspaceResolvers.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Restore\WorkspaceRestoreService.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Runtime\NamedWorkspaceManager.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Runtime\WorkspaceRuntime.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\ImportExport\WorkspaceImportExport.cpp" />
+    <ClCompile Include="..\..\winterm\Workspaces\Diagnostics\WorkspaceDiagnostics.cpp" />
+    <ClCompile Include="..\..\winterm\Startup\StartupWorkspaceResolver.cpp" />
   </ItemGroup>
   <!-- ========================= idl Files ======================== -->
   <ItemGroup>
