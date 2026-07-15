@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "ColorScheme.h"
+#include "ColorSchemeSerialization.h"
 #include "../../types/inc/Utils.hpp"
 #include "../../types/inc/colorTable.hpp"
 #include "Utils.h"
@@ -170,4 +171,21 @@ bool ColorScheme::IsEquivalentForSettingsMergePurposes(const winrt::com_ptr<Colo
     // We do not care about the cursor color or the selection background, as the main reason we are
     // doing equivalence merging is to replace old, poorly-specified versions of those two properties.
     return _table == other->_table && _Background == other->_Background && _Foreground == other->_Foreground;
+}
+
+namespace winrt::Microsoft::Terminal::Settings::Model
+{
+    ColorScheme DeserializeColorScheme(const Json::Value& json)
+    {
+        if (const auto scheme{ implementation::ColorScheme::FromJson(json) })
+        {
+            return scheme.as<ColorScheme>();
+        }
+        return nullptr;
+    }
+
+    Json::Value SerializeColorScheme(const ColorScheme& scheme)
+    {
+        return get_self<implementation::ColorScheme>(scheme)->ToJson();
+    }
 }

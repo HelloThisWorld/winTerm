@@ -4,7 +4,7 @@
 #include "pch.h"
 #include "ColorSchemesPageViewModel.h"
 #include "ColorSchemesPageViewModel.g.cpp"
-#include "../TerminalSettingsModel/ColorScheme.h"
+#include "../TerminalSettingsModel/ColorSchemeSerialization.h"
 
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
@@ -113,22 +113,20 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Editor::ColorSchemeViewModel ColorSchemesPageViewModel::RequestAddImported(const Json::Value& schemeJson)
     {
-        auto schemeImpl{ Model::implementation::ColorScheme::FromJson(schemeJson) };
-        if (!schemeImpl)
+        auto scheme{ Model::DeserializeColorScheme(schemeJson) };
+        if (!scheme)
         {
             throw std::invalid_argument{ "The imported color scheme is incomplete." };
         }
 
-        const auto baseName{ schemeImpl->Name() };
+        const auto baseName{ scheme.Name() };
         auto uniqueName{ baseName };
         for (uint32_t suffix = 2; _settings.GlobalSettings().ColorSchemes().HasKey(uniqueName); ++suffix)
         {
             uniqueName = winrt::hstring{ fmt::format(FMT_COMPILE(L"{} ({})"), baseName, suffix) };
         }
-        schemeImpl->Name(uniqueName);
-        schemeImpl->Origin(Model::OriginTag::User);
-
-        const auto scheme{ schemeImpl.as<Model::ColorScheme>() };
+        scheme.Name(uniqueName);
+        scheme.Origin(Model::OriginTag::User);
         _settings.GlobalSettings().AddColorScheme(scheme);
 
         const auto schemeVM{ winrt::make<ColorSchemeViewModel>(scheme, *this, _settings) };
@@ -146,7 +144,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         const auto scheme{ _viewModelToSchemeMap.Lookup(_CurrentScheme) };
-        return winrt::get_self<Model::implementation::ColorScheme>(scheme)->ToJson();
+        return Model::SerializeColorScheme(scheme);
     }
 
     bool ColorSchemesPageViewModel::RequestRenameCurrentScheme(hstring newName)
