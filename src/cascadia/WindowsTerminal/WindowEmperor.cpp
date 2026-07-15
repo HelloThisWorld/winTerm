@@ -819,14 +819,15 @@ void WindowEmperor::_createMessageWindow(const wchar_t* className)
     // receive any HWND_BROADCAST messages, like WM_QUERYENDSESSION.
     // NOTE: Before CreateWindowExW() returns it invokes our WM_NCCREATE
     // message handler, which then stores the HWND in this->_window.
+#if defined(WT_BRANDING_WINTERM)
+    constexpr auto windowName = L"winTerm";
+#else
+    constexpr auto windowName = L"Windows Terminal";
+#endif
     WINRT_VERIFY(CreateWindowExW(
         /* dwExStyle    */ 0,
         /* lpClassName  */ className,
-#if defined(WT_BRANDING_WINTERM)
-        /* lpWindowName */ L"winTerm",
-#else
-        /* lpWindowName */ L"Windows Terminal",
-#endif
+        /* lpWindowName */ windowName,
         /* dwStyle      */ 0,
         /* X            */ 0,
         /* Y            */ 0,
