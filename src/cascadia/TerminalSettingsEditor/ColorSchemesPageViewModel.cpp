@@ -113,7 +113,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Editor::ColorSchemeViewModel ColorSchemesPageViewModel::RequestAddImported(const Json::Value& schemeJson)
     {
-        auto scheme{ Model::DeserializeColorScheme(schemeJson) };
+        auto scheme{ Model::DeserializeColorScheme(schemeJson, Model::OriginTag::User) };
         if (!scheme)
         {
             throw std::invalid_argument{ "The imported color scheme is incomplete." };
@@ -126,7 +126,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             uniqueName = winrt::hstring{ fmt::format(FMT_COMPILE(L"{} ({})"), baseName, suffix) };
         }
         scheme.Name(uniqueName);
-        scheme.Origin(Model::OriginTag::User);
         _settings.GlobalSettings().AddColorScheme(scheme);
 
         const auto schemeVM{ winrt::make<ColorSchemeViewModel>(scheme, *this, _settings) };

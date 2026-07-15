@@ -7,6 +7,6 @@
 
 namespace winrt::Microsoft::Terminal::Settings::Model
 {
-    ColorScheme DeserializeColorScheme(const Json::Value& json);
+    ColorScheme DeserializeColorScheme(const Json::Value& json, OriginTag origin);
     Json::Value SerializeColorScheme(const ColorScheme& scheme);
 }

@@ -175,10 +175,11 @@ bool ColorScheme::IsEquivalentForSettingsMergePurposes(const winrt::com_ptr<Colo
 
 namespace winrt::Microsoft::Terminal::Settings::Model
 {
-    ColorScheme DeserializeColorScheme(const Json::Value& json)
+    ColorScheme DeserializeColorScheme(const Json::Value& json, const OriginTag origin)
     {
         if (const auto scheme{ implementation::ColorScheme::FromJson(json) })
         {
+            scheme->Origin(origin);
             return scheme.as<ColorScheme>();
         }
         return nullptr;
