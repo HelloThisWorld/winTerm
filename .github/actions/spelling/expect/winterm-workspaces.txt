@@ -1,0 +1,8 @@
+autorun
+environmentvariables
+executablepath
+externalfile
+privatekeypath
+shellarguments
+sshprivatekey
+startupcommand

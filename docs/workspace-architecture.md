@@ -18,4 +18,4 @@ Capture must read the minimum UI state on the UI thread, produce a value snapsho
 
 The storage layout is a winTerm-only `workspaces` directory under the application state root. It contains `last-session.json`, its backup, `snapshots`, `named`, `imported`, `quarantine`, and a rebuildable `index.json`. This storage never uses Microsoft Terminal package identity or LocalState.
 
-Visual docking, corner docking, `GridNode`, `EmptySlotNode`, cross-window live pane transfer, terminal brokering, ConPTY reattachment, command replay, and SSH reconnection remain outside this architecture.
+Visual docking, corner docking, `GridNode`, `EmptySlotNode`, cross-window live pane transfer, terminal broker support, ConPTY reattachment, command replay, and SSH reconnection remain outside this architecture.
