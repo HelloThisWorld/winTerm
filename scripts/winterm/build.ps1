@@ -74,6 +74,7 @@ try
         '/p:WindowsTerminalBranding=WinTerm',
         '/p:AppxSymbolPackageEnabled=false',
         '/p:AppxBundle=Never',
+        '/p:XAMLFingerprint=false',
         '/m'
     )
 
