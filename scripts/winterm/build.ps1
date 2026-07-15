@@ -77,13 +77,6 @@ try
         '/m'
     )
 
-    if ($env:WINTERM_MSBUILD_DIAGNOSTIC -eq '1')
-    {
-        $diagnosticLog = Join-Path $repositoryRoot 'winterm-msbuild-diag.log'
-        $msbuildArguments += '/fl'
-        $msbuildArguments += "/flp:LogFile=$diagnosticLog;Verbosity=diagnostic"
-    }
-
     if ($GeneratePackage)
     {
         $msbuildArguments += '/p:GenerateAppxPackageOnBuild=true'
