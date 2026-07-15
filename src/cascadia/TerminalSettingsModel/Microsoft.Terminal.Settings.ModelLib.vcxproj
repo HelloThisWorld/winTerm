@@ -71,7 +71,6 @@
     <ClInclude Include="ColorScheme.h">
       <DependentUpon>ColorScheme.idl</DependentUpon>
     </ClInclude>
-    <ClInclude Include="ColorSchemeSerialization.h" />
     <ClInclude Include="Theme.h">
       <DependentUpon>Theme.idl</DependentUpon>
     </ClInclude>

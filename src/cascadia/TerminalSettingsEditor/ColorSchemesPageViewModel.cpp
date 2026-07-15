@@ -4,7 +4,90 @@
 #include "pch.h"
 #include "ColorSchemesPageViewModel.h"
 #include "ColorSchemesPageViewModel.g.cpp"
-#include "../TerminalSettingsModel/ColorSchemeSerialization.h"
+#include "../TerminalSettingsModel/JsonUtils.h"
+
+namespace
+{
+    constexpr std::array<std::string_view, 16> ColorKeys{
+        "black",
+        "red",
+        "green",
+        "yellow",
+        "blue",
+        "purple",
+        "cyan",
+        "white",
+        "brightBlack",
+        "brightRed",
+        "brightGreen",
+        "brightYellow",
+        "brightBlue",
+        "brightPurple",
+        "brightCyan",
+        "brightWhite",
+    };
+
+    winrt::Microsoft::Terminal::Settings::Model::ColorScheme DeserializeColorScheme(const Json::Value& json)
+    {
+        namespace JsonUtils = ::Microsoft::Terminal::Settings::Model::JsonUtils;
+        namespace Model = winrt::Microsoft::Terminal::Settings::Model;
+        namespace Core = winrt::Microsoft::Terminal::Core;
+
+        winrt::hstring name;
+        if (!JsonUtils::GetValueForKey(json, "name", name))
+        {
+            return nullptr;
+        }
+
+        Model::ColorScheme scheme{ name };
+        Core::Color color{};
+        if (JsonUtils::GetValueForKey(json, "foreground", color))
+        {
+            scheme.Foreground(color);
+        }
+        if (JsonUtils::GetValueForKey(json, "background", color))
+        {
+            scheme.Background(color);
+        }
+        if (JsonUtils::GetValueForKey(json, "selectionBackground", color))
+        {
+            scheme.SelectionBackground(color);
+        }
+        if (JsonUtils::GetValueForKey(json, "cursorColor", color))
+        {
+            scheme.CursorColor(color);
+        }
+
+        for (uint8_t index = 0; index < ColorKeys.size(); ++index)
+        {
+            if (!JsonUtils::GetValueForKey(json, ColorKeys[index], color))
+            {
+                return nullptr;
+            }
+            scheme.SetColorTableEntry(index, color);
+        }
+        return scheme;
+    }
+
+    Json::Value SerializeColorScheme(const winrt::Microsoft::Terminal::Settings::Model::ColorScheme& scheme)
+    {
+        namespace JsonUtils = ::Microsoft::Terminal::Settings::Model::JsonUtils;
+
+        Json::Value json{ Json::objectValue };
+        JsonUtils::SetValueForKey(json, "name", scheme.Name());
+        JsonUtils::SetValueForKey(json, "foreground", scheme.Foreground());
+        JsonUtils::SetValueForKey(json, "background", scheme.Background());
+        JsonUtils::SetValueForKey(json, "selectionBackground", scheme.SelectionBackground());
+        JsonUtils::SetValueForKey(json, "cursorColor", scheme.CursorColor());
+
+        const auto table{ scheme.Table() };
+        for (uint8_t index = 0; index < ColorKeys.size(); ++index)
+        {
+            JsonUtils::SetValueForKey(json, ColorKeys[index], table[index]);
+        }
+        return json;
+    }
+}
 
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
@@ -113,7 +196,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     Editor::ColorSchemeViewModel ColorSchemesPageViewModel::RequestAddImported(const Json::Value& schemeJson)
     {
-        auto scheme{ Model::DeserializeColorScheme(schemeJson, Model::OriginTag::User) };
+        auto scheme{ DeserializeColorScheme(schemeJson) };
         if (!scheme)
         {
             throw std::invalid_argument{ "The imported color scheme is incomplete." };
@@ -143,7 +226,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
 
         const auto scheme{ _viewModelToSchemeMap.Lookup(_CurrentScheme) };
-        return Model::SerializeColorScheme(scheme);
+        return SerializeColorScheme(scheme);
     }
 
     bool ColorSchemesPageViewModel::RequestRenameCurrentScheme(hstring newName)
