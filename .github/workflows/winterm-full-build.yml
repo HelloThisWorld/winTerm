@@ -43,6 +43,8 @@ jobs:
 
       - name: Build x64
         shell: pwsh
+        env:
+          WINTERM_MSBUILD_DIAGNOSTIC: ${{ matrix.configuration == 'Release' && '1' || '0' }}
         run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
 
       - name: Run relevant upstream tests

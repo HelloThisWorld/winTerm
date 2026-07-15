@@ -74,9 +74,13 @@ try
         '/p:WindowsTerminalBranding=WinTerm',
         '/p:AppxSymbolPackageEnabled=false',
         '/p:AppxBundle=Never',
-        '/p:XAMLFingerprint=false',
         '/m'
     )
+
+    if ($env:WINTERM_MSBUILD_DIAGNOSTIC -eq '1')
+    {
+        $msbuildArguments += '/v:diagnostic'
+    }
 
     if ($GeneratePackage)
     {
