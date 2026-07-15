@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.security-url",
+  "name": "Security URL",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
+  "include": "https://example.invalid/workspace.json",
+  "windows": []
+}

@@ -39,3 +39,11 @@ jobs:
       - name: Test PowerShell and Command Prompt integration
         shell: powershell
         run: .\scripts\winterm\test-shell-integration.ps1 -Shell All
+
+      - name: Validate workspace fixtures, restore, recovery, and import security
+        shell: powershell
+        run: |
+          .\scripts\winterm\test-workspace-model.ps1
+          .\scripts\winterm\test-workspace-restore.ps1
+          .\scripts\winterm\test-workspace-recovery.ps1
+          .\scripts\winterm\test-workspace-import.ps1

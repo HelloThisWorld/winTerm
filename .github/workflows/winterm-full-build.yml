@@ -36,6 +36,10 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\test-shell-integration.ps1 -Shell All
 
+      - name: Validate workspace fixtures and security boundaries
+        shell: pwsh
+        run: .\scripts\winterm\validate-workspaces.ps1 -BundledFixtures
+
       - name: Build x64
         shell: pwsh
         run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
@@ -43,6 +47,10 @@ jobs:
       - name: Run relevant upstream tests
         shell: pwsh
         run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration ${{ matrix.configuration }} -Platform x64
+
+      - name: Run workspace benchmark
+        shell: pwsh
+        run: .\scripts\winterm\benchmark-workspace.ps1
 
   package:
     name: x64 Release MSIX

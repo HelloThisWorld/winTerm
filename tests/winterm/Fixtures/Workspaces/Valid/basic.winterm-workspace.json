@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.fixture-basic",
+  "name": "Fixture Basic",
+  "description": "A deterministic workspace validation fixture.",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
+  "source": "user",
+  "applicationVersion": "0.4.0-dev",
+  "protocolVersion": 1,
+  "startupBehavior": {
+    "restoreFocus": true,
+    "restoreWindowState": true
+  },
+  "activeWindowId": "window-1",
+  "tags": ["fixture"],
+  "isDefault": false,
+  "windows": [
+    {
+      "id": "window-1",
+      "displayName": "Fixture",
+      "monitor": {
+        "deviceId": "DISPLAY-A",
+        "stableId": "fixture-monitor-a",
+        "friendlyName": "Primary Monitor",
+        "workArea": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        "dpiX": 96,
+        "dpiY": 96,
+        "isPrimary": true
+      },
+      "bounds": { "x": 100, "y": 80, "width": 1200, "height": 800 },
+      "normalizedBounds": { "x": 0.052, "y": 0.074, "width": 0.625, "height": 0.741 },
+      "windowState": "normal",
+      "isAlwaysOnTop": false,
+      "activeTabId": "tab-1",
+      "tabs": [
+        {
+          "id": "tab-1",
+          "title": "PowerShell",
+          "customTitle": false,
+          "themeId": "winterm.midnight",
+          "activePaneId": "pane-1",
+          "isReadOnly": false,
+          "panes": [
+            {
+              "id": "pane-1",
+              "profileId": "{fixture-powershell}",
+              "profileNameFallback": "PowerShell",
+              "profileSource": "Windows.Terminal.PowershellCore",
+              "stableProfileId": "powershell",
+              "shellType": "powershell",
+              "workingDirectory": {
+                "kind": "windows",
+                "value": "C:\\Projects\\winTerm",
+                "source": "shellIntegration",
+                "verifiedAt": "2026-07-15T00:00:00Z"
+              },
+              "startingDirectoryFallback": "C:\\Projects",
+              "title": "PowerShell",
+              "font": {},
+              "session": {
+                "wasCommandRunning": false,
+                "endedUnexpectedly": false
+              }
+            }
+          ],
+          "layout": { "type": "pane", "paneId": "pane-1" }
+        }
+      ]
+    }
+  ]
+}

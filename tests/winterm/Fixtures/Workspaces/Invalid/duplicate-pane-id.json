@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.invalid-duplicate",
+  "name": "Invalid duplicate",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
+  "source": "user",
+  "applicationVersion": "0.4.0-dev",
+  "protocolVersion": 1,
+  "windows": [
+    {
+      "id": "window-1",
+      "monitor": { "workArea": { "x": 0, "y": 0, "width": 1920, "height": 1080 }, "dpiX": 96, "dpiY": 96 },
+      "bounds": { "x": 0, "y": 0, "width": 1000, "height": 700 },
+      "normalizedBounds": { "x": 0, "y": 0, "width": 0.5, "height": 0.5 },
+      "windowState": "normal",
+      "tabs": [
+        {
+          "id": "tab-1",
+          "panes": [
+            { "id": "pane-1", "shellType": "powershell", "workingDirectory": { "kind": "unknown", "source": "unknown" } },
+            { "id": "pane-1", "shellType": "cmd", "workingDirectory": { "kind": "unknown", "source": "unknown" } }
+          ],
+          "layout": {
+            "type": "split",
+            "orientation": "vertical",
+            "ratio": 0.5,
+            "first": { "type": "pane", "paneId": "pane-1" },
+            "second": { "type": "pane", "paneId": "pane-1" }
+          }
+        }
+      ]
+    }
+  ]
+}
