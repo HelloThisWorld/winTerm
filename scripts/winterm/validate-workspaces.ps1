@@ -34,6 +34,20 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+function ConvertFrom-WorkspaceJson
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Content
+    )
+
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind'))
+    {
+        return $Content | ConvertFrom-Json -DateKind String -ErrorAction Stop
+    }
+    return $Content | ConvertFrom-Json -ErrorAction Stop
+}
+
 $maximumFileSize = 5MB
 $maximumWindows = 32
 $maximumTabsPerWindow = 128
@@ -387,7 +401,7 @@ function Read-AndValidateWorkspace
     $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
     try
     {
-        $document = $content | ConvertFrom-Json -ErrorAction Stop
+        $document = ConvertFrom-WorkspaceJson -Content $content
     }
     catch
     {
@@ -509,7 +523,7 @@ try
     {
         $documents = foreach ($workspacePath in $pathsToValidate)
         {
-            (Get-Content -LiteralPath $workspacePath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop)
+            ConvertFrom-WorkspaceJson -Content (Get-Content -LiteralPath $workspacePath -Raw -Encoding UTF8)
         }
         Write-IndexAtomically -WorkspaceStorageRoot $StorageRoot -NamedWorkspaces @($documents)
     }
