@@ -15,7 +15,7 @@ Run source validation first:
 
 ## 2. Set release identity
 
-For a local development package, the v0.3 manifest uses version `0.3.0.0` and publisher `CN=winTerm Development`.
+For a local development package, the v0.4 manifest uses version `0.4.0.0` and publisher `CN=winTerm Development`.
 
 For a public release:
 

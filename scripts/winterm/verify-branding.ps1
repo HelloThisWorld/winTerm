@@ -73,7 +73,7 @@ function Test-Manifest
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -eq 'Kaname.winTerm') -Message "$Path uses package identity Kaname.winTerm"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -notmatch '^Microsoft\.') -Message "$Path does not use a Microsoft package name"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Publisher -eq 'CN=winTerm Development') -Message "$Path uses the documented development publisher placeholder"
-    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '0.3.0.0') -Message "$Path uses package version 0.3.0.0"
+    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '0.4.0.0') -Message "$Path uses package version 0.4.0.0"
     Test-Requirement -Condition ($null -ne $properties -and $properties.DisplayName -eq 'winTerm') -Message "$Path package display name is winTerm"
     Test-Requirement -Condition ($null -ne $application -and $application.Id -eq 'winTerm') -Message "$Path application ID is winTerm"
     Test-Requirement -Condition ($null -ne $visualElements -and $visualElements.DisplayName -eq 'winTerm') -Message "$Path application display name is winTerm"
