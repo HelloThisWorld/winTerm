@@ -182,13 +182,13 @@ DirectoryResolution DirectoryResolver::Resolve(const WorkingDirectoryDescriptor&
     {
         const auto exists = context.pathExists ? context.pathExists : [](const std::string_view value) {
             std::error_code error;
-            return std::filesystem::is_directory(std::filesystem::u8path(std::string{ value }), error);
+            return std::filesystem::is_directory(std::filesystem::path{ til::u8u16(value) }, error);
         };
         if (exists(directory.value))
         {
             return { ResolutionStatus::Exact, directory.kind, directory.value, {} };
         }
-        auto candidate = std::filesystem::u8path(directory.value);
+        auto candidate = std::filesystem::path{ til::u8u16(directory.value) };
         while (candidate.has_parent_path() && candidate.parent_path() != candidate)
         {
             candidate = candidate.parent_path();

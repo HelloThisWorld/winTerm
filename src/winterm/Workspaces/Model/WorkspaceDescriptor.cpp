@@ -144,7 +144,7 @@ std::string_view winTerm::Workspaces::ToString(const WorkingDirectorySource valu
 
 std::optional<WorkspaceSource> winTerm::Workspaces::WorkspaceSourceFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<WorkspaceSource, std::string_view> values[]{
         std::pair{ WorkspaceSource::Runtime, std::string_view{ "runtime" } },
         std::pair{ WorkspaceSource::User, std::string_view{ "user" } },
         std::pair{ WorkspaceSource::Imported, std::string_view{ "imported" } },
@@ -155,7 +155,7 @@ std::optional<WorkspaceSource> winTerm::Workspaces::WorkspaceSourceFromString(co
 
 std::optional<WindowState> winTerm::Workspaces::WindowStateFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<WindowState, std::string_view> values[]{
         std::pair{ WindowState::Normal, std::string_view{ "normal" } },
         std::pair{ WindowState::Maximized, std::string_view{ "maximized" } },
         std::pair{ WindowState::Fullscreen, std::string_view{ "fullscreen" } },
@@ -166,7 +166,7 @@ std::optional<WindowState> winTerm::Workspaces::WindowStateFromString(const std:
 
 std::optional<LayoutNodeType> winTerm::Workspaces::LayoutNodeTypeFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<LayoutNodeType, std::string_view> values[]{
         std::pair{ LayoutNodeType::Pane, std::string_view{ "pane" } },
         std::pair{ LayoutNodeType::Split, std::string_view{ "split" } },
     };
@@ -175,7 +175,7 @@ std::optional<LayoutNodeType> winTerm::Workspaces::LayoutNodeTypeFromString(cons
 
 std::optional<SplitOrientation> winTerm::Workspaces::SplitOrientationFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<SplitOrientation, std::string_view> values[]{
         std::pair{ SplitOrientation::Horizontal, std::string_view{ "horizontal" } },
         std::pair{ SplitOrientation::Vertical, std::string_view{ "vertical" } },
     };
@@ -184,7 +184,7 @@ std::optional<SplitOrientation> winTerm::Workspaces::SplitOrientationFromString(
 
 std::optional<ShellType> winTerm::Workspaces::ShellTypeFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<ShellType, std::string_view> values[]{
         std::pair{ ShellType::Unknown, std::string_view{ "unknown" } },
         std::pair{ ShellType::PowerShell, std::string_view{ "powershell" } },
         std::pair{ ShellType::WindowsPowerShell, std::string_view{ "windowsPowerShell" } },
@@ -198,7 +198,7 @@ std::optional<ShellType> winTerm::Workspaces::ShellTypeFromString(const std::str
 
 std::optional<WorkingDirectoryKind> winTerm::Workspaces::WorkingDirectoryKindFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<WorkingDirectoryKind, std::string_view> values[]{
         std::pair{ WorkingDirectoryKind::Unknown, std::string_view{ "unknown" } },
         std::pair{ WorkingDirectoryKind::Windows, std::string_view{ "windows" } },
         std::pair{ WorkingDirectoryKind::Unc, std::string_view{ "unc" } },
@@ -210,7 +210,7 @@ std::optional<WorkingDirectoryKind> winTerm::Workspaces::WorkingDirectoryKindFro
 
 std::optional<WorkingDirectorySource> winTerm::Workspaces::WorkingDirectorySourceFromString(const std::string_view value) noexcept
 {
-    static constexpr std::pair values[]{
+    static constexpr std::pair<WorkingDirectorySource, std::string_view> values[]{
         std::pair{ WorkingDirectorySource::Unknown, std::string_view{ "unknown" } },
         std::pair{ WorkingDirectorySource::ShellIntegration, std::string_view{ "shellIntegration" } },
         std::pair{ WorkingDirectorySource::Profile, std::string_view{ "profile" } },
