@@ -10,7 +10,7 @@ permissions:
 jobs:
   build-and-test:
     name: x64 ${{ matrix.configuration }} build and relevant tests
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -56,7 +56,7 @@ jobs:
   package:
     name: x64 Release MSIX
     needs: build-and-test
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 180
 
     steps:
