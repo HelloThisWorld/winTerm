@@ -12,7 +12,10 @@ namespace
 {
     RestoreItemStatus CombinedStatus(const PaneRestorePlan& pane)
     {
-        if (!pane.profile.profile)
+        // A substituted default profile means the pane's saved content could not
+        // be restored; report that as an isolated failure even though the pane
+        // still opens with the fallback profile.
+        if (!pane.profile.profile || pane.profile.status == ResolutionStatus::SafeDefault)
         {
             return RestoreItemStatus::Failed;
         }

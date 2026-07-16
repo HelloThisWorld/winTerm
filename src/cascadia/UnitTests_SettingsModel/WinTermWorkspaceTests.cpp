@@ -256,6 +256,8 @@ namespace SettingsModelUnitTests
     {
         auto workspace = ValidWorkspace(2);
         workspace.windows.front().tabs.front().panes[1].profileId = "missing";
+        workspace.windows.front().tabs.front().panes[1].profileSource.clear();
+        workspace.windows.front().tabs.front().panes[1].stableProfileId.clear();
         workspace.windows.front().tabs.front().panes[1].profileNameFallback = "Missing";
         workspace.windows.front().tabs.front().panes[1].shellType = ShellType::Wsl;
 
