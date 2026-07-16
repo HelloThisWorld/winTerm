@@ -5,6 +5,7 @@
 #include "ColorSchemes.h"
 #include "ColorTableEntry.g.cpp"
 #include "ColorSchemes.g.cpp"
+#include "../WinRTUtils/inc/Utils.h"
 #include "../../winterm/Appearance/Importers/WindowsTerminalSchemeImporter.h"
 #include "../../winterm/Appearance/Themes/ThemeLoader.h"
 

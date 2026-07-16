@@ -306,17 +306,17 @@ function Invoke-OpenConsoleTests()
 function Invoke-OpenConsoleBuild()
 {
     $root = Find-OpenConsoleRoot
-    & "$root\dep\nuget\nuget.exe" restore "$root\OpenConsole.slnx"
+    & "$root\dep\nuget\nuget.exe" restore "$root\build\packages.config"
     if ($LASTEXITCODE -ne 0)
     {
-        throw "NuGet solution restore failed with exit code $LASTEXITCODE."
+        throw "NuGet build dependency restore failed with exit code $LASTEXITCODE."
     }
     & "$root\dep\nuget\nuget.exe" restore "$root\dep\nuget\packages.config"
     if ($LASTEXITCODE -ne 0)
     {
         throw "NuGet dependency restore failed with exit code $LASTEXITCODE."
     }
-    msbuild.exe "$root\OpenConsole.slnx" @args
+    msbuild.exe "$root\OpenConsole.slnx" /restore @args
     if ($LASTEXITCODE -ne 0)
     {
         throw "MSBuild failed with exit code $LASTEXITCODE."

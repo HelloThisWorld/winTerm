@@ -82,6 +82,24 @@ function Assert-NonEmptyString
     }
 }
 
+function Test-Integer
+{
+    param(
+        [Parameter(Mandatory)]
+        [AllowNull()]
+        [object]$Value
+    )
+
+    return $Value -is [sbyte] -or
+        $Value -is [byte] -or
+        $Value -is [int16] -or
+        $Value -is [uint16] -or
+        $Value -is [int32] -or
+        $Value -is [uint32] -or
+        $Value -is [int64] -or
+        $Value -is [uint64]
+}
+
 function Read-JsonFile
 {
     param(
@@ -510,7 +528,11 @@ function Test-FontManifest
         Assert-ObjectSchema -Object $weightRange -Required @('min', 'max') -Allowed @('min', 'max') -Context "Font '$id'.weightRange"
         $minimumWeight = Get-RequiredProperty -Object $weightRange -Name 'min' -Context "Font '$id'.weightRange"
         $maximumWeight = Get-RequiredProperty -Object $weightRange -Name 'max' -Context "Font '$id'.weightRange"
-        if ($minimumWeight -isnot [int] -or $maximumWeight -isnot [int] -or $minimumWeight -lt 1 -or $maximumWeight -gt 1000 -or $minimumWeight -gt $maximumWeight)
+        if (-not (Test-Integer -Value $minimumWeight) -or
+            -not (Test-Integer -Value $maximumWeight) -or
+            $minimumWeight -lt 1 -or
+            $maximumWeight -gt 1000 -or
+            $minimumWeight -gt $maximumWeight)
         {
             throw "Font '$id'.weightRange must contain integer min/max values from 1 through 1000."
         }

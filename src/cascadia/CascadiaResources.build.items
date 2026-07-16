@@ -58,7 +58,7 @@
       <DeploymentContent>true</DeploymentContent>
       <Link>ShellAssets\version.json</Link>
     </Content>
-    <Content Include="$(OpenConsoleCommonOutDir)winterm-shim.exe" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
+    <Content Include="$(OpenConsoleDir)bin\$(Platform)\$(Configuration)\winterm-shim.exe" Condition="'$(WindowsTerminalBranding)'=='WinTerm'">
       <DeploymentContent>true</DeploymentContent>
       <Link>ShellAssets\winterm-shim.exe</Link>
     </Content>

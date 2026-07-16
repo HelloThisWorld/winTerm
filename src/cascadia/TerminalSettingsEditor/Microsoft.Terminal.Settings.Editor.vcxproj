@@ -10,7 +10,7 @@
       <Private>false</Private>
     </Reference>
     <ClCompile>
-      <AdditionalIncludeDirectories>"$(OpenConsoleDir)src\cascadia\TerminalSettingsModel\Generated Files";%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(OpenConsoleDir)src\cascadia\TerminalSettingsModel\Generated Files;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <PropertyGroup Label="Globals">

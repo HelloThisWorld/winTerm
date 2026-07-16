@@ -1,6 +1,7 @@
 name: winTerm full Windows build
 
 on:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -9,7 +10,7 @@ permissions:
 jobs:
   build-and-test:
     name: x64 ${{ matrix.configuration }} build and relevant tests
-    runs-on: [self-hosted, windows, x64, winterm-build]
+    runs-on: windows-2022
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -36,6 +37,10 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\test-shell-integration.ps1 -Shell All
 
+      - name: Validate workspace fixtures and security boundaries
+        shell: pwsh
+        run: .\scripts\winterm\validate-workspaces.ps1 -BundledFixtures
+
       - name: Build x64
         shell: pwsh
         run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
@@ -44,10 +49,14 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration ${{ matrix.configuration }} -Platform x64
 
+      - name: Run workspace benchmark
+        shell: pwsh
+        run: .\scripts\winterm\benchmark-workspace.ps1
+
   package:
     name: x64 Release MSIX
     needs: build-and-test
-    runs-on: [self-hosted, windows, x64, winterm-build]
+    runs-on: windows-2022
     timeout-minutes: 180
 
     steps:

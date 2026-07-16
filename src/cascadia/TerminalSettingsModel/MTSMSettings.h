@@ -18,6 +18,12 @@ Author(s):
 // Macro format (defaultArgs are optional):
 // (type, name, jsonKey, defaultArgs)
 
+#if defined(WT_BRANDING_WINTERM)
+#define MTSM_FIRST_WINDOW_PREFERENCE_DEFAULT FirstWindowPreference::PersistedLayout
+#else
+#define MTSM_FIRST_WINDOW_PREFERENCE_DEFAULT FirstWindowPreference::DefaultProfile
+#endif
+
 #define MTSM_GLOBAL_SETTINGS(X)                                                                                                                                                                       \
     X(int32_t, InitialRows, "initialRows", 30)                                                                                                                                                        \
     X(int32_t, InitialCols, "initialCols", 80)                                                                                                                                                        \
@@ -50,7 +56,7 @@ Author(s):
     X(winrt::Microsoft::Terminal::Control::WarnAboutMultiLinePaste, WarnAboutMultiLinePaste, "warning.multiLinePaste", winrt::Microsoft::Terminal::Control::WarnAboutMultiLinePaste::Automatic)       \
     X(Model::LaunchPosition, InitialPosition, "initialPosition", nullptr, nullptr)                                                                                                                    \
     X(bool, CenterOnLaunch, "centerOnLaunch", false)                                                                                                                                                  \
-    X(Model::FirstWindowPreference, FirstWindowPreference, "firstWindowPreference", FirstWindowPreference::DefaultProfile)                                                                            \
+    X(Model::FirstWindowPreference, FirstWindowPreference, "firstWindowPreference", MTSM_FIRST_WINDOW_PREFERENCE_DEFAULT)                                                                             \
     X(Model::LaunchMode, LaunchMode, "launchMode", LaunchMode::DefaultMode)                                                                                                                           \
     X(bool, SnapToGridOnResize, "snapToGridOnResize", true)                                                                                                                                           \
     X(bool, DebugFeaturesEnabled, "debugFeatures", debugFeaturesDefault)                                                                                                                              \

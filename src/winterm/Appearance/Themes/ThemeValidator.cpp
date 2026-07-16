@@ -51,6 +51,10 @@ bool ThemeValidator::TryNormalizeColor(const std::string_view input, std::string
     {
         value.remove_prefix(2);
     }
+    else if (value.front() == '#')
+    {
+        value.remove_prefix(1);
+    }
 
     if (value.size() == 3 || value.size() == 4)
     {
@@ -77,30 +81,17 @@ bool ThemeValidator::TryNormalizeColor(const std::string_view input, std::string
         return true;
     }
 
-    if (value.front() != '#')
-    {
-        if (value.size() != 6 && value.size() != 8)
-        {
-            return false;
-        }
-        normalized.push_back('#');
-    }
-
-    const auto digits = value.front() == '#' ? value.substr(1) : value;
-    if (digits.size() != 6 && digits.size() != 8)
+    if (value.size() != 6 && value.size() != 8)
     {
         return false;
     }
-    if (!std::all_of(digits.begin(), digits.end(), IsHexDigit))
+    if (!std::all_of(value.begin(), value.end(), IsHexDigit))
     {
         return false;
     }
 
-    if (normalized.empty())
-    {
-        normalized.push_back('#');
-    }
-    std::transform(digits.begin(), digits.end(), std::back_inserter(normalized), ToUpperHex);
+    normalized.push_back('#');
+    std::transform(value.begin(), value.end(), std::back_inserter(normalized), ToUpperHex);
     return true;
 }
 

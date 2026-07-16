@@ -18,7 +18,7 @@
   <Identity
     Name="Kaname.winTerm"
     Publisher="CN=winTerm Development"
-    Version="0.3.0.0" />
+    Version="0.4.0.0" />
 
   <Properties>
     <DisplayName>winTerm</DisplayName>

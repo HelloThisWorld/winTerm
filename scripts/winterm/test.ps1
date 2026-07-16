@@ -142,6 +142,31 @@ function Test-ShellExperienceFoundations
     Write-Host 'PASS: Shell Experience source foundations' -ForegroundColor Green
 }
 
+function Test-WorkspaceFoundations
+{
+    $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+    $settingsModel = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\TerminalSettingsModel\MTSMSettings.h') -Raw
+    if (-not ($settingsModel.Contains('WT_BRANDING_WINTERM') -and $settingsModel.Contains('FirstWindowPreference::PersistedLayout')))
+    {
+        throw 'winTerm does not default to the inherited safe persisted-layout startup path.'
+    }
+
+    foreach ($scriptName in @(
+        'test-workspace-model.ps1',
+        'test-workspace-restore.ps1',
+        'test-workspace-recovery.ps1',
+        'test-workspace-import.ps1'
+    ))
+    {
+        & (Join-Path $PSScriptRoot $scriptName)
+        if (-not $?)
+        {
+            throw "Workspace validation script '$scriptName' failed."
+        }
+    }
+    Write-Host 'PASS: Workspace Restore source foundations' -ForegroundColor Green
+}
+
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $originalLocation = Get-Location
 
@@ -170,6 +195,7 @@ try
 
     Test-ProfileFoundations -RepositoryRoot $repositoryRoot
     Test-ShellExperienceFoundations -RepositoryRoot $repositoryRoot
+    Test-WorkspaceFoundations
 
     if ($Suite -eq 'Smoke')
     {

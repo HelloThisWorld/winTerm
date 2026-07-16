@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.security-executable",
+  "name": "Security executable",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
+  "executablePath": "C:\\Temp\\untrusted.exe",
+  "windows": []
+}
