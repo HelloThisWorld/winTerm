@@ -5,7 +5,7 @@
 - Start from a clean, reviewed branch.
 - Record the exact Microsoft Terminal upstream commit.
 - Confirm `git diff` contains no generated build output, certificate, key, credential, unmanifested font or theme, or downloaded logo.
-- Confirm the release contains no post-v0.2 or out-of-scope feature work.
+- Confirm the release contains no post-v0.5 or out-of-scope feature work.
 
 Run source validation first:
 
@@ -15,7 +15,7 @@ Run source validation first:
 
 ## 2. Set release identity
 
-For a local development package, the v0.4 manifest uses version `0.4.0.0` and publisher `CN=winTerm Development`.
+For a local development package, the v0.5 manifest uses version `0.5.0.0` and publisher `CN=winTerm Development`.
 
 For a public release:
 

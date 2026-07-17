@@ -41,9 +41,9 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' must claim winterm.exe and must not claim wt.exe."
     }
-    if ($identity.Version -ne '0.4.0.0')
+    if ($identity.Version -ne '0.5.0.0')
     {
-        throw "Package '$Path' must use the winTerm v0.4 package version."
+        throw "Package '$Path' must use the winTerm v0.5 package version."
     }
 }
 

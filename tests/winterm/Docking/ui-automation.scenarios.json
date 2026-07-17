@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "suite": "winTerm v0.5 local docking UI automation",
+  "execution": "manual-local",
+  "scenarios": [
+    "drag-tab-within-window",
+    "drag-tab-to-another-window",
+    "drag-tab-to-edge",
+    "drag-pane-to-empty-slot",
+    "cancel-with-escape",
+    "keyboard-docking",
+    "undo-redo"
+  ],
+  "privacy": {
+    "captureTerminalOutput": false,
+    "captureCommandText": false,
+    "captureClipboard": false,
+    "useRealUserWorkspace": false
+  }
+}

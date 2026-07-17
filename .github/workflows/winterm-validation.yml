@@ -47,3 +47,22 @@ jobs:
           .\scripts\winterm\test-workspace-restore.ps1
           .\scripts\winterm\test-workspace-recovery.ps1
           .\scripts\winterm\test-workspace-import.ps1
+
+      - name: Validate docking model, transactions, ownership, and history
+        shell: powershell
+        run: |
+          .\scripts\winterm\test-layout-transformations.ps1
+          .\scripts\winterm\test-docking-transactions.ps1
+          .\scripts\winterm\test-session-transfer.ps1
+          .\scripts\winterm\test-layout-history.ps1
+
+      - name: Validate docking overlay, accessibility, diagnostics, and local UI suite
+        shell: powershell
+        run: |
+          .\scripts\winterm\test-docking-presentation.ps1
+          .\scripts\winterm\test-docking-ui.ps1 -Mode Validate
+          .\scripts\winterm\validate-layout.ps1 -TestFixture empty-slot.winterm-workspace.json
+
+      - name: Run non-runtime docking benchmark
+        shell: powershell
+        run: .\scripts\winterm\benchmark-docking.ps1
