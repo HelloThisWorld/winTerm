@@ -245,6 +245,10 @@
     <ClInclude Include="..\..\winterm\Docking\Layout\LayoutValidator.h" />
     <ClInclude Include="..\..\winterm\Docking\Layout\LayoutTransformer.h" />
     <ClInclude Include="..\..\winterm\Docking\Layout\LayoutGeometry.h" />
+    <ClInclude Include="..\..\winterm\Docking\Drag\DockDragSession.h" />
+    <ClInclude Include="..\..\winterm\Docking\Sessions\SessionOwnership.h" />
+    <ClInclude Include="..\..\winterm\Docking\Transactions\LayoutTransaction.h" />
+    <ClInclude Include="..\..\winterm\Docking\History\LayoutHistory.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.h" />
@@ -296,6 +300,10 @@
     <ClCompile Include="..\..\winterm\Docking\Layout\LayoutValidator.cpp" />
     <ClCompile Include="..\..\winterm\Docking\Layout\LayoutTransformer.cpp" />
     <ClCompile Include="..\..\winterm\Docking\Layout\LayoutGeometry.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Drag\DockDragSession.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Sessions\SessionOwnership.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Transactions\LayoutTransaction.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\History\LayoutHistory.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.cpp" />
