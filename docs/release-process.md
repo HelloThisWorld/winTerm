@@ -1,83 +1,77 @@
-# winTerm release process
+# winTerm Stable release process
 
-## 1. Establish the release input
+## 1. Select exact source
 
-- Start from a clean, reviewed branch.
-- Record the exact Microsoft Terminal upstream commit.
-- Confirm `git diff` contains no generated build output, certificate, key, credential, unmanifested font or theme, or downloaded logo.
-- Confirm the release contains no post-v0.5 or out-of-scope feature work.
+Start from reviewed `main`, create a release branch, and record:
 
-Run source validation first:
+- repository and branch;
+- commit SHA and v0.6 baseline;
+- Microsoft Terminal upstream revision;
+- clean working tree and untracked files;
+- CI, package, signing, architecture, and blocker status.
+
+Run:
 
 ```powershell
-.\scripts\winterm\test.ps1 -Suite Smoke
+.\scripts\winterm\verify-version.ps1
+.\scripts\winterm\test.ps1 -Suite Smoke -Configuration Release -Platform x64
 ```
 
-## 2. Set release identity
+Do not tag, publish, force-push, or overwrite user work at this stage.
 
-For a local development package, the v0.5 manifest uses version `0.5.0.0` and publisher `CN=winTerm Development`.
+## 2. Run compiled and manual gates
 
-For a public release:
-
-1. Update the package version according to the chosen release channel.
-2. Replace the manifest publisher with the real publisher identity.
-3. Use a code-signing certificate with a subject that exactly matches that publisher.
-4. Recheck package family, upgrade, uninstall, and side-by-side behavior.
-
-Do not commit a PFX, private key, password, certificate export, Store credential, or CI secret.
-
-## 3. Build and test x64
-
-Use a provisioned Windows 11 x64 machine and PowerShell 7:
+Build and test x64 with PowerShell 7, Visual Studio, and Windows SDK 10.0.22621.0:
 
 ```powershell
-.\scripts\winterm\build.ps1 -Configuration Debug -Platform x64 -IncludeTests
-.\scripts\winterm\test.ps1 -Suite Relevant -Configuration Debug -Platform x64
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
-```
-
-Run `-Suite Full` for release candidates when runner time permits. Record all failures, skips, warnings, and test binaries used.
-
-## 4. Create and inspect the package
-
-```powershell
 .\scripts\winterm\package.ps1 -Platform x64
-.\scripts\winterm\verify-branding.ps1 -PackageOutput <path-to-winTerm.msix>
 ```
 
-The wrapper intentionally generates an unsigned MSIX. It reports the artifact under `src/cascadia/CascadiaPackage/AppPackages`, validates the embedded identity and alias, and reports signing status.
+Then validate a production-signed package on a clean Windows 11 x64 machine: install, launch, PowerShell, CMD, tabs, panes, Workspace save/restore, restart, upgrade from 0.6, uninstall, reinstall, `winterm.exe`, Windows Terminal coexistence, and continued ownership of `wt.exe` by Windows Terminal.
 
-Sign only in a controlled release environment. A typical Windows SDK operation is:
+Complete Narrator, keyboard, contrast, scaling, privacy, diagnostics, performance, and soak evidence. ARM64 is published only after separate native evidence.
 
-```powershell
-signtool.exe sign /fd SHA256 /f <path-to-certificate.pfx> <path-to-winTerm.msix>
-```
+## 3. Configure protected signing
 
-Supply passwords through an approved secret mechanism, not a command committed to this repository. Verify the result:
+The `winterm-stable-release` GitHub environment owns:
 
-```powershell
-Get-AuthenticodeSignature <path-to-winTerm.msix>
-```
+- `WINTERM_SIGNING_PFX_BASE64` secret;
+- `WINTERM_SIGNING_PFX_PASSWORD` secret;
+- `WINTERM_PACKAGE_PUBLISHER` protected variable;
+- `WINTERM_TIMESTAMP_URL` protected variable;
+- required reviewers.
 
-## 5. Install and perform acceptance
+The workflow validates certificate purpose, subject, expiry, private key, timestamp, package Publisher, package identity, alias, and signature. It deletes the ephemeral PFX. Never echo or commit signing material.
 
-Trust only the intended development or release certificate, then install the signed package:
+## 4. Merge, tag, and prepare Draft
 
-```powershell
-Add-AppxPackage -Path <path-to-winTerm.msix>
-```
+After every pre-tag gate is reviewed:
 
-If MSBuild emits an `Add-AppDevPackage.ps1` helper, inspect its certificate and script before running it. The package script never installs a certificate automatically.
+1. merge the release PR to `main`;
+2. record the exact merge commit;
+3. create annotated tag `v1.0.0` on that commit;
+4. push only the tag;
+5. let `.github/workflows/release.yml` build from the clean tag checkout.
 
-Complete every manual item in `docs/v0.2-acceptance.md`, including side-by-side installation with Microsoft Windows Terminal, aliases, first-launch state, profiles, tabs, panes, settings, Theme import and export, app-private fonts, command palette, clipboard, CJK input, ANSI colors, emoji, Powerline, upgrade, and uninstall behavior.
+The prepare mode creates a Draft, uploads an allowlist, generates Attestations, re-downloads every asset, verifies hashes, package identity, architecture, alias, Publisher, signature when present, and Attestation. It never uses `--clobber`.
 
-## 6. Publish deliberately
+If production signing is unavailable, the Draft is explicitly blocked and remains unsigned. Do not promote it.
 
-- Publish only reviewed, signed artifacts and their checksums.
-- State architecture, version, upstream baseline, publisher, signing status, and known limitations.
-- Keep CI free of Store publishing and real signing credentials.
-- Do not overwrite an existing release or automatically publish to a Store.
-- Tag and release only after the acceptance checklist is complete.
+## 5. Publish deliberately
 
-ARM64 must not be advertised until its build, tests, package, install, and manual acceptance have been run independently.
+Run workflow dispatch from the `v1.0.0` tag in `publish` mode. Supply the exact commit that passed clean install, upgrade, uninstall, alias, and coexistence validation. The protected environment reviewers confirm all manual evidence.
+
+The workflow re-downloads the Draft, requires a valid trusted signature and timestamp, verifies checksums and Attestation, then sets Draft false, Prerelease false, and Latest. It re-downloads the public assets into a new directory and verifies hashes again.
+
+The phase remains open until a clean Windows 11 machine installs and launches the publicly downloaded package. If that smoke test fails, do not replace the `v1.0.0` asset; record the incident and prepare `v1.0.1`.
+
+## 6. Post-release metadata
+
+Only after the public URL and asset hash exist:
+
+- generate the stable update manifest with `generate-stable-update-manifest.ps1`;
+- run the WinGet workflow and `winget validate`;
+- update the README to link `/releases/latest`;
+- record Release ID, URL, workflow run, assets, hashes, signatures, installation results, and remaining issues.

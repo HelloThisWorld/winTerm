@@ -1,6 +1,6 @@
 # PowerShell integration
 
-The packaged module is `ShellAssets\powershell\winTerm.Shell\winTerm.Shell.psd1`, version `0.3.0`. It supports PowerShell 7 and Windows PowerShell 5.1 with the same syntax.
+The packaged module is `ShellAssets\powershell\winTerm.Shell\winTerm.Shell.psd1`, version `1.0.0`. It supports PowerShell 7 and Windows PowerShell 5.1 with the same syntax.
 
 An explicit winTerm profile launcher must set these process-local variables before importing the module:
 

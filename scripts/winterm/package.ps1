@@ -8,7 +8,11 @@ param(
     [string]$Platform = 'x64',
 
     [Parameter()]
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+
+    [Parameter()]
+    [ValidatePattern('^CN=')]
+    [string]$ExpectedPublisher = 'CN=winTerm Development'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,7 +22,10 @@ function Assert-WinTermManifest
 {
     param(
         [Parameter(Mandatory)]
-        [string]$Path
+    [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$Publisher
     )
 
     [xml]$manifest = Get-Content -LiteralPath $Path -Raw
@@ -31,9 +38,9 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' does not use the Kaname.winTerm identity."
     }
-    if ($identity.Publisher -match 'Microsoft')
+    if ($identity.Publisher -match 'Microsoft' -or $identity.Publisher -cne $Publisher)
     {
-        throw "Package '$Path' uses a forbidden Microsoft publisher identity."
+        throw "Package '$Path' does not use the expected non-Microsoft publisher identity."
     }
 
     $aliases = @($manifest.SelectNodes('//uap3:AppExecutionAlias/*', $namespaceManager) | ForEach-Object { $_.Alias })
@@ -41,9 +48,9 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' must claim winterm.exe and must not claim wt.exe."
     }
-    if ($identity.Version -ne '0.6.0.0')
+    if ($identity.Version -ne '1.0.0.0')
     {
-        throw "Package '$Path' must use the winTerm v0.6 package version."
+        throw "Package '$Path' must use the winTerm 1.0.0.0 package version."
     }
 }
 
@@ -132,7 +139,7 @@ $temporaryDirectory = $null
 
 try
 {
-    Assert-WinTermManifest -Path $sourceManifest
+    Assert-WinTermManifest -Path $sourceManifest -Publisher $ExpectedPublisher
 
     if (-not $SkipBuild)
     {
@@ -172,7 +179,7 @@ try
         throw "makeappx.exe failed to unpack '$($artifact.FullName)' with exit code $LASTEXITCODE."
     }
 
-    Assert-WinTermManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml')
+    Assert-WinTermManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml') -Publisher $ExpectedPublisher
     Assert-AppearancePayload -Path $temporaryDirectory -RepositoryRoot $repositoryRoot
     & (Join-Path $PSScriptRoot 'package-shell-assets.ps1') -PackageRoot $temporaryDirectory
     if (-not $?)

@@ -2,7 +2,7 @@
 
 ## Public identity
 
-| Surface | v0.1 value |
+| Surface | winTerm 1.0 value |
 | --- | --- |
 | Product and display name | `winTerm` |
 | Package name | `Kaname.winTerm` |
@@ -10,45 +10,30 @@
 | Execution alias | `winterm.exe` |
 | Forbidden alias | `wt.exe` |
 | Development publisher | `CN=winTerm Development` |
-| Package version | `0.6.0.0` |
-| Release status | `0.6.0-beta.1`; public beta preparation |
+| Stable publisher | Injected only from the protected signing environment and required to match the production certificate subject |
+| Package version | `1.0.0.0` |
+| Application version | `1.0.0` |
+| Release channel | `stable` |
 | Package description | `Independent open-source terminal based on Microsoft Windows Terminal` |
 
-The WinTerm build brand selects these values without changing Microsoft Terminal Stable, Preview, Canary, or Dev package identities. Unique WinTerm COM handoff and shell-extension identifiers are used so package registration does not replace the upstream application.
+The WinTerm build brand does not change Microsoft Terminal Stable, Preview, Canary, or Dev package identities. Unique winTerm package, application-data, COM handoff, and shell-extension identities prevent package registration from replacing the upstream application.
 
-The terminal host may retain the internal filename `WindowsTerminal.exe`, and upstream project names, namespaces, API contracts, compatibility identifiers, and source paths remain unchanged. Its WinTerm build metadata uses product name `winTerm` and description `winTerm Terminal Host`. The package maps the upstream launcher output to `winterm.exe`; it does not ship or register `wt.exe` for the WinTerm brand.
+The terminal host may retain the internal filename `WindowsTerminal.exe`, and upstream project names, namespaces, API contracts, compatibility identifiers, and source paths remain unchanged. The package maps the launcher output to `winterm.exe`; it neither ships nor registers `wt.exe`.
 
-## URI protocol
+## Publisher and signing
 
-No `winterm:` URI protocol is registered in v0.1. The upstream package does not provide a reusable URI activation handler that can be renamed safely as a packaging-only change. Registering a protocol without an activation contract would expose a broken public interface. A protocol can be designed in a later version only with an explicit parser, security review, tests, and compatibility policy.
+`CN=winTerm Development` is a source-controlled development placeholder, not a production publisher. The protected Release workflow may replace it only in the clean tag checkout immediately before packaging. The certificate subject must exactly match the injected Publisher. A private key, PFX, password, token, or signing-service credential must never be committed or uploaded as a release asset.
 
-## Signing identity
+An unsigned package can exist only in an explicitly blocked Draft Release. It cannot be described or published as a Stable installer.
 
-`CN=winTerm Development` is a local-development placeholder, not a production publisher. The subject of any signing certificate must match the manifest Publisher value. Before a public release, replace both values with the publisher's real identity, validate upgrades and side-by-side behavior, and keep the certificate, private key, password, and secret-provider configuration outside Git.
+## Application data and coexistence
 
-## Application data
+Packaged winTerm has its own package-local data. Unpackaged winTerm uses `%LOCALAPPDATA%\winTerm`. It does not import, overwrite, or remove Microsoft Windows Terminal settings. Uninstall and Reset operations may target only winTerm-owned data.
 
-The unique package name gives packaged winTerm its own package-local application data. Unpackaged WinTerm builds use `%LOCALAPPDATA%\winTerm`. The WinTerm branch bypasses the upstream Stable settings migration path, so first launch does not import or overwrite Microsoft Windows Terminal settings.
+## Public contracts
 
-Shared fragment discovery paths are retained as a compatibility input for third-party profile fragments. Those paths are not used as winTerm's settings or state root. See [Architecture](architecture.md) for the complete state table.
-
-## User-visible changes
-
-Conditional WinTerm values cover the package and Start menu display name, description, application fallback title, settings tab title, command-line help heading, tray tooltip, About feedback destination, executable file metadata, package resources, and selected English resource strings. Branding verification intentionally checks these owned surfaces rather than rejecting every technical occurrence of `Windows Terminal`.
-
-## Retained upstream strings
-
-Microsoft Terminal names remain where they describe:
-
-- Copyright and license attribution
-- Third-party notices and historical comments
-- Internal namespaces, project files, types, and executable host filename
-- API, protocol, policy, fragment, and compatibility identifiers
-- Alternative upstream build-brand branches and their test fixtures
-- Documentation that explains the upstream relationship
-
-This avoids a high-risk repository-wide rename and keeps upstream integrations reviewable.
+The `winterm.exe` alias is frozen for winTerm 1.x. No `winterm:` URI protocol is registered because no reviewed activation contract exists. Shared profile-fragment identifiers retained from upstream are compatibility inputs, not winTerm settings roots or a claim of Microsoft endorsement.
 
 ## Artwork
 
-`assets/winterm/icons/winterm.svg` is the canonical original placeholder. It uses a dark rounded rectangle, an accent rail, and original `>_` geometry. It contains no Microsoft, Windows, Windows Terminal, or Apple artwork. Generated PNG and ICO files are committed so Pillow is not a build dependency. Artwork source, sizes, regeneration, review, and licensing are documented in `assets/winterm/icons/README.md`.
+`assets/winterm/icons/winterm.svg` is original placeholder geometry. It contains no Microsoft, Windows, Windows Terminal, or Apple logo. Generated PNG and ICO files are committed so image generation is not a build dependency.

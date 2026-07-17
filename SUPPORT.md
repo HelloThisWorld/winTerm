@@ -1,17 +1,27 @@
-# Support
+# winTerm support policy
 
-## How to file issues and get help  
+## Supported releases
 
-This project uses [GitHub issues][gh-issue] to [track bugs][gh-bug] and [feature requests][gh-feature]. Please search the existing issues before filing new issues to avoid duplicates. For new topics, file your bug or feature request as a new issue.
+The latest public Stable winTerm release is supported. A prerelease is supported for testing and feedback only. At present, winTerm 1.0.0 remains a release candidate and is not a supported public Stable release until every publication gate passes.
 
-For help and questions about using this project, please look at the [docs site for Windows Terminal][docs] and our [Contributor's Guide][contributor] if you want to work on Windows Terminal.
+## Platforms and architectures
 
-## Microsoft Support Policy  
+- Windows 11 x64 is the intended fully supported platform after clean installation, upgrade, uninstall, and runtime validation pass.
+- Windows 11 ARM64 is unsupported unless an ARM64 asset is actually published with native build, install, and launch evidence.
+- Windows 10 is unsupported for the winTerm 1.0 Stable commitment.
 
-Support for Windows Terminal is limited to the resources listed above.
+## Shells and feature levels
 
-[gh-issue]: https://github.com/microsoft/terminal/issues/new/choose
-[gh-bug]: https://github.com/microsoft/terminal/issues/new?assignees=&labels=Issue-Bug&template=bug_report.md&title=
-[gh-feature]: https://github.com/microsoft/terminal/issues/new?assignees=&labels=Issue-Feature&template=Feature_Request.md&title=
-[docs]: https://docs.microsoft.com/windows/terminal
-[contributor]: ./CONTRIBUTING.md
+PowerShell 7, Windows PowerShell 5.1, Command Prompt, and WSL have different evidence levels recorded in `docs/compatibility-matrix.md`. Experimental and Disabled features are listed in `docs/feature-status.md`; they do not receive the same compatibility promise as Stable features.
+
+## Getting help
+
+Use the [winTerm GitHub Issue chooser](https://github.com/HelloThisWorld/winTerm/issues/new/choose) for reproducible bugs, crashes, compatibility reports, and feature requests. Remove credentials, private terminal output, commands, proprietary source, and unredacted Workspace files before posting.
+
+## Security
+
+Do not report a vulnerability in a public Issue. Follow `SECURITY.md` and use GitHub Private Vulnerability Reporting when available.
+
+## Release cadence and data compatibility
+
+No fixed release cadence is promised. The latest Stable release receives priority for correctness and security fixes. Data compatibility follows `docs/compatibility-policy.md` and `docs/schema-support-policy.md`; winTerm 1.x reads winTerm 1.0 settings and Workspace Schema version 2 unless an explicit deprecation and migration policy is published.

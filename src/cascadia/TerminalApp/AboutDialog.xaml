@@ -26,6 +26,9 @@
             <Run x:Uid="AboutDialog_VersionLabel" />
             <Run Text="{x:Bind ApplicationVersion}" />
         </TextBlock>
+        <TextBlock Margin="0,8,0,0"
+                   IsTextSelectionEnabled="True"
+                   Text="{x:Bind ReleaseDetails}" />
 
         <StackPanel Orientation="Vertical">
             <StackPanel Padding="0,16,0,16"
@@ -54,13 +57,13 @@
         <StackPanel Margin="-12,0,0,0"
                     Orientation="Vertical">
             <HyperlinkButton x:Uid="AboutDialog_SourceCodeLink"
-                             NavigateUri="https://go.microsoft.com/fwlink/?linkid=2203152" />
+                             NavigateUri="{x:Bind SourceCodeUri}" />
             <HyperlinkButton x:Uid="AboutDialog_DocumentationLink"
-                             NavigateUri="https://go.microsoft.com/fwlink/?linkid=2125416" />
+                             NavigateUri="{x:Bind DocumentationUri}" />
             <HyperlinkButton x:Uid="AboutDialog_ReleaseNotesLink"
-                             NavigateUri="https://go.microsoft.com/fwlink/?linkid=2125417" />
+                             NavigateUri="{x:Bind ReleaseNotesUri}" />
             <HyperlinkButton x:Uid="AboutDialog_PrivacyPolicyLink"
-                             NavigateUri="https://go.microsoft.com/fwlink/?linkid=2125418" />
+                             NavigateUri="{x:Bind PrivacyPolicyUri}" />
             <HyperlinkButton x:Uid="AboutDialog_ThirdPartyNoticesLink"
                              Click="_ThirdPartyNoticesOnClick" />
         </StackPanel>

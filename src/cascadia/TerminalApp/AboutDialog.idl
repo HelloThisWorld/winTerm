@@ -9,6 +9,11 @@ namespace TerminalApp
 
         String ApplicationDisplayName { get; };
         String ApplicationVersion { get; };
+        String ReleaseDetails { get; };
+        Windows.Foundation.Uri SourceCodeUri { get; };
+        Windows.Foundation.Uri DocumentationUri { get; };
+        Windows.Foundation.Uri ReleaseNotesUri { get; };
+        Windows.Foundation.Uri PrivacyPolicyUri { get; };
 
         Boolean CheckingForUpdates { get; };
         Boolean UpdatesAvailable { get; };

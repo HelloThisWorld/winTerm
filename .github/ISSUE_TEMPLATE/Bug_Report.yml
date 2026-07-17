@@ -1,40 +1,73 @@
 name: Bug report
 description: Report a reproducible winTerm problem without sensitive terminal data.
 title: "[Bug]: "
-labels: [bug]
+labels:
+  - bug
 body:
   - type: markdown
     attributes:
-      value: Do not include passwords, tokens, private terminal output, proprietary source code, or confidential Workspace files.
+      value: Do not include passwords, tokens, private terminal output, commands, proprietary source code, memory dumps, or confidential Workspace files.
   - type: input
     id: version
-    attributes: { label: winTerm version, placeholder: 0.6.0-beta.1 }
-    validations: { required: true }
+    attributes:
+      label: winTerm version
+      placeholder: 1.0.0 or exact commit
+    validations:
+      required: true
   - type: dropdown
     id: install
-    attributes: { label: Installation type, options: [MSIX, Portable, Development build, Other] }
-    validations: { required: true }
+    attributes:
+      label: Installation type
+      options:
+        - Public MSIX
+        - Draft MSIX
+        - Development build
+        - Other
+    validations:
+      required: true
   - type: dropdown
     id: architecture
-    attributes: { label: Architecture, options: [x64, ARM64, Unknown] }
-    validations: { required: true }
+    attributes:
+      label: Architecture
+      options:
+        - x64
+        - ARM64
+        - Unknown
+    validations:
+      required: true
   - type: textarea
     id: environment
-    attributes: { label: Windows version, description: Include edition and build only. }
-  - type: input
-    id: shell
-    attributes: { label: Shell and feature area, placeholder: PowerShell 7 - Workspace Restore }
+    attributes:
+      label: Windows and Shell versions
+      description: Include edition and build only; redact user and machine names.
+    validations:
+      required: true
   - type: textarea
     id: reproduce
-    attributes: { label: Steps to reproduce }
-    validations: { required: true }
+    attributes:
+      label: Steps to reproduce
+      description: Replace private commands, paths, and data with safe examples.
+    validations:
+      required: true
   - type: textarea
     id: expected
-    attributes: { label: Expected and actual behavior }
-    validations: { required: true }
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
   - type: dropdown
     id: frequency
-    attributes: { label: Frequency, options: [Always, Often, Once, Unknown] }
+    attributes:
+      label: Frequency
+      options:
+        - Always
+        - Often
+        - Once
+        - Unknown
+    validations:
+      required: true
   - type: textarea
     id: diagnostics
-    attributes: { label: Diagnostic bundle or screenshots, description: Attach only a reviewed, redacted bundle. }
+    attributes:
+      label: Reviewed diagnostic bundle or screenshots
+      description: Attach only a user-generated, reviewed, redacted bundle.

@@ -1,90 +1,84 @@
 # winTerm
 
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
-[![License](https://img.shields.io/github/license/HelloThisWorld/winTerm)](LICENSE)
+[![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
+[![Stable release](https://img.shields.io/badge/stable%20release-blocked-critical)](docs/release-checklist-v1.0.md)
 
-winTerm is an independent, open-source Windows terminal application based on Microsoft Windows Terminal. It is not affiliated with or endorsed by Microsoft.
+winTerm is an independent open-source terminal application based on Microsoft Windows Terminal.
 
-## Public Beta status
+winTerm is not affiliated with or endorsed by Microsoft. It does not use Microsoft, Windows, or Windows Terminal logos.
 
-The current target is **winTerm 0.6.0-beta.1**. It prepares a public beta with repeatable validation, release metadata, checksums, SBOM generation, privacy boundaries, security reporting, user documentation, and structured feedback templates.
+## Latest stable release
 
-This is not a public release yet. The [release candidate gate](docs/v0.6-rc-gate.md) records the remaining evidence before a draft release can be approved. In particular, x64 CI builds and unsigned development MSIX packaging are verified; clean install, upgrade, uninstall, accessibility, PowerShell 7, WSL, live Docking, and ARM64 native validation still require provisioned Windows testing.
+There is no approved public winTerm Stable release yet. The 1.0.0 candidate is blocked on production signing, clean Windows 11 installation, upgrade, uninstall, accessibility, packaged runtime, and performance evidence. A download link is intentionally withheld so an unsigned Draft or Actions artifact is not presented as a user installer.
 
-## What is available
+When the real public Release exists and its assets pass re-download verification, this section must link to the repository’s `/releases/latest` page.
 
-- Independent MSIX identity `Kaname.winTerm`, `winterm.exe` alias, and separate application-data boundary. `wt.exe` and Windows Terminal settings are untouched.
-- PowerShell 7, Windows PowerShell 5.1, Command Prompt, and dynamically discovered WSL profile foundations.
-- Theme and app-private font asset registries, ANSI/Unicode foundations, paste-risk analysis, and conservative local-shell helpers.
-- Workspace schema v2, recovery snapshots, named Workspaces, layout validation, empty slots, layout history, and Docking transaction safety models.
-- Privacy-safe release and diagnostics foundations: no general telemetry, no default command/output/clipboard collection, and opt-in-only future update or crash upload paths.
+## Supported Windows versions
 
-See the [compatibility matrix](docs/compatibility-matrix.md) for evidence by shell and architecture, and the [feature freeze](docs/v0.6-feature-freeze.md) for Stable/Beta/Experimental/Disabled classification.
+The intended winTerm 1.0 support target is Windows 11 x64. Windows 10 is unsupported for the Stable commitment. ARM64 remains Disabled until a native ARM64 package is built, installed, and launched successfully and is actually attached to a public Release.
 
-## Important limitations
+## Installation
 
-- The Visual Docking runtime adapter is **disabled by default**. The model, preview, rollback, and keyboard descriptions are present, but live transfer needs Windows runtime verification. Cross-process pane transfer is unsupported.
-- Windows 11 x64 is the current CI packaging target. ARM64 is not supported until a native package is built and launched successfully.
-- The development package is unsigned. Never treat it as a signed public release; verify official release SHA-256 checksums before installation.
-- winTerm does not provide general Bash compatibility, remote session persistence, shell restarts to imitate session transfer, cloud synchronization, AI command generation, or a plugin marketplace.
+Do not install a development or Draft package as a Stable release. An approved installer must:
 
-## Install and get started
+- be downloaded from the public `v1.0.0` Release in this repository;
+- be named `winTerm-1.0.0-x64.msix`;
+- match `SHA256SUMS.txt`;
+- have a trusted production signature and timestamp whose subject matches the package Publisher;
+- install without Visual Studio, Git, Developer Mode, registry edits, global font installation, or profile modification.
 
-When an approved release is available, download only the official GitHub Release MSIX and verify `SHA256SUMS.txt` first. The development package uses `Kaname.winTerm` and can coexist with Windows Terminal.
+See [installation guidance](docs/user/installation.md).
 
-- [Installation](docs/user/installation.md)
-- [Getting started](docs/user/getting-started.md)
-- [Shells and Linux compatibility](docs/user/shells.md)
-- [Themes and fonts](docs/user/themes-and-fonts.md)
-- [Workspaces](docs/user/workspaces.md)
-- [Visual Docking](docs/user/visual-docking.md)
-- [Keyboard shortcuts](docs/user/keyboard-shortcuts.md)
-- [Accessibility](docs/user/accessibility.md)
-- [Updates](docs/user/updates.md)
-- [Diagnostics](docs/user/diagnostics.md)
-- [Privacy](PRIVACY.md)
-- [Uninstall](docs/user/uninstall.md)
-- [Troubleshooting](docs/user/troubleshooting.md)
+## Screenshots
 
-## Build, test, and package
+Release screenshots must be captured from the signed winTerm package after branding and accessibility review. No Microsoft or Windows Terminal screenshot is reused as winTerm promotional artwork. Screenshots are therefore withheld while the Stable gate is blocked.
 
-Use a provisioned Windows development environment with Visual Studio 2022, Windows SDK 10.0.22621.0, PowerShell 7, Git, and the repository NuGet client.
+## Core features
+
+- independent `Kaname.winTerm` package identity and `winterm.exe` alias;
+- PowerShell 7, Windows PowerShell 5.1, CMD, and dynamic WSL profile foundations;
+- conservative Linux-style Safe Compatibility for local PowerShell and CMD;
+- built-in and open-source Themes with pinned hashes and license records;
+- app-private Cascadia programming fonts;
+- ANSI color, CJK, Emoji, multiple windows, tabs, panes, and Command Palette foundations inherited from Microsoft Terminal;
+- Workspace Schema version 2, Named Workspaces, restore planning, backups, and crash-recovery foundations;
+- transactional edge and corner Docking models, keyboard commands, and Layout Undo/Redo;
+- multiline and suspicious-paste protection;
+- user-generated redacted diagnostics.
+
+Runtime evidence is tracked in [feature status](docs/feature-status.md) and the [compatibility matrix](docs/compatibility-matrix.md). Runtime Docking, cross-process Pane transfer, Update Check, Git Bash integration, and ARM64 are Disabled.
+
+## Privacy
+
+winTerm does not collect command text, terminal output, clipboard content, Workspace contents, working directories, or usage analytics. Crash upload is off and opt-in. Update checks are disabled until explicit consent exists. See [PRIVACY.md](PRIVACY.md).
+
+## Release status
+
+The exact gate status is recorded in:
+
+- [winTerm 1.0 release checklist](docs/release-checklist-v1.0.md);
+- [current progress](docs/v1.0-progress.md);
+- [security review](docs/security-review-v1.0.md);
+- [accessibility audit](docs/accessibility-audit-v1.0.md);
+- [performance validation](docs/performance-v1.0.md);
+- [release notes](docs/releases/1.0.0.md).
+
+GitHub Actions may prepare an explicitly blocked Draft Release. It cannot publish an unsigned or untested installer, replace an existing Stable asset, or upload ARM64 without exact native-validation evidence.
+
+## Build
+
+Use the Microsoft Terminal upstream toolchain described in [build guidance](docs/build.md). A release build requires PowerShell 7, the supported Visual Studio toolset, Windows SDK 10.0.22621.0, and the repository’s pinned dependencies.
 
 ```powershell
-.\scripts\winterm\build.ps1 -Configuration Debug -Platform x64
-.\scripts\winterm\test.ps1 -Suite Relevant -Configuration Debug -Platform x64
-.\scripts\winterm\build.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\package.ps1 -Platform x64
+.\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
+.\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 ```
 
-The source-only smoke suite can run with Windows PowerShell 5.1:
+Local builds and unsigned development MSIX packages are not public releases.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\winterm\test.ps1 -Suite Smoke
-```
+## License and upstream
 
-Release automation builds x64 and ARM64 candidates, generates SHA-256 checksums and SPDX/CycloneDX metadata, and creates a **draft** GitHub Release. It never automatically publishes a release or stores signing secrets in the repository.
+winTerm retains the Microsoft Terminal MIT license, copyright notices, and third-party notices. The pinned upstream baseline is `release-1.25@1cea42d433253d95c4487a3037db48197b5e72f4`.
 
-## Security and feedback
-
-Use the [bug](.github/ISSUE_TEMPLATE/bug_report.yml), [compatibility](.github/ISSUE_TEMPLATE/compatibility_report.yml), or [crash](.github/ISSUE_TEMPLATE/crash_report.yml) template. Do not include passwords, tokens, private terminal output, proprietary source code, or unredacted Workspace files.
-
-Report security vulnerabilities privately under the [security policy](SECURITY.md). See the [privacy policy](PRIVACY.md) before creating or sharing diagnostics.
-
-## Release engineering
-
-- [Feature freeze and classification](docs/v0.6-feature-freeze.md)
-- [Performance baseline](docs/performance-baseline.md)
-- [Accessibility audit](docs/accessibility-audit.md)
-- [Security review](docs/security-review-v0.6.md)
-- [Release checklist](docs/release-checklist.md)
-- [Release notes draft](docs/releases/0.6.0-beta.1.md)
-- [WinGet plan](packaging/winget/README.md)
-
-The source baseline is Microsoft Terminal `release-1.25` at commit `1cea42d433253d95c4487a3037db48197b5e72f4`. The `upstream` remote points to `https://github.com/microsoft/terminal.git`.
-
-## License and attribution
-
-winTerm is distributed under the repository [MIT License](LICENSE). It is based on the [Microsoft Terminal open-source project](https://github.com/microsoft/terminal), which is also MIT licensed. Microsoft copyright notices, [third-party notices](NOTICE.md), and package notices are retained.
-
-Microsoft, Windows, and Windows Terminal are trademarks of Microsoft Corporation. Their names are used only for accurate attribution and technical compatibility documentation.
+See [LICENSE](LICENSE), [NOTICE.md](NOTICE.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and [upstream synchronization](docs/upstream-sync.md).
