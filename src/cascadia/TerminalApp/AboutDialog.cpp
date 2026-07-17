@@ -40,7 +40,7 @@ namespace winrt::TerminalApp::implementation
     winrt::hstring AboutDialog::ApplicationVersion()
     {
 #if defined(WT_BRANDING_WINTERM)
-        return { winTerm::Branding::ApplicationVersion };
+        return winrt::hstring{ winTerm::Branding::ApplicationVersion };
 #else
         return CascadiaSettings::ApplicationVersion();
 #endif
