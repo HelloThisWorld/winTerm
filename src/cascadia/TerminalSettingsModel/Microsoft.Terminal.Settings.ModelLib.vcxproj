@@ -249,6 +249,10 @@
     <ClInclude Include="..\..\winterm\Docking\Sessions\SessionOwnership.h" />
     <ClInclude Include="..\..\winterm\Docking\Transactions\LayoutTransaction.h" />
     <ClInclude Include="..\..\winterm\Docking\History\LayoutHistory.h" />
+    <ClInclude Include="..\..\winterm\Docking\Targets\DockTargetResolver.h" />
+    <ClInclude Include="..\..\winterm\Docking\Overlay\DockingOverlayModel.h" />
+    <ClInclude Include="..\..\winterm\Accessibility\KeyboardDockingController.h" />
+    <ClInclude Include="..\..\winterm\Settings\Docking\DockingSettingsModel.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.h" />
@@ -304,6 +308,10 @@
     <ClCompile Include="..\..\winterm\Docking\Sessions\SessionOwnership.cpp" />
     <ClCompile Include="..\..\winterm\Docking\Transactions\LayoutTransaction.cpp" />
     <ClCompile Include="..\..\winterm\Docking\History\LayoutHistory.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Targets\DockTargetResolver.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Overlay\DockingOverlayModel.cpp" />
+    <ClCompile Include="..\..\winterm\Accessibility\KeyboardDockingController.cpp" />
+    <ClCompile Include="..\..\winterm\Settings\Docking\DockingSettingsModel.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.cpp" />

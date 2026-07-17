@@ -50,6 +50,7 @@
     <ClCompile Include="WinTermWorkspaceTests.cpp" />
     <ClCompile Include="WinTermDockingTests.cpp" />
     <ClCompile Include="WinTermDockingSafetyTests.cpp" />
+    <ClCompile Include="WinTermDockingPresentationTests.cpp" />
     <ClCompile Include="MediaResourceTests.cpp" />
     <ClCompile Include="../TerminalSettingsAppAdapterLib/TerminalSettings.cpp" />
     <ClCompile Include="pch.cpp">
