@@ -153,7 +153,7 @@ namespace SettingsModelUnitTests
 
         const auto migrated = WorkspaceMigration::Migrate(legacy);
         VERIFY_IS_TRUE(migrated.changed);
-        VERIFY_ARE_EQUAL(uint32_t{ 1 }, migrated.targetVersion);
+        VERIFY_ARE_EQUAL(uint32_t{ 2 }, migrated.targetVersion);
         VERIFY_ARE_EQUAL(std::string{ "workspace.legacy" }, migrated.document["id"].asString());
 
         const auto repeated = WorkspaceMigration::Migrate(migrated.document);

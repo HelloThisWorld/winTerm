@@ -47,6 +47,17 @@ std::shared_ptr<LayoutNodeDescriptor> LayoutNodeDescriptor::Split(
     return node;
 }
 
+std::shared_ptr<LayoutNodeDescriptor> LayoutNodeDescriptor::EmptySlot(
+    std::string slotId,
+    std::optional<std::string> preferredProfileId)
+{
+    auto node = std::make_shared<LayoutNodeDescriptor>();
+    node->type = LayoutNodeType::EmptySlot;
+    node->slotId = std::move(slotId);
+    node->preferredProfileId = std::move(preferredProfileId);
+    return node;
+}
+
 size_t WorkspaceDescriptor::TabCount() const noexcept
 {
     size_t result{};
@@ -96,7 +107,13 @@ std::string_view winTerm::Workspaces::ToString(const WindowState value) noexcept
 
 std::string_view winTerm::Workspaces::ToString(const LayoutNodeType value) noexcept
 {
-    return value == LayoutNodeType::Split ? "split" : "pane";
+    switch (value)
+    {
+    case LayoutNodeType::Pane: return "pane";
+    case LayoutNodeType::Split: return "split";
+    case LayoutNodeType::EmptySlot: return "emptySlot";
+    default: return "unknown";
+    }
 }
 
 std::string_view winTerm::Workspaces::ToString(const SplitOrientation value) noexcept
@@ -169,6 +186,7 @@ std::optional<LayoutNodeType> winTerm::Workspaces::LayoutNodeTypeFromString(cons
     static constexpr std::pair<LayoutNodeType, std::string_view> values[]{
         std::pair{ LayoutNodeType::Pane, std::string_view{ "pane" } },
         std::pair{ LayoutNodeType::Split, std::string_view{ "split" } },
+        std::pair{ LayoutNodeType::EmptySlot, std::string_view{ "emptySlot" } },
     };
     return EnumFromString(value, values);
 }

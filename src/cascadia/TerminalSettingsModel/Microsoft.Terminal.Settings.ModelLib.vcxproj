@@ -239,6 +239,12 @@
     <ClInclude Include="..\..\winterm\Shell\Protocol\ShellIntegrationProtocol.h" />
     <ClInclude Include="..\..\winterm\Shell\Sessions\ShellSessionMetadata.h" />
     <ClInclude Include="..\..\winterm\Clipboard\PasteRiskAnalyzer.h" />
+    <ClInclude Include="..\..\winterm\Docking\Model\DockingModel.h" />
+    <ClInclude Include="..\..\winterm\Docking\Layout\LayoutTree.h" />
+    <ClInclude Include="..\..\winterm\Docking\Layout\LayoutNormalizer.h" />
+    <ClInclude Include="..\..\winterm\Docking\Layout\LayoutValidator.h" />
+    <ClInclude Include="..\..\winterm\Docking\Layout\LayoutTransformer.h" />
+    <ClInclude Include="..\..\winterm\Docking\Layout\LayoutGeometry.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.h" />
     <ClInclude Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.h" />
@@ -284,6 +290,12 @@
     <ClCompile Include="..\..\winterm\Shell\Protocol\ShellIntegrationProtocol.cpp" />
     <ClCompile Include="..\..\winterm\Shell\Sessions\ShellSessionMetadata.cpp" />
     <ClCompile Include="..\..\winterm\Clipboard\PasteRiskAnalyzer.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Model\DockingModel.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Layout\LayoutTree.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Layout\LayoutNormalizer.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Layout\LayoutValidator.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Layout\LayoutTransformer.cpp" />
+    <ClCompile Include="..\..\winterm\Docking\Layout\LayoutGeometry.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Model\WorkspaceDescriptor.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Persistence\AtomicFileWriter.cpp" />
     <ClCompile Include="..\..\winterm\Workspaces\Persistence\WorkspaceMigration.cpp" />

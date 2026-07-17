@@ -205,6 +205,10 @@ function Test-Layout
         [System.Collections.Generic.HashSet[string]]$ReferencedPaneIds,
 
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Identifiers,
+
+        [Parameter(Mandatory)]
         [int]$Depth,
 
         [Parameter(Mandatory)]
@@ -229,6 +233,12 @@ function Test-Layout
         }
         return
     }
+    if ($type -eq 'emptySlot')
+    {
+        $slotId = [string](Get-PropertyValue -InputObject $Node -Name 'slotId')
+        Test-Identifier -Value $slotId -Field "$Field.slotId" -Identifiers $Identifiers
+        return
+    }
     if ($type -ne 'split')
     {
         throw "Unsupported layout node '$type' at '$Field'."
@@ -243,14 +253,18 @@ function Test-Layout
     {
         throw "Split ratio must be finite at '$Field'."
     }
+    if ($ratio -lt 0.05 -or $ratio -gt 0.95)
+    {
+        throw "Split ratio is outside the supported range at '$Field'."
+    }
     $first = Get-PropertyValue -InputObject $Node -Name 'first'
     $second = Get-PropertyValue -InputObject $Node -Name 'second'
     if ($null -eq $first -or $null -eq $second)
     {
         throw "Split node is missing a child at '$Field'."
     }
-    Test-Layout -Node $first -PaneIds $PaneIds -ReferencedPaneIds $ReferencedPaneIds -Depth ($Depth + 1) -Field "$Field.first"
-    Test-Layout -Node $second -PaneIds $PaneIds -ReferencedPaneIds $ReferencedPaneIds -Depth ($Depth + 1) -Field "$Field.second"
+    Test-Layout -Node $first -PaneIds $PaneIds -ReferencedPaneIds $ReferencedPaneIds -Identifiers $Identifiers -Depth ($Depth + 1) -Field "$Field.first"
+    Test-Layout -Node $second -PaneIds $PaneIds -ReferencedPaneIds $ReferencedPaneIds -Identifiers $Identifiers -Depth ($Depth + 1) -Field "$Field.second"
 }
 
 function Test-WorkspaceDocument
@@ -272,17 +286,21 @@ function Test-WorkspaceDocument
     {
         throw "Workspace schema version is missing in '$SourcePath'."
     }
-    if ([int]$schemaVersion -gt 1)
+    if ([int]$schemaVersion -gt 2)
     {
         throw "Workspace '$SourcePath' was created by a newer version of winTerm."
     }
-    if ([int]$schemaVersion -lt 1)
+    if ([int]$schemaVersion -lt 2)
     {
         if ($PermitLegacy)
         {
             return [pscustomobject]@{ Path = $SourcePath; Schema = [int]$schemaVersion; Windows = 0; Tabs = 0; Panes = 0; Result = 'Legacy migration input' }
         }
         throw "Workspace '$SourcePath' requires migration before it can be loaded."
+    }
+    if ([int](Get-PropertyValue -InputObject $Document -Name 'dockingModelVersion' -Default 0) -ne 1)
+    {
+        throw "Workspace '$SourcePath' uses an unsupported docking model version."
     }
 
     $identifiers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
@@ -327,7 +345,7 @@ function Test-WorkspaceDocument
             Test-Identifier -Value $tabId -Field 'tabs.id' -Identifiers $identifiers
             [void]$tabIds.Add($tabId)
             $panes = @(Get-PropertyValue -InputObject $tab -Name 'panes' -Default @())
-            if ($panes.Count -lt 1 -or $panes.Count -gt $maximumPanesPerTab)
+            if ($panes.Count -gt $maximumPanesPerTab)
             {
                 throw "Tab '$tabId' has an unsupported pane count."
             }
@@ -354,7 +372,12 @@ function Test-WorkspaceDocument
                 }
             }
             $referencedPaneIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-            Test-Layout -Node (Get-PropertyValue -InputObject $tab -Name 'layout') -PaneIds $paneIds -ReferencedPaneIds $referencedPaneIds -Depth 1 -Field 'tab.layout'
+            $layout = Get-PropertyValue -InputObject $tab -Name 'layout'
+            Test-Layout -Node $layout -PaneIds $paneIds -ReferencedPaneIds $referencedPaneIds -Identifiers $identifiers -Depth 1 -Field 'tab.layout'
+            if ($panes.Count -eq 0 -and [string](Get-PropertyValue -InputObject $layout -Name 'type') -ne 'emptySlot')
+            {
+                throw "Tab '$tabId' without panes must contain one empty layout slot."
+            }
             if ($referencedPaneIds.Count -ne $paneIds.Count)
             {
                 throw "Tab '$tabId' contains a pane that is not referenced exactly once."
@@ -380,7 +403,7 @@ function Test-WorkspaceDocument
     {
         throw "Workspace '$SourcePath' references a missing active window."
     }
-    return [pscustomobject]@{ Path = $SourcePath; Schema = 1; Windows = $windows.Count; Tabs = $tabCount; Panes = $paneCount; Result = 'Valid' }
+    return [pscustomobject]@{ Path = $SourcePath; Schema = 2; Windows = $windows.Count; Tabs = $tabCount; Panes = $paneCount; Result = 'Valid' }
 }
 
 function Read-AndValidateWorkspace

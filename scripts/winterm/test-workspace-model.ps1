@@ -20,7 +20,7 @@ try
     $validator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Workspaces\Persistence\WorkspaceValidator.cpp') -Raw
     $serializer = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp') -Raw
 
-    foreach ($required in @('WorkspaceSchemaVersion{ 1 }', 'MaximumWorkspacePanes{ 512 }', 'LayoutNodeType', 'WorkingDirectoryKind'))
+    foreach ($required in @('WorkspaceSchemaVersion{ 2 }', 'DockingModelVersion{ 1 }', 'MaximumWorkspacePanes{ 512 }', 'LayoutNodeType', 'EmptySlot', 'WorkingDirectoryKind'))
     {
         if (-not $model.Contains($required))
         {
