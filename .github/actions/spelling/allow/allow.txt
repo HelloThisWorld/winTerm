@@ -5,6 +5,7 @@ breadcrumbs
 ccmp
 ccon
 clickable
+crashid
 cmark
 CMMI
 colorbrewer
