@@ -618,7 +618,7 @@ WorkspaceDescriptor WorkspaceSerializer::FromJson(const Json::Value& json, const
         throw std::runtime_error("The workspace source is not supported.");
     }
     workspace.source = *source;
-    workspace.applicationVersion = StringOrDefault(json, "applicationVersion", "0.5.0-alpha");
+    workspace.applicationVersion = StringOrDefault(json, "applicationVersion", "0.6.0-beta.1");
     workspace.protocolVersion = UIntOrDefault(json, "protocolVersion", 1);
     workspace.dockingModelVersion = UIntOrDefault(json, "dockingModelVersion", DockingModelVersion);
     if (const auto& startup = json["startupBehavior"]; !startup.isNull())

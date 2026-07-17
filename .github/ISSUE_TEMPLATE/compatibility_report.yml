@@ -1,0 +1,29 @@
+name: Compatibility report
+description: Record a shell or terminal compatibility result.
+title: "[Compatibility]: "
+labels: [compatibility]
+body:
+  - type: input
+    id: shell
+    attributes: { label: Shell or terminal application and version }
+    validations: { required: true }
+  - type: textarea
+    id: profile
+    attributes: { label: Safe profile configuration, description: Remove paths, secrets, and proprietary prompt code. }
+  - type: input
+    id: feature
+    attributes: { label: Feature tested }
+    validations: { required: true }
+  - type: dropdown
+    id: result
+    attributes: { label: Result, options: [Supported, Partial, Experimental, Not supported, Not tested] }
+    validations: { required: true }
+  - type: input
+    id: prompt
+    attributes: { label: Prompt framework and PSReadLine version }
+  - type: input
+    id: wsl
+    attributes: { label: WSL distribution, if applicable }
+  - type: textarea
+    id: reproduce
+    attributes: { label: Reproduction steps and observed behavior }

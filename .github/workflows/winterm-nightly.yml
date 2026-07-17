@@ -1,0 +1,32 @@
+name: winTerm nightly stability
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arm64-cross-build:
+    name: ARM64 cross-build and source validation
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run Public Beta source validation
+        shell: pwsh
+        run: .\scripts\winterm\test.ps1 -Suite Smoke -Configuration Release -Platform x64
+      - name: Cross-build ARM64 package
+        shell: pwsh
+        run: .\scripts\winterm\package.ps1 -Platform ARM64
+      - name: Upload ARM64 candidate
+        uses: actions/upload-artifact@v6
+        with:
+          name: winTerm-ARM64-cross-build-unsigned
+          path: src/cascadia/CascadiaPackage/AppPackages/**/*.msix
+          if-no-files-found: error
+      - name: Record native-validation limitation
+        shell: pwsh
+        run: Write-Host 'ARM64 package was cross-built; native launch validation is still required before support is claimed.'

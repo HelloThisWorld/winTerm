@@ -59,7 +59,7 @@ function New-BenchmarkWorkspace
         createdAt = '2026-07-15T00:00:00Z'
         updatedAt = '2026-07-15T00:00:00Z'
         source = 'runtime'
-        applicationVersion = '0.5.0-alpha'
+        applicationVersion = '0.6.0-beta.1'
         protocolVersion = 1
         dockingModelVersion = 1
         activeWindowId = 'window-0'

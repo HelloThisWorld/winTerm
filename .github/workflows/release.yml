@@ -1,0 +1,55 @@
+name: winTerm draft release
+
+on:
+  push:
+    tags:
+      - 'v0.6.0-beta.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Beta version without the v prefix
+        required: true
+        default: 0.6.0-beta.1
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build draft release artifacts
+    runs-on: windows-2022
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.event_name }}' -eq 'push') { '${{ github.ref_name }}'.Substring(1) } else { '${{ inputs.version }}' }
+          if ($version -notmatch '^0\.6\.0-beta\.[0-9]+$') { throw "Unsupported release version '$version'." }
+          "value=$version" >> $env:GITHUB_OUTPUT
+      - name: Validate release source
+        shell: pwsh
+        run: .\scripts\winterm\test.ps1 -Suite Smoke -Configuration Release -Platform x64
+      - name: Build x64 MSIX
+        shell: pwsh
+        run: .\scripts\winterm\package.ps1 -Platform x64
+      - name: Build ARM64 MSIX
+        shell: pwsh
+        run: .\scripts\winterm\package.ps1 -Platform ARM64
+      - name: Generate release metadata
+        shell: pwsh
+        run: .\scripts\winterm\generate-release-artifacts.ps1 -Version '${{ steps.version.outputs.value }}' -ArtifactDirectory src\cascadia\CascadiaPackage\AppPackages -CommitSha '${{ github.sha }}' -RequiredArchitecture x64,ARM64
+      - name: Upload verified release artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: winTerm-${{ steps.version.outputs.value }}-release
+          path: src/cascadia/CascadiaPackage/AppPackages/winTerm-${{ steps.version.outputs.value }}-release/*
+          if-no-files-found: error
+      - name: Create draft GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${{ steps.version.outputs.value }}" --draft --title "winTerm ${{ steps.version.outputs.value }}" --notes-file "src/cascadia/CascadiaPackage/AppPackages/winTerm-${{ steps.version.outputs.value }}-release/release-notes.md" "src/cascadia/CascadiaPackage/AppPackages/winTerm-${{ steps.version.outputs.value }}-release/*"

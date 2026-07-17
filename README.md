@@ -1,90 +1,85 @@
 # winTerm
 
-[![CI](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
+[![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![License](https://img.shields.io/github/license/HelloThisWorld/winTerm)](LICENSE)
 
-winTerm is an independent open-source terminal application based on Microsoft Windows Terminal.
+winTerm is an independent, open-source Windows terminal application based on Microsoft Windows Terminal. It is not affiliated with or endorsed by Microsoft.
 
-winTerm is not affiliated with or endorsed by Microsoft.
+## Public Beta status
 
-winTerm v0.3 is a development release for Shell Experience foundations. It keeps the mature Microsoft Terminal engine and adds an independent package identity, application-data boundary, user-visible branding, original placeholder artwork, reproducible wrappers, validation, CI, an upstream synchronization workflow, Appearance source foundations, and packaged PowerShell/CMD shell-integration assets.
+The current target is **winTerm 0.6.0-beta.1**. It prepares a public beta with repeatable validation, release metadata, checksums, SBOM generation, privacy boundaries, security reporting, user documentation, and structured feedback templates.
 
-## Current development scope
+This is not a public release yet. The [release candidate gate](docs/v0.6-rc-gate.md) records the remaining evidence before a draft release can be approved. In particular, x64 CI builds and unsigned development MSIX packaging are verified; clean install, upgrade, uninstall, accessibility, PowerShell 7, WSL, live Docking, and ARM64 native validation still require provisioned Windows testing.
 
-The foundation preserves upstream tabs, panes, multiple windows, command palette, settings UI, keyboard shortcuts, clipboard, search, scrollback, ANSI color, Unicode, CJK, emoji fallback, and font-dependent Powerline rendering. It uses the upstream profile generators for PowerShell 7, Windows PowerShell 5.1, Command Prompt, and installed WSL distributions.
+## What is available
 
-v0.3 adds a conservative local-shell integration layer: a PowerShell 7/Windows PowerShell 5.1 module, CMD initialization assets, OSC 9;9 and OSC 133 marks reused from upstream, Safe `ll`, `la`, `which`, `touch`, and `open` mappings, a Windows API helper for CMD, diagnostics, and a non-persisting paste-risk analyser.
+- Independent MSIX identity `Kaname.winTerm`, `winterm.exe` alias, and separate application-data boundary. `wt.exe` and Windows Terminal settings are untouched.
+- PowerShell 7, Windows PowerShell 5.1, Command Prompt, and dynamically discovered WSL profile foundations.
+- Theme and app-private font asset registries, ANSI/Unicode foundations, paste-risk analysis, and conservative local-shell helpers.
+- Workspace schema v2, recovery snapshots, named Workspaces, layout validation, empty slots, layout history, and Docking transaction safety models.
+- Privacy-safe release and diagnostics foundations: no general telemetry, no default command/output/clipboard collection, and opt-in-only future update or crash upload paths.
 
-It does not add a full GNU compatibility layer, bundled GNU utilities or Clink, global PowerShell profile changes, CMD AutoRun changes, renderer changes, extended session restoration, workspaces, docking, AI features, cloud history, remote persistence, or command/clipboard telemetry.
+See the [compatibility matrix](docs/compatibility-matrix.md) for evidence by shell and architecture, and the [feature freeze](docs/v0.6-feature-freeze.md) for Stable/Beta/Experimental/Disabled classification.
 
-## Prerequisites
+## Important limitations
 
-- Windows 11 x64 for the v0.1 validation target
-- Visual Studio 2022 with the components in `.vsconfig`
-- Windows SDK 10.0.22621.0
-- PowerShell 7 or later (`pwsh.exe`)
-- Git and the repository-provided NuGet client
+- The Visual Docking runtime adapter is **disabled by default**. The model, preview, rollback, and keyboard descriptions are present, but live transfer needs Windows runtime verification. Cross-process pane transfer is unsupported.
+- Windows 11 x64 is the current CI packaging target. ARM64 is not supported until a native package is built and launched successfully.
+- The development package is unsigned. Never treat it as a signed public release; verify official release SHA-256 checksums before installation.
+- winTerm does not provide general Bash compatibility, remote session persistence, shell restarts to imitate session transfer, cloud synchronization, AI command generation, or a plugin marketplace.
 
-See [Build and test](docs/build.md) for the complete setup and current environment limitations.
+## Install and get started
+
+When an approved release is available, download only the official GitHub Release MSIX and verify `SHA256SUMS.txt` first. The development package uses `Kaname.winTerm` and can coexist with Windows Terminal.
+
+- [Installation](docs/user/installation.md)
+- [Getting started](docs/user/getting-started.md)
+- [Shells and Linux compatibility](docs/user/shells.md)
+- [Themes and fonts](docs/user/themes-and-fonts.md)
+- [Workspaces](docs/user/workspaces.md)
+- [Visual Docking](docs/user/visual-docking.md)
+- [Keyboard shortcuts](docs/user/keyboard-shortcuts.md)
+- [Accessibility](docs/user/accessibility.md)
+- [Updates](docs/user/updates.md)
+- [Diagnostics](docs/user/diagnostics.md)
+- [Privacy](PRIVACY.md)
+- [Uninstall](docs/user/uninstall.md)
+- [Troubleshooting](docs/user/troubleshooting.md)
 
 ## Build, test, and package
 
-Run these commands from a PowerShell 7 prompt:
+Use a provisioned Windows development environment with Visual Studio 2022, Windows SDK 10.0.22621.0, PowerShell 7, Git, and the repository NuGet client.
 
 ```powershell
 .\scripts\winterm\build.ps1 -Configuration Debug -Platform x64
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Debug -Platform x64
-.\scripts\winterm\test-shell-integration.ps1 -Shell All
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64
 .\scripts\winterm\package.ps1 -Platform x64
 ```
 
-The fast source-only suite also supports Windows PowerShell 5.1:
+The source-only smoke suite can run with Windows PowerShell 5.1:
 
 ```powershell
-.\scripts\winterm\test.ps1 -Suite Smoke
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\winterm\test.ps1 -Suite Smoke
 ```
 
-The development package uses `Kaname.winTerm`, registers `winterm.exe`, and does not claim `wt.exe`. The package wrapper creates an unsigned MSIX; installation requires a locally trusted development certificate whose subject matches the manifest publisher. Certificates and private keys must never be committed.
+Release automation builds x64 and ARM64 candidates, generates SHA-256 checksums and SPDX/CycloneDX metadata, and creates a **draft** GitHub Release. It never automatically publishes a release or stores signing secrets in the repository.
 
-## Supported shells
+## Security and feedback
 
-- PowerShell 7, when `pwsh.exe` is installed
-- Windows PowerShell 5.1
-- Command Prompt
-- Dynamically discovered WSL distributions, when WSL is installed
+Use the [bug](.github/ISSUE_TEMPLATE/bug_report.yml), [compatibility](.github/ISSUE_TEMPLATE/compatibility_report.yml), or [crash](.github/ISSUE_TEMPLATE/crash_report.yml) template. Do not include passwords, tokens, private terminal output, proprietary source code, or unredacted Workspace files.
 
-winTerm does not bundle PowerShell, WSL, or a Linux distribution.
+Report security vulnerabilities privately under the [security policy](SECURITY.md). See the [privacy policy](PRIVACY.md) before creating or sharing diagnostics.
 
-## Current limitations
+## Release engineering
 
-- This checkout has passed source-level smoke validation, but the local environment used for the v0.1 work did not contain PowerShell 7, Visual Studio/MSBuild, or Windows SDK 10.0.22621.0. No local binary or MSIX was produced here.
-- The current local environment has Windows PowerShell 5.1 and CMD, but not PowerShell 7, Visual Studio/MSBuild, or the required SDK. Its execution policy also blocks script execution, so runtime module, build, package, launch, UI, clipboard, and rendering acceptance remain open.
-- v0.2 Appearance remains source-level only: compilation, package payload, launch, Settings UI, Theme Gallery, font loading, and manual rendering have not been verified. Those facts are not treated as v0.3 passes.
-- v0.3 packages the shell module, CMD assets, and helper source/project, but automatic profile launcher injection, Shell Experience settings UI, right-click behavior, paste confirmation UI, and built-app validation remain tracked acceptance work.
-- Installation, launch, shell execution, tabs, panes, input, and rendering still require manual verification on a correctly provisioned Windows 11 x64 machine.
-- The manifest publisher `CN=winTerm Development` is a development placeholder and must be replaced together with the signing certificate for a public release.
-- `winterm.exe` is the packaged execution alias. A `winterm:` URI protocol is intentionally not registered in v0.1 because the upstream application has no matching URI activation handler to reuse safely.
-- ARM64 is reserved by the wrappers but has not been validated for v0.1.
-
-The evidence and outstanding checks are tracked in [v0.1 acceptance](docs/v0.1-acceptance.md).
-
-The current baseline and v0.3 evidence are tracked in [v0.2 acceptance](docs/v0.2-acceptance.md) and [v0.3 acceptance](docs/v0.3-acceptance.md).
-
-## Architecture and maintenance
-
-- [Architecture and ownership](docs/architecture.md)
-- [Brand and package identity](docs/branding.md)
-- [Upstream synchronization](docs/upstream-sync.md)
-- [Release process](docs/release-process.md)
-- [Shell Experience architecture](docs/shell-experience-architecture.md)
-- [Shell protocol](docs/shell-protocol.md)
-- [PowerShell integration](docs/powershell-integration.md)
-- [Command Prompt integration](docs/cmd-integration.md)
-- [Linux command compatibility](docs/linux-compatibility.md)
-- [Completion](docs/completion.md)
-- [Clipboard and paste protection](docs/clipboard-and-paste-protection.md)
-- [Shell diagnostics](docs/shell-diagnostics.md)
+- [Feature freeze and classification](docs/v0.6-feature-freeze.md)
+- [Performance baseline](docs/performance-baseline.md)
+- [Accessibility audit](docs/accessibility-audit.md)
+- [Security review](docs/security-review-v0.6.md)
+- [Release checklist](docs/release-checklist.md)
+- [Release notes draft](docs/releases/0.6.0-beta.1.md)
+- [WinGet plan](packaging/winget/README.md)
 
 The source baseline is Microsoft Terminal `release-1.25` at commit `1cea42d433253d95c4487a3037db48197b5e72f4`. The `upstream` remote points to `https://github.com/microsoft/terminal.git`.
 
