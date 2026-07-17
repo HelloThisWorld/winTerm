@@ -100,6 +100,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(OlderGenerationCannotOverwriteNewerState);
         TEST_METHOD(StoreRetainsLastValidBackup);
         TEST_METHOD(RestorePlanningIsolatesPaneFailures);
+        TEST_METHOD(RestorePlanningPreservesCornerAndEmptySlot);
     };
 
     void WinTermWorkspaceTests::ModelValidationRejectsUnsafeGraphs()
@@ -273,5 +274,35 @@ namespace SettingsModelUnitTests
         VERIFY_IS_TRUE(plan.canRestore);
         VERIFY_ARE_EQUAL(size_t{ 2 }, plan.windows.front().tabs.front().panes.size());
         VERIFY_ARE_EQUAL(size_t{ 1 }, plan.report.FailureCount());
+    }
+
+    void WinTermWorkspaceTests::RestorePlanningPreservesCornerAndEmptySlot()
+    {
+        auto workspace = ValidWorkspace(2);
+        workspace.windows.front().tabs.front().layout = LayoutNodeDescriptor::Split(
+            SplitOrientation::Vertical,
+            0.35,
+            LayoutNodeDescriptor::Split(
+                SplitOrientation::Horizontal,
+                0.5,
+                LayoutNodeDescriptor::Pane("pane-1"),
+                LayoutNodeDescriptor::EmptySlot("slot-corner")),
+            LayoutNodeDescriptor::Pane("pane-2"));
+
+        WorkspaceRestoreContext context;
+        context.profiles.push_back({ "{profile-powershell}", "Windows.Terminal.PowershellCore", "powershell", "PowerShell", ShellType::PowerShell, false, true });
+        context.monitors.push_back(workspace.windows.front().monitor);
+        context.defaultDirectoryContext.pathExists = [](const std::string_view) { return true; };
+
+        const auto plan = WorkspaceRestoreService::Plan(workspace, context);
+        VERIFY_IS_TRUE(plan.canRestore);
+        const auto& layout = plan.windows.front().tabs.front().layout;
+        VERIFY_ARE_EQUAL(static_cast<int>(LayoutNodeType::Split), static_cast<int>(layout->type));
+        VERIFY_ARE_EQUAL(0.35, layout->ratio);
+        VERIFY_ARE_EQUAL(static_cast<int>(LayoutNodeType::Split), static_cast<int>(layout->first->type));
+        VERIFY_ARE_EQUAL(std::string{ "pane-1" }, layout->first->first->paneId);
+        VERIFY_ARE_EQUAL(static_cast<int>(LayoutNodeType::EmptySlot), static_cast<int>(layout->first->second->type));
+        VERIFY_ARE_EQUAL(std::string{ "slot-corner" }, layout->first->second->slotId);
+        VERIFY_ARE_EQUAL(std::string{ "pane-2" }, layout->second->paneId);
     }
 }

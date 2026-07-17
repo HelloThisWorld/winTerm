@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "id": "workspace.fixture-corner-top-left",
+  "name": "Fixture Corner Top Left",
+  "description": "A deterministic top-left corner docking fixture.",
+  "createdAt": "2026-07-17T00:00:00Z",
+  "updatedAt": "2026-07-17T00:00:00Z",
+  "source": "user",
+  "applicationVersion": "0.5.0-alpha",
+  "protocolVersion": 1,
+  "dockingModelVersion": 1,
+  "activeWindowId": "window-corner",
+  "windows": [
+    {
+      "id": "window-corner",
+      "displayName": "Corner Docking",
+      "monitor": {
+        "deviceId": "DISPLAY1",
+        "stableId": "monitor-primary",
+        "friendlyName": "Primary",
+        "workArea": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        "dpiX": 144,
+        "dpiY": 144,
+        "isPrimary": true
+      },
+      "bounds": { "x": 120, "y": 80, "width": 1200, "height": 800 },
+      "normalizedBounds": { "x": 0.06, "y": 0.07, "width": 0.63, "height": 0.74 },
+      "windowState": "normal",
+      "activeTabId": "tab-corner",
+      "tabs": [
+        {
+          "id": "tab-corner",
+          "title": "Top Left",
+          "activePaneId": "pane-source",
+          "panes": [
+            {
+              "id": "pane-source",
+              "profileId": "{fixture-powershell}",
+              "profileNameFallback": "PowerShell",
+              "shellType": "powershell",
+              "workingDirectory": { "kind": "unknown", "value": "", "source": "unknown" }
+            },
+            {
+              "id": "pane-target",
+              "profileId": "{fixture-cmd}",
+              "profileNameFallback": "Command Prompt",
+              "shellType": "cmd",
+              "workingDirectory": { "kind": "unknown", "value": "", "source": "unknown" }
+            }
+          ],
+          "layout": {
+            "type": "split",
+            "orientation": "vertical",
+            "ratio": 0.35,
+            "first": {
+              "type": "split",
+              "orientation": "horizontal",
+              "ratio": 0.5,
+              "first": { "type": "pane", "paneId": "pane-source" },
+              "second": {
+                "type": "emptySlot",
+                "slotId": "slot-corner-top-left",
+                "preferredProfileId": null
+              }
+            },
+            "second": { "type": "pane", "paneId": "pane-target" }
+          }
+        }
+      ]
+    }
+  ]
+}
