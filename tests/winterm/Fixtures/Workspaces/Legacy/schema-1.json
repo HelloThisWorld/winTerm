@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "workspace.legacy-v1",
+  "name": "Legacy schema 1",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "updatedAt": "2026-07-15T00:00:00Z",
+  "source": "user",
+  "applicationVersion": "0.4.0-dev",
+  "protocolVersion": 1,
+  "windows": []
+}

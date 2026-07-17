@@ -13,7 +13,8 @@
 
 namespace winTerm::Workspaces
 {
-    inline constexpr uint32_t WorkspaceSchemaVersion{ 1 };
+    inline constexpr uint32_t WorkspaceSchemaVersion{ 2 };
+    inline constexpr uint32_t DockingModelVersion{ 1 };
     inline constexpr size_t MaximumWorkspaceFileSize{ 5 * 1024 * 1024 };
     inline constexpr size_t MaximumWorkspaceWindows{ 32 };
     inline constexpr size_t MaximumWorkspaceTabsPerWindow{ 128 };
@@ -45,6 +46,7 @@ namespace winTerm::Workspaces
     {
         Pane,
         Split,
+        EmptySlot,
     };
 
     enum class SplitOrientation
@@ -144,6 +146,8 @@ namespace winTerm::Workspaces
     {
         LayoutNodeType type{ LayoutNodeType::Pane };
         std::string paneId;
+        std::string slotId;
+        std::optional<std::string> preferredProfileId;
         SplitOrientation orientation{ SplitOrientation::Vertical };
         double ratio{ DefaultSplitRatio };
         std::shared_ptr<LayoutNodeDescriptor> first;
@@ -155,6 +159,9 @@ namespace winTerm::Workspaces
             double ratio,
             std::shared_ptr<LayoutNodeDescriptor> first,
             std::shared_ptr<LayoutNodeDescriptor> second);
+        static std::shared_ptr<LayoutNodeDescriptor> EmptySlot(
+            std::string slotId,
+            std::optional<std::string> preferredProfileId = std::nullopt);
     };
 
     struct TabDescriptor
@@ -197,6 +204,12 @@ namespace winTerm::Workspaces
         std::string capturedAt;
     };
 
+    struct LayoutHistoryMetadata
+    {
+        uint32_t limit{ 20 };
+        uint64_t lastSequence{};
+    };
+
     struct WorkspaceDescriptor
     {
         uint32_t schemaVersion{ WorkspaceSchemaVersion };
@@ -206,8 +219,9 @@ namespace winTerm::Workspaces
         std::string createdAt;
         std::string updatedAt;
         WorkspaceSource source{ WorkspaceSource::User };
-        std::string applicationVersion{ "0.4.0-dev" };
+        std::string applicationVersion{ "0.5.0-alpha" };
         uint32_t protocolVersion{ 1 };
+        uint32_t dockingModelVersion{ DockingModelVersion };
         WorkspaceStartupBehavior startupBehavior;
         std::optional<std::string> activeWindowId;
         std::vector<std::string> tags;
@@ -215,6 +229,7 @@ namespace winTerm::Workspaces
         std::optional<std::string> lastOpenedAt;
         std::optional<std::string> captureReason;
         std::optional<RecoveryMetadata> recoveryMetadata;
+        std::optional<LayoutHistoryMetadata> layoutHistoryMetadata;
         std::vector<WindowDescriptor> windows;
 
         size_t TabCount() const noexcept;

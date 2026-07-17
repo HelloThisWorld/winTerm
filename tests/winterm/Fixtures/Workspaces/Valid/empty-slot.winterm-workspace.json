@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 2,
+  "id": "workspace.fixture-empty-slot",
+  "name": "Fixture Empty Slot",
+  "description": "A schema-v2 empty layout slot fixture.",
+  "createdAt": "2026-07-17T00:00:00Z",
+  "updatedAt": "2026-07-17T00:00:00Z",
+  "source": "user",
+  "applicationVersion": "0.5.0-alpha",
+  "protocolVersion": 1,
+  "dockingModelVersion": 1,
+  "activeWindowId": "window-empty-slot",
+  "startupBehavior": {
+    "restoreFocus": true,
+    "restoreWindowState": true
+  },
+  "windows": [
+    {
+      "id": "window-empty-slot",
+      "displayName": "Empty Slot",
+      "monitor": {
+        "deviceId": "DISPLAY1",
+        "stableId": "monitor-primary",
+        "friendlyName": "Primary",
+        "workArea": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+        "dpiX": 96,
+        "dpiY": 96,
+        "isPrimary": true
+      },
+      "bounds": { "x": 200, "y": 120, "width": 1000, "height": 700 },
+      "normalizedBounds": { "x": 0.1, "y": 0.1, "width": 0.52, "height": 0.65 },
+      "windowState": "normal",
+      "isAlwaysOnTop": false,
+      "activeTabId": "tab-empty-slot",
+      "tabs": [
+        {
+          "id": "tab-empty-slot",
+          "title": "Empty",
+          "customTitle": false,
+          "isReadOnly": false,
+          "panes": [],
+          "layout": {
+            "type": "emptySlot",
+            "slotId": "slot-empty-1",
+            "preferredProfileId": null
+          }
+        }
+      ]
+    }
+  ]
+}

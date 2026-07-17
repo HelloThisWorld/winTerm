@@ -65,9 +65,10 @@ namespace
     {
         static const std::set<std::string, std::less<>> fields{
             "schemaVersion", "id", "name", "description", "createdAt", "updatedAt", "source",
-            "applicationVersion", "protocolVersion", "startupBehavior", "activeWindowId", "tags",
-            "isDefault", "lastOpenedAt", "captureReason", "recoveryMetadata", "windows",
+            "applicationVersion", "protocolVersion", "dockingModelVersion", "startupBehavior", "activeWindowId", "tags",
+            "isDefault", "lastOpenedAt", "captureReason", "recoveryMetadata", "layoutHistoryMetadata", "windows",
             "restoreFocus", "restoreWindowState", "generation", "cleanShutdown", "capturedAt",
+            "limit", "lastSequence",
             "displayName", "monitor", "bounds", "normalizedBounds", "windowState", "isAlwaysOnTop",
             "activeTabId", "tabs", "deviceId", "stableId", "friendlyName", "workArea", "dpiX",
             "dpiY", "isPrimary", "x", "y", "width", "height", "title", "customTitle", "themeId",
@@ -75,7 +76,7 @@ namespace
             "profileNameFallback", "profileSource", "stableProfileId", "shellType", "workingDirectory",
             "startingDirectoryFallback", "font", "session", "kind", "value", "verifiedAt",
             "distributionId", "family", "size", "weight", "lastExitCode", "wasCommandRunning",
-            "endedUnexpectedly", "type", "paneId", "orientation", "ratio", "first", "second",
+            "endedUnexpectedly", "type", "paneId", "slotId", "preferredProfileId", "orientation", "ratio", "first", "second",
         };
         return fields.contains(field);
     }

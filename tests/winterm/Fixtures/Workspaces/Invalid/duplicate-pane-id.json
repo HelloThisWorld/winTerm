@@ -1,12 +1,13 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "workspace.invalid-duplicate",
   "name": "Invalid duplicate",
   "createdAt": "2026-07-15T00:00:00Z",
   "updatedAt": "2026-07-15T00:00:00Z",
   "source": "user",
-  "applicationVersion": "0.4.0-dev",
+  "applicationVersion": "0.5.0-alpha",
   "protocolVersion": 1,
+  "dockingModelVersion": 1,
   "windows": [
     {
       "id": "window-1",

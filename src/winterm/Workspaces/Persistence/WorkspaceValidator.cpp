@@ -125,7 +125,16 @@ namespace
                 context.Error("invalidPaneNode", field, "A pane layout node cannot have child nodes.");
             }
         }
-        else
+        else if (node->type == LayoutNodeType::EmptySlot)
+        {
+            ValidateId(context, node->slotId, field + ".slotId");
+            ValidateOptionalString(context, node->preferredProfileId, field + ".preferredProfileId");
+            if (!node->paneId.empty() || node->first || node->second)
+            {
+                context.Error("invalidEmptySlotNode", field, "An empty layout slot cannot reference a pane or contain child nodes.");
+            }
+        }
+        else if (node->type == LayoutNodeType::Split)
         {
             if (!std::isfinite(node->ratio) || node->ratio < MinimumSplitRatio || node->ratio > MaximumSplitRatio)
             {
@@ -142,6 +151,14 @@ namespace
             {
                 context.Error("invalidSplitNode", field + ".paneId", "A split layout node cannot reference a pane directly.");
             }
+            if (!node->slotId.empty() || node->preferredProfileId)
+            {
+                context.Error("invalidSplitNode", field, "A split layout node cannot contain empty-slot metadata.");
+            }
+        }
+        else
+        {
+            context.Error("unsupportedLayoutNode", field + ".type", "The layout contains an unsupported node type.");
         }
         ancestors.erase(node.get());
     }
@@ -156,6 +173,14 @@ namespace
             const auto newer = workspace.schemaVersion > WorkspaceSchemaVersion;
             context.Error(newer ? "newerSchema" : "migrationRequired", "schemaVersion",
                           newer ? "The workspace was created by a newer version of winTerm." : "The workspace requires schema migration.");
+        }
+        if (workspace.dockingModelVersion != DockingModelVersion)
+        {
+            context.Error("unsupportedDockingModel", "dockingModelVersion", "The workspace uses an unsupported docking model version.");
+        }
+        if (workspace.layoutHistoryMetadata && (workspace.layoutHistoryMetadata->limit == 0 || workspace.layoutHistoryMetadata->limit > 100))
+        {
+            context.Error("invalidLayoutHistoryLimit", "layoutHistoryMetadata.limit", "The layout history limit must be between 1 and 100.");
         }
         ValidateId(context, workspace.id, "id");
         ValidateString(context, workspace.name, "name", true);
@@ -231,9 +256,9 @@ namespace
                 ValidateOptionalString(context, tab.zoomedPaneId, tabField + ".zoomedPaneId");
                 ValidateOptionalString(context, tab.tabColor, tabField + ".tabColor");
 
-                if (tab.panes.empty())
+                if (tab.panes.empty() && (!tab.layout || tab.layout->type != LayoutNodeType::EmptySlot))
                 {
-                    context.Error("emptyTab", tabField + ".panes", "A restored tab must contain at least one pane.");
+                    context.Error("emptyTab", tabField + ".panes", "A restored tab without panes must contain one empty layout slot.");
                 }
                 if (tab.panes.size() > MaximumWorkspacePanesPerTab)
                 {

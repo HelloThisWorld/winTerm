@@ -11,7 +11,8 @@ try
 {
     $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     $fixture = Join-Path $repositoryRoot 'tests\winterm\Fixtures\Workspaces\Valid\split-pane.winterm-workspace.json'
-    & (Join-Path $PSScriptRoot 'validate-workspaces.ps1') -Path $fixture
+    $cornerFixture = Join-Path $repositoryRoot 'tests\winterm\Fixtures\Workspaces\Valid\corner-top-left.winterm-workspace.json'
+    & (Join-Path $PSScriptRoot 'validate-workspaces.ps1') -Path @($fixture, $cornerFixture)
     if (-not $?)
     {
         throw 'The split-pane restore fixture is invalid.'
@@ -26,6 +27,19 @@ try
     if ($tab.activePaneId -ne 'pane-left' -or $tab.panes.Count -ne 2)
     {
         throw 'The restore fixture did not preserve pane focus or pane count.'
+    }
+    $cornerWorkspace = Get-Content -LiteralPath $cornerFixture -Raw -Encoding UTF8 | ConvertFrom-Json
+    $corner = $cornerWorkspace.windows[0].tabs[0].layout
+    if ($corner.type -ne 'split' -or
+        $corner.orientation -ne 'vertical' -or
+        [double]$corner.ratio -ne 0.35 -or
+        $corner.first.orientation -ne 'horizontal' -or
+        $corner.first.first.paneId -ne 'pane-source' -or
+        $corner.first.second.type -ne 'emptySlot' -or
+        $corner.first.second.slotId -ne 'slot-corner-top-left' -or
+        $corner.second.paneId -ne 'pane-target')
+    {
+        throw 'The restore fixture did not preserve deterministic top-left corner docking.'
     }
 
     $resolver = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Workspaces\Restore\WorkspaceResolvers.cpp') -Raw
@@ -44,7 +58,7 @@ try
             throw "Progressive restore boundary '$required' is missing."
         }
     }
-    Write-Host 'PASS: workspace restore planning, pane layout, monitor, DPI, and fallback foundations.' -ForegroundColor Green
+    Write-Host 'PASS: workspace restore planning, pane, corner, empty-slot, monitor, DPI, and fallback foundations.' -ForegroundColor Green
 }
 catch
 {

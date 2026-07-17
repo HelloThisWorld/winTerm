@@ -41,6 +41,17 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\validate-workspaces.ps1 -BundledFixtures
 
+      - name: Validate docking source and local UI boundaries
+        shell: pwsh
+        run: |
+          .\scripts\winterm\test-layout-transformations.ps1
+          .\scripts\winterm\test-docking-transactions.ps1
+          .\scripts\winterm\test-session-transfer.ps1
+          .\scripts\winterm\test-layout-history.ps1
+          .\scripts\winterm\test-docking-presentation.ps1
+          .\scripts\winterm\test-docking-ui.ps1 -Mode Validate
+          .\scripts\winterm\validate-layout.ps1 -TestFixture empty-slot.winterm-workspace.json
+
       - name: Build x64
         shell: pwsh
         run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
@@ -52,6 +63,10 @@ jobs:
       - name: Run workspace benchmark
         shell: pwsh
         run: .\scripts\winterm\benchmark-workspace.ps1
+
+      - name: Run docking model benchmark
+        shell: pwsh
+        run: .\scripts\winterm\benchmark-docking.ps1
 
   package:
     name: x64 Release MSIX

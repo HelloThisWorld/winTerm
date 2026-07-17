@@ -48,6 +48,10 @@
     <ClCompile Include="WinTermFontAssetTests.cpp" />
     <ClCompile Include="WinTermShellTests.cpp" />
     <ClCompile Include="WinTermWorkspaceTests.cpp" />
+    <ClCompile Include="WinTermDockingTests.cpp" />
+    <ClCompile Include="WinTermDockingSafetyTests.cpp" />
+    <ClCompile Include="WinTermDockingPresentationTests.cpp" />
+    <ClCompile Include="WinTermDockingDiagnosticsTests.cpp" />
     <ClCompile Include="MediaResourceTests.cpp" />
     <ClCompile Include="../TerminalSettingsAppAdapterLib/TerminalSettings.cpp" />
     <ClCompile Include="pch.cpp">

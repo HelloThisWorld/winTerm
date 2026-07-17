@@ -36,7 +36,7 @@ WorkspaceMigrationResult WorkspaceMigration::Migrate(const Json::Value& document
                 result.document.removeMember("workspaceId");
             }
             if (result.document["source"].isNull()) result.document["source"] = "user";
-            if (result.document["applicationVersion"].isNull()) result.document["applicationVersion"] = "0.4.0-dev";
+            if (result.document["applicationVersion"].isNull()) result.document["applicationVersion"] = "0.5.0-alpha";
             if (result.document["protocolVersion"].isNull()) result.document["protocolVersion"] = 1;
             if (result.document["description"].isNull()) result.document["description"] = "";
             if (result.document["startupBehavior"].isNull())
@@ -50,6 +50,16 @@ WorkspaceMigrationResult WorkspaceMigration::Migrate(const Json::Value& document
             result.targetVersion = 1;
             result.changed = true;
             result.notes.emplace_back("Migrated the legacy workspace envelope to schema version 1.");
+            break;
+        case 1:
+            if (result.document["dockingModelVersion"].isNull())
+            {
+                result.document["dockingModelVersion"] = DockingModelVersion;
+            }
+            result.document["schemaVersion"] = 2;
+            result.targetVersion = 2;
+            result.changed = true;
+            result.notes.emplace_back("Migrated the workspace envelope to schema version 2 without changing pane or split layouts.");
             break;
         default:
             throw std::runtime_error("The workspace cannot be migrated from its schema version.");

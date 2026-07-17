@@ -302,6 +302,16 @@ WorkspaceLoadResult WorkspaceStore::_load(
         }
         if (json["schemaVersion"].isUInt() && json["schemaVersion"].asUInt() < WorkspaceSchemaVersion)
         {
+            const auto sourceVersion = json["schemaVersion"].asUInt();
+            const auto migrationBackup = std::filesystem::path{ path.string() + ".schema-v" + std::to_string(sourceVersion) + ".backup.json" };
+            if (!std::filesystem::is_regular_file(migrationBackup))
+            {
+                const auto backupResult = AtomicFileWriter::Write(migrationBackup, content);
+                if (!backupResult.succeeded)
+                {
+                    throw std::runtime_error("The workspace could not be backed up before schema migration.");
+                }
+            }
             json = WorkspaceMigration::Migrate(json).document;
         }
         return { WorkspaceLoadStatus::Loaded, WorkspaceSerializer::FromJson(json), path, {} };

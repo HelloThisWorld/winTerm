@@ -53,14 +53,15 @@ function New-BenchmarkWorkspace
         }
     }
     return [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         id = 'workspace.benchmark'
         name = 'Benchmark'
         createdAt = '2026-07-15T00:00:00Z'
         updatedAt = '2026-07-15T00:00:00Z'
         source = 'runtime'
-        applicationVersion = '0.4.0-dev'
+        applicationVersion = '0.5.0-alpha'
         protocolVersion = 1
+        dockingModelVersion = 1
         activeWindowId = 'window-0'
         windows = @($windows)
     }

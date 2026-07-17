@@ -246,6 +246,14 @@ namespace
         {
             json["paneId"] = layout->paneId;
         }
+        else if (layout->type == LayoutNodeType::EmptySlot)
+        {
+            json["slotId"] = layout->slotId;
+            if (layout->preferredProfileId)
+            {
+                json["preferredProfileId"] = *layout->preferredProfileId;
+            }
+        }
         else
         {
             json["orientation"] = std::string{ ToString(layout->orientation) };
@@ -270,6 +278,12 @@ namespace
         if (*type == LayoutNodeType::Pane)
         {
             return LayoutNodeDescriptor::Pane(RequiredString(json, "paneId"));
+        }
+        if (*type == LayoutNodeType::EmptySlot)
+        {
+            return LayoutNodeDescriptor::EmptySlot(
+                RequiredString(json, "slotId"),
+                OptionalString(json, "preferredProfileId"));
         }
         const auto orientation = SplitOrientationFromString(RequiredString(json, "orientation"));
         if (!orientation)
@@ -545,6 +559,7 @@ Json::Value WorkspaceSerializer::ToJson(const WorkspaceDescriptor& workspace)
     json["source"] = std::string{ ToString(workspace.source) };
     json["applicationVersion"] = workspace.applicationVersion;
     json["protocolVersion"] = workspace.protocolVersion;
+    json["dockingModelVersion"] = workspace.dockingModelVersion;
     Json::Value startupBehavior{ Json::objectValue };
     startupBehavior["restoreFocus"] = workspace.startupBehavior.restoreFocus;
     startupBehavior["restoreWindowState"] = workspace.startupBehavior.restoreWindowState;
@@ -563,6 +578,13 @@ Json::Value WorkspaceSerializer::ToJson(const WorkspaceDescriptor& workspace)
         recovery["cleanShutdown"] = workspace.recoveryMetadata->cleanShutdown;
         recovery["capturedAt"] = workspace.recoveryMetadata->capturedAt;
         json["recoveryMetadata"] = std::move(recovery);
+    }
+    if (workspace.layoutHistoryMetadata)
+    {
+        Json::Value history{ Json::objectValue };
+        history["limit"] = workspace.layoutHistoryMetadata->limit;
+        history["lastSequence"] = Json::UInt64{ workspace.layoutHistoryMetadata->lastSequence };
+        json["layoutHistoryMetadata"] = std::move(history);
     }
     Json::Value windows{ Json::arrayValue };
     for (const auto& window : workspace.windows)
@@ -596,8 +618,9 @@ WorkspaceDescriptor WorkspaceSerializer::FromJson(const Json::Value& json, const
         throw std::runtime_error("The workspace source is not supported.");
     }
     workspace.source = *source;
-    workspace.applicationVersion = StringOrDefault(json, "applicationVersion", "0.4.0-dev");
+    workspace.applicationVersion = StringOrDefault(json, "applicationVersion", "0.5.0-alpha");
     workspace.protocolVersion = UIntOrDefault(json, "protocolVersion", 1);
+    workspace.dockingModelVersion = UIntOrDefault(json, "dockingModelVersion", DockingModelVersion);
     if (const auto& startup = json["startupBehavior"]; !startup.isNull())
     {
         if (!startup.isObject())
@@ -636,6 +659,17 @@ WorkspaceDescriptor WorkspaceSerializer::FromJson(const Json::Value& json, const
             recovery["generation"].asUInt64(),
             BoolOrDefault(recovery, "cleanShutdown", true),
             StringOrDefault(recovery, "capturedAt"),
+        };
+    }
+    if (const auto& history = json["layoutHistoryMetadata"]; !history.isNull())
+    {
+        if (!history.isObject() || !history["lastSequence"].isUInt64())
+        {
+            throw std::runtime_error("Workspace layout history metadata is invalid.");
+        }
+        workspace.layoutHistoryMetadata = LayoutHistoryMetadata{
+            UIntOrDefault(history, "limit", 20),
+            history["lastSequence"].asUInt64(),
         };
     }
     const auto& windows = RequiredArray(json, "windows");
