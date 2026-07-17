@@ -1,0 +1,28 @@
+name: Crash report
+description: Report a winTerm crash without publishing a memory dump or sensitive terminal content.
+title: "[Crash]: "
+labels: [crash]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach a full memory dump, terminal buffer, Workspace file, password, token, or proprietary command output to a public issue.
+  - type: input
+    id: crashid
+    attributes: { label: Crash ID, description: Include only if winTerm displayed one. }
+  - type: input
+    id: version
+    attributes: { label: winTerm version and architecture }
+    validations: { required: true }
+  - type: textarea
+    id: action
+    attributes: { label: Action before the crash }
+    validations: { required: true }
+  - type: dropdown
+    id: recovery
+    attributes: { label: Recovery result, options: [Recovered, Did not recover, Not attempted, Unknown] }
+  - type: dropdown
+    id: frequency
+    attributes: { label: Frequency, options: [Always, Often, Once, Unknown] }
+  - type: textarea
+    id: diagnostics
+    attributes: { label: Reviewed diagnostic bundle, description: Attach only an explicitly generated and reviewed redacted bundle. }

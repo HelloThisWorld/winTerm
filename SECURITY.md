@@ -1,41 +1,19 @@
-<!-- BEGIN MICROSOFT SECURITY.MD V0.0.2 BLOCK -->
+# Security policy
 
-## Security
+## Supported versions
 
-Microsoft takes the security of our software products and services seriously, which includes all source code repositories managed through our GitHub organizations, which include [Microsoft](https://github.com/Microsoft), [Azure](https://github.com/Azure), [DotNet](https://github.com/dotnet), [AspNet](https://github.com/aspnet), [Xamarin](https://github.com/xamarin), and [many more](https://opensource.microsoft.com/).
+Security fixes are assessed for the current `main` branch and supported winTerm beta releases. An unsigned development package is not a public security release.
 
-If you believe you have found a security vulnerability in any Microsoft-owned repository that meets Microsoft's [definition](https://docs.microsoft.com/en-us/previous-versions/tn-archive/cc751383(v=technet.10)) of a security vulnerability, please report it to us as described below.
+## Reporting a vulnerability
 
-## Reporting Security Issues
+Do not open a public issue for a suspected vulnerability and do not include real credentials, tokens, private terminal output, Workspace files, or exploit payloads in public discussions.
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+This repository has GitHub Private Vulnerability Reporting enabled. Use the repository Security tab to submit a private report. If that feature is unavailable, contact a repository maintainer through GitHub and request a private reporting channel before sharing technical details.
 
-Instead, please report them to the Microsoft Security Response Center (MSRC) at [https://msrc.microsoft.com/create-report](https://msrc.microsoft.com/create-report).
+## Scope
 
-If you prefer to submit without logging in, send email to [secure@microsoft.com](mailto:secure@microsoft.com).  If possible, encrypt your message with our PGP key; please download it from the [Microsoft Security Response Center PGP Key page](https://www.microsoft.com/en-us/msrc/pgp-key-msrc).
+Examples include arbitrary command execution, unsafe import processing, secret or clipboard exposure, package identity confusion, unsafe update behavior, diagnostic-redaction failure, docking session loss, and vulnerabilities in winTerm-maintained release automation.
 
-You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message. Additional information can be found at [microsoft.com/msrc](https://www.microsoft.com/msrc). 
+## Response process
 
-Please include the requested information listed below (as much as you can provide) to help us better understand the nature and scope of the possible issue:
-
-  * Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
-  * Full paths of source file(s) related to the manifestation of the issue
-  * The location of the affected source code (tag/branch/commit or direct URL)
-  * Any special configuration required to reproduce the issue
-  * Step-by-step instructions to reproduce the issue
-  * Proof-of-concept or exploit code (if possible)
-  * Impact of the issue, including how an attacker might exploit the issue
-
-This information will help us triage your report more quickly.
-
-If you are reporting for a bug bounty, more complete reports can contribute to a higher bounty award. Please visit our [Microsoft Bug Bounty Program](https://microsoft.com/msrc/bounty) page for more details about our active programs.
-
-## Preferred Languages
-
-We prefer all communications to be in English.
-
-## Policy
-
-Microsoft follows the principle of [Coordinated Vulnerability Disclosure](https://www.microsoft.com/en-us/msrc/cvd).
-
-<!-- END MICROSOFT SECURITY.MD BLOCK -->
+Maintainers will acknowledge a valid report through the private channel, assess impact and affected versions, coordinate a fix, and publish a disclosure only after users have a reasonable opportunity to update. We do not promise a specific response time or a bug bounty.

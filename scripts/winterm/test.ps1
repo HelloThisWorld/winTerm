@@ -197,6 +197,12 @@ try
     Test-ShellExperienceFoundations -RepositoryRoot $repositoryRoot
     Test-WorkspaceFoundations
 
+    & (Join-Path $PSScriptRoot 'test-diagnostics.ps1')
+    if (-not $?)
+    {
+        throw 'Diagnostic redaction source validation failed.'
+    }
+
     if ($Suite -eq 'Smoke')
     {
         Write-Host 'SKIP: Compiled unit tests are not part of the Smoke suite.' -ForegroundColor Yellow
