@@ -169,8 +169,8 @@ jobs:
           Copy-Item -LiteralPath 'docs\releases\1.0.1.md' -Destination $notesPath
           Add-Content -LiteralPath $notesPath -Value @'
 
-> **Self-signed installer:** download `winTerm-1.0.1-x64.msix`, `winTerm-1.0.1.cer`, `INSTALL.txt`, and `SHA256SUMS.txt`. Windows does not trust this certificate by default. Verify the hashes and repository URL before importing the certificate into Trusted People.
-'@
+          > **Self-signed installer:** download `winTerm-1.0.1-x64.msix`, `winTerm-1.0.1.cer`, `INSTALL.txt`, and `SHA256SUMS.txt`. Windows does not trust this certificate by default. Verify the hashes and repository URL before importing the certificate into Trusted People.
+          '@
 
           $assets = @(
             'artifacts\release\winTerm-1.0.1-x64.msix',
