@@ -1,5 +1,6 @@
 # winTerm
 
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](docs/releases/1.0.0.md)
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
 [![Stable release](https://img.shields.io/badge/stable%20release-blocked-critical)](docs/release-checklist-v1.0.md)
@@ -75,7 +76,24 @@ Use the Microsoft Terminal upstream toolchain described in [build guidance](docs
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 ```
 
-Local builds and unsigned development MSIX packages are not public releases.
+To build an installable x64 package without a public CA, run the local
+development wrapper from PowerShell 7:
+
+```powershell
+.\scripts\winterm\build-local-development.ps1 -IncludeTests
+```
+
+It builds and validates Release, creates a disposable self-signed code-signing
+certificate, signs the MSIX, exports only the public `.cer`, verifies the
+package signature and identity, and writes `SHA256SUMS.txt` under
+`artifacts/local/winTerm-1.0.0-development-x64`. The private key is removed
+after signing.
+
+Before installation, an administrator must import the included `.cer` into
+the Local Machine `Trusted People` certificate store. This package is for
+local or controlled internal testing; it is not publicly trusted, timestamped,
+or a Stable release. See [build guidance](docs/build.md) for prerequisites,
+output files, installation steps, and optional arguments.
 
 ## License and upstream
 
