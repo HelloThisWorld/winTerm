@@ -13,6 +13,13 @@ using namespace winrt::Windows::UI::Composition;
 using namespace winrt::Windows::UI::Xaml::Hosting;
 using namespace winrt::Windows::Foundation::Numerics;
 
+#if defined(WT_BRANDING_WINTERM)
+TRACELOGGING_DEFINE_PROVIDER(
+    g_hWindowsTerminalProvider,
+    "winTerm.Win32Host",
+    // {a303edd2-dea1-42be-9b6d-158f42246d54}
+    (0xa303edd2, 0xdea1, 0x42be, 0x9b, 0x6d, 0x15, 0x8f, 0x42, 0x24, 0x6d, 0x54));
+#else
 // Note: Generate GUID using TlgGuid.exe tool - seriously, it won't work if you
 // just generate an arbitrary GUID
 TRACELOGGING_DEFINE_PROVIDER(
@@ -21,6 +28,7 @@ TRACELOGGING_DEFINE_PROVIDER(
     // {56c06166-2e2e-5f4d-7ff3-74f4b78c87d6}
     (0x56c06166, 0x2e2e, 0x5f4d, 0x7f, 0xf3, 0x74, 0xf4, 0xb7, 0x8c, 0x87, 0xd6),
     TraceLoggingOptionMicrosoftTelemetry());
+#endif
 
 // !! BODGY !!
 // Manually use the resources from TerminalApp as our resources.
@@ -84,6 +92,7 @@ static void EnsureNativeArchitecture()
 
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int nCmdShow)
 {
+#if !defined(WT_BRANDING_WINTERM)
     TraceLoggingRegister(g_hWindowsTerminalProvider);
     ::Microsoft::Console::ErrorReporting::EnableFallbackFailureReporting(g_hWindowsTerminalProvider);
 
@@ -93,6 +102,7 @@ int __stdcall wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int nCmdShow)
         TraceLoggingDescription("Event emitted when the terminal process is started"),
         TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
         TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+#endif
 
     // If Terminal is spawned by a shortcut that requests that it run in a new process group
     // while attached to a console session, that request is nonsense. That request will, however,

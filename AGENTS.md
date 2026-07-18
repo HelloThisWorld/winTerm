@@ -7,6 +7,22 @@
 - Build wrappers must preserve compiler output and must not hide compiler errors.
 - Do not commit local absolute paths or generated build output.
 
+## Create PR Protocol
+
+When the user says `create pr`, follow this workflow:
+
+- Run `git remote -v`, `git status --short`, and `gh auth status` before changing Git state. If GitHub CLI is not authenticated, use `gh auth login` with browser authorization.
+- Work on a feature branch, never directly on the default branch.
+- Inspect the complete diff, stage only files belonging to the requested work, and run the relevant tests before committing.
+- Never force-push. Push the branch with upstream tracking on its first push.
+- Check for an existing pull request with the same head branch before creating one.
+- Follow `.github/PULL_REQUEST_TEMPLATE.md`. For a substantial body, write a temporary Markdown file and pass it with `--body-file`.
+- Create a Draft pull request unless the user explicitly requests a ready-for-review pull request.
+- Monitor the pull request checks without rapid polling. Prefer a background `gh pr checks --watch` or `gh run watch --exit-status` process with a 30-second interval.
+- On failure, inspect failed-job logs, fix only failures caused by the requested changes, rerun relevant local tests, commit, and push to the same branch so the same pull request updates.
+- Remember that `workflow_dispatch` cannot dispatch a workflow that exists only outside the default branch. Use the pull-request trigger for new workflows or merge them before dispatching.
+- Before release operations, check for an existing tag or Release and never overwrite an existing release asset.
+
 ## Code Rules
 
 - Use English for code, function names, variable names, comments, logs, and error messages.

@@ -10,6 +10,7 @@
 
 #include "../../types/inc/utils.hpp"
 #include "Utils.h"
+#include "../../winterm/Branding/ReleaseMetadata.h"
 
 using namespace winrt;
 using namespace winrt::Microsoft::Terminal::Settings::Model;
@@ -38,7 +39,87 @@ namespace winrt::TerminalApp::implementation
 
     winrt::hstring AboutDialog::ApplicationVersion()
     {
+#if defined(WT_BRANDING_WINTERM)
+        return winrt::hstring{ winTerm::Branding::ApplicationVersion };
+#else
         return CascadiaSettings::ApplicationVersion();
+#endif
+    }
+
+    winrt::hstring AboutDialog::ReleaseDetails()
+    {
+#if defined(WT_BRANDING_WINTERM)
+#if defined(_M_ARM64)
+        constexpr std::wstring_view architecture{ L"ARM64" };
+#elif defined(_M_X64)
+        constexpr std::wstring_view architecture{ L"x64" };
+#else
+        constexpr std::wstring_view architecture{ L"unknown" };
+#endif
+        const auto details = wil::str_printf<std::wstring>(
+            L"Channel: %.*s\n"
+            L"Architecture: %.*s\n"
+            L"Commit SHA: %.*s\n"
+            L"Build timestamp: %.*s\n"
+            L"Microsoft Terminal upstream revision: %.*s\n"
+            L"Workspace Schema version: %u\n"
+            L"Docking Model version: %u\n"
+            L"Shell Protocol version: %u\n"
+            L"Theme Schema version: %u",
+            static_cast<int>(winTerm::Branding::ReleaseChannel.size()),
+            winTerm::Branding::ReleaseChannel.data(),
+            static_cast<int>(architecture.size()),
+            architecture.data(),
+            static_cast<int>(winTerm::Branding::CommitSha.size()),
+            winTerm::Branding::CommitSha.data(),
+            static_cast<int>(winTerm::Branding::BuildTimestamp.size()),
+            winTerm::Branding::BuildTimestamp.data(),
+            static_cast<int>(winTerm::Branding::MicrosoftTerminalUpstreamRevision.size()),
+            winTerm::Branding::MicrosoftTerminalUpstreamRevision.data(),
+            winTerm::Branding::WorkspaceSchemaVersion,
+            winTerm::Branding::DockingModelVersion,
+            winTerm::Branding::ShellProtocolVersion,
+            winTerm::Branding::ThemeSchemaVersion);
+        return winrt::hstring{ details };
+#else
+        return {};
+#endif
+    }
+
+    Windows::Foundation::Uri AboutDialog::SourceCodeUri()
+    {
+#if defined(WT_BRANDING_WINTERM)
+        return Windows::Foundation::Uri{ L"https://github.com/HelloThisWorld/winTerm" };
+#else
+        return Windows::Foundation::Uri{ L"https://go.microsoft.com/fwlink/?linkid=2203152" };
+#endif
+    }
+
+    Windows::Foundation::Uri AboutDialog::DocumentationUri()
+    {
+#if defined(WT_BRANDING_WINTERM)
+        return Windows::Foundation::Uri{ L"https://github.com/HelloThisWorld/winTerm/tree/main/docs" };
+#else
+        return Windows::Foundation::Uri{ L"https://go.microsoft.com/fwlink/?linkid=2125416" };
+#endif
+    }
+
+    Windows::Foundation::Uri AboutDialog::ReleaseNotesUri()
+    {
+#if defined(WT_BRANDING_WINTERM)
+        return Windows::Foundation::Uri{ L"https://github.com/HelloThisWorld/winTerm/releases" };
+#else
+        return Windows::Foundation::Uri{ L"https://go.microsoft.com/fwlink/?linkid=2125417" };
+#endif
+    }
+
+    Windows::Foundation::Uri AboutDialog::PrivacyPolicyUri()
+    {
+#if defined(WT_BRANDING_WINTERM)
+        return Windows::Foundation::Uri{ L"https://github.com/HelloThisWorld/winTerm/blob/main/PRIVACY.md" };
+#else
+        return Windows::Foundation::Uri{ L"https://go.microsoft.com/fwlink/?linkid=2125418" };
+#endif
     }
 
     void AboutDialog::_SendFeedbackOnClick(const IInspectable& /*sender*/, const Windows::UI::Xaml::Controls::ContentDialogButtonClickEventArgs& /*eventArgs*/)
@@ -65,6 +146,10 @@ namespace winrt::TerminalApp::implementation
 
     safe_void_coroutine AboutDialog::_queueUpdateCheck()
     {
+#if defined(WT_BRANDING_WINTERM)
+        // Stable winTerm does not contact an update service without explicit consent.
+        co_return;
+#else
         auto strongThis = get_strong();
         auto now{ std::chrono::system_clock::now() };
         if (now - _lastUpdateCheck < std::chrono::days{ 1 })
@@ -151,5 +236,6 @@ namespace winrt::TerminalApp::implementation
 
         co_await wil::resume_foreground(strongThis->Dispatcher());
         CheckingForUpdates(false);
+#endif
     }
 }

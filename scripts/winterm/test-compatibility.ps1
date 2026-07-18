@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 & (Join-Path $PSScriptRoot 'test-shell-integration.ps1') -Shell WindowsPowerShell
-if ($LASTEXITCODE -ne 0)
+if (-not $?)
 {
-    exit $LASTEXITCODE
+    throw 'Windows PowerShell compatibility validation failed.'
 }

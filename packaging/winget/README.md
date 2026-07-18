@@ -1,5 +1,16 @@
-# WinGet Public Beta manifest plan
+# WinGet manifest preparation
 
-The Public Beta package identifier is reserved as `Kaname.winTerm.Beta`. A WinGet manifest is not submitted or claimed valid until the draft GitHub Release has immutable x64 MSIX URLs and SHA-256 values.
+The Stable package identifier is `Kaname.winTerm`.
 
-Generate installer, default-locale, and version manifests from `release-metadata.json`, validate them with `winget validate`, and retain the final validation output with the release report. Do not publish a template with invented URLs or hashes.
+No 1.0.0 manifest is committed before the public GitHub Release exists. The installer URL and SHA-256 must come from the actually published `winTerm-1.0.0-x64.msix`; placeholders and Actions artifact URLs are forbidden.
+
+After publication, `.github/workflows/winget.yml`:
+
+1. confirms `v1.0.0` is public and not a Prerelease;
+2. downloads the x64 installer from the Release;
+3. computes its real SHA-256;
+4. generates installer, default-locale, and version manifests;
+5. runs `winget validate`;
+6. uploads the validated set as a workflow artifact for manual review.
+
+This does not claim that an official `microsoft/winget-pkgs` pull request exists or has been approved. Record a real PR URL only after a separate reviewed submission succeeds.

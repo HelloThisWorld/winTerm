@@ -1,25 +1,32 @@
 # Changelog
 
-## 0.6.0-beta.1 - Unreleased
+## 1.0.0 - Release candidate
 
 ### Added
 
-- Public Beta release criteria, compatibility matrix, accessibility audit plan, security review, release checklist, and release-notes draft.
-- Privacy policy, security reporting policy, and issue templates for bug, compatibility, and crash reports.
-- Release-artifact automation for checksums, SBOM metadata, and draft-release preparation.
+- Stable compatibility and schema policies for Workspace 2, Docking 1, Shell Protocol 1, Theme 1, and Update Manifest 1.
+- Version-consistency, privacy, checksum, package, signing, SBOM, Attestation, and downloaded-asset verification.
+- A protected two-stage GitHub Draft and Stable publication workflow.
+- Stable release notes, feature status, security, accessibility, performance, support, and release checklists.
 
 ### Changed
 
-- Package version is `0.6.0.0`; application release channel is `beta`.
-
-### Fixed
-
-- The release process now records unsupported runtime paths rather than presenting source-only validation as full product verification.
+- Application, package, executable metadata, Workspace metadata, and PowerShell module versions are 1.0.0.
+- The release channel is `stable`.
+- Runtime Docking, cross-process Pane transfer, Update Check, Git Bash integration, and ARM64 remain Disabled until their gates pass.
 
 ### Security
 
-- The Public Beta release flow excludes secrets and requires checksums, identity verification, and redacted diagnostics.
+- Release assets are allowlisted and must come from the exact `v1.0.0` commit.
+- Published installers require a production signature, trusted timestamp, package Publisher match, checksum verification, and clean-machine validation evidence.
+- winTerm performs no update request without explicit consent.
+- The Release workflow never uses `--clobber` and never silently replaces assets.
 
-### Known Issues
+### Known issues
 
-- See [the beta release notes](docs/releases/0.6.0-beta.1.md).
+- See [winTerm 1.0.0 release notes](docs/releases/1.0.0.md).
+- Stable publication remains blocked until signing, clean installation, upgrade, uninstall, accessibility, runtime, and performance gates pass.
+
+## 0.6.0-beta.1 - Unpublished baseline
+
+- Added public-beta release infrastructure, compatibility evidence, privacy boundaries, security reporting, Workspace and Docking source validation, and unsigned development packaging.

@@ -1,20 +1,33 @@
-name: "Feature Request/Idea 🚀"
-description: Suggest a new feature or improvement (this does not mean you have to implement it)
-labels: [Issue-Feature]
-type: Feature
+name: Feature request
+description: Propose a post-1.0 improvement without expanding the active Stable release.
+title: "[Feature]: "
+labels:
+  - enhancement
 body:
-- type: textarea
-  attributes:
-    label: Description of the new feature
-    description: A clear and concise description of what the problem is that the new feature would solve.
-    placeholder: |
-      ... and guess what? I have four Terminals. And I have a hover car, and a hover house. And my computer's a runner, and it shows.
-  validations:
-    required: true
-
-- type: textarea
-  attributes:
-    label: Proposed technical implementation details
-    description: This field is optional. If you have any ideas, let us know!
-  validations:
-    required: false
+  - type: markdown
+    attributes:
+      value: winTerm 1.0 is feature-frozen. Accepted ideas are tracked for a later release and are not added to the Stable branch.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user problem without private commands, output, or Workspace data.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      options:
+        - label: I understand this request is not part of winTerm 1.0 Stable release work.
+          required: true

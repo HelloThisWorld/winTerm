@@ -2,7 +2,7 @@
 
 ## Supported development target
 
-The v0.1 release target is Windows 11 x64. The wrappers accept `ARM64` so a later validation effort does not require a command-line redesign, but ARM64 is not a v0.1 validated target.
+The winTerm 1.0 release target is Windows 11 x64. The wrappers accept `ARM64`, but ARM64 remains Disabled until a native build, install, and launch validation passes.
 
 ## Required tools
 
@@ -73,10 +73,10 @@ The wrapper builds Release with MSIX generation and signing disabled, locates th
 
 ## CI runner
 
-The lightweight workflow uses a GitHub-hosted Windows runner. The full workflow is manual and requires a self-hosted runner with labels `self-hosted`, `windows`, `x64`, and `winterm-build`, the complete toolchain above, and a GitHub Actions runner new enough for `actions/checkout@v6` (2.329.0 or later). The self-hosted workflow does not receive signing secrets.
+The validation and full-build workflows use GitHub-hosted Windows runners. The Stable workflow uses the protected `winterm-stable-release` environment and an exact `v1.0.0` checkout. Only the protected prepare job may access production signing configuration; pull-request workflows never receive those secrets.
 
 ## Known build issues in the implementation environment
 
-On 2026-07-13, the available implementation machine did not contain PowerShell 7, Visual Studio or `vswhere.exe`, MSBuild, or Windows SDK 10.0.22621.0. The initial unmodified build could not pass upstream module import, and the winTerm Debug and Release wrappers stop with a clear PowerShell 7 prerequisite error. Consequently, no compiler, unit-test binary, application launch, or package result is claimed from that machine.
+On 2026-07-18, the available implementation machine did not contain PowerShell 7, Visual Studio or `vswhere.exe`, MSBuild, MakeAppx, SignTool, Winget, or Windows SDK 10.0.22621.0. Consequently, no v1.0 compiler, unit-test binary, application launch, package, signature, or installer result is claimed from that machine.
 
 Install the declared prerequisites, reopen a PowerShell 7 prompt, and rerun Smoke, both x64 builds, Relevant tests, and packaging. Do not treat a source-only Smoke pass as a successful application build.

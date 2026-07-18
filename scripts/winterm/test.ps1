@@ -101,7 +101,7 @@ function Test-ShellExperienceFoundations
     }
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
-    if ($manifest.ModuleVersion -ne '0.3.0' -or $manifest.PowerShellVersion -ne '5.1')
+    if ($manifest.ModuleVersion -ne '1.0.0' -or $manifest.PowerShellVersion -ne '5.1')
     {
         throw 'The winTerm PowerShell module manifest does not declare the supported version boundary.'
     }
@@ -175,6 +175,18 @@ try
     Write-Host "Running winTerm $Suite tests ($Configuration, $Platform)..."
     Test-PowerShellSyntax -Directory $PSScriptRoot
 
+    & (Join-Path $PSScriptRoot 'verify-version.ps1')
+    if (-not $?)
+    {
+        throw 'Version consistency validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'test-release-workflow.ps1')
+    if (-not $?)
+    {
+        throw 'Release workflow validation failed.'
+    }
+
     & (Join-Path $PSScriptRoot 'validate-assets.ps1')
     if (-not $?)
     {
@@ -201,6 +213,12 @@ try
     if (-not $?)
     {
         throw 'Diagnostic redaction source validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'test-privacy.ps1')
+    if (-not $?)
+    {
+        throw 'Privacy validation failed.'
     }
 
     if ($Suite -eq 'Smoke')

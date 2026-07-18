@@ -14,6 +14,11 @@ namespace winrt::TerminalApp::implementation
 
         winrt::hstring ApplicationDisplayName();
         winrt::hstring ApplicationVersion();
+        winrt::hstring ReleaseDetails();
+        Windows::Foundation::Uri SourceCodeUri();
+        Windows::Foundation::Uri DocumentationUri();
+        Windows::Foundation::Uri ReleaseNotesUri();
+        Windows::Foundation::Uri PrivacyPolicyUri();
 
         til::property_changed_event PropertyChanged;
         WINRT_OBSERVABLE_PROPERTY(bool, UpdatesAvailable, PropertyChanged.raise, false);

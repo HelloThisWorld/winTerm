@@ -1,27 +1,66 @@
-name: Publish to WinGet
+name: Prepare winTerm WinGet manifests
 
 on:
   release:
-    types: [published]
+    types:
+      - published
+  workflow_dispatch:
 
-env:
-  REGEX: 'Microsoft\.WindowsTerminal(?:Preview)?_([\d.]+)_8wekyb3d8bbwe\.msixbundle$'
-  # winget-create will read the following environment variable to access the GitHub token needed for submitting a PR
-  # See https://aka.ms/winget-create-token
-  WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+permissions:
+  contents: read
 
 jobs:
-  publish:
-    runs-on: windows-latest # Action can only run on Windows
+  validate:
+    name: Generate and validate public-release manifests
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v1.0.0'
+    runs-on: windows-2022
+    timeout-minutes: 20
     steps:
-      - name: Publish Windows Terminal ${{ github.event.release.prerelease && 'Preview' || 'Stable' }}
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download the public x64 installer and derive its actual hash
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $assets = '${{ toJSON(github.event.release.assets) }}' | ConvertFrom-Json
-          $wingetRelevantAsset = $assets | Where-Object { $_.name -like '*.msixbundle' } | Select-Object -First 1
-          $regex = [Regex]::New($env:REGEX)
-          $version = $regex.Match($wingetRelevantAsset.name).Groups[1].Value
+          $release = gh release view v1.0.0 --repo '${{ github.repository }}' --json tagName,isDraft,isPrerelease,url,assets | ConvertFrom-Json
+          if ($release.tagName -ne 'v1.0.0' -or $release.isDraft -or $release.isPrerelease) {
+            throw 'WinGet manifests may be generated only from the public stable v1.0.0 Release.'
+          }
+          $asset = @($release.assets | Where-Object { $_.name -eq 'winTerm-1.0.0-x64.msix' })
+          if ($asset.Count -ne 1) {
+            throw 'The public Release does not contain exactly one x64 installer.'
+          }
 
-          $wingetPackage = "Microsoft.WindowsTerminal${{ github.event.release.prerelease && '.Preview' || '' }}"
+          $downloadDirectory = Join-Path $env:RUNNER_TEMP 'winterm-winget-source'
+          New-Item -ItemType Directory -Path $downloadDirectory | Out-Null
+          gh release download v1.0.0 --repo '${{ github.repository }}' --pattern 'winTerm-1.0.0-x64.msix' --dir $downloadDirectory
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Public installer download failed.'
+          }
+          $packagePath = Join-Path $downloadDirectory 'winTerm-1.0.0-x64.msix'
+          $sha = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
+          $url = 'https://github.com/${{ github.repository }}/releases/download/v1.0.0/winTerm-1.0.0-x64.msix'
+          .\scripts\winterm\generate-winget-manifests.ps1 `
+            -InstallerUrl $url `
+            -InstallerSha256 $sha `
+            -OutputDirectory 'packaging\winget\1.0.0'
 
-          & curl.exe -JLO https://aka.ms/wingetcreate/latest
-          & .\wingetcreate.exe update $wingetPackage -s -v $version -u $wingetRelevantAsset.browser_download_url
+      - name: Validate WinGet manifests
+        shell: pwsh
+        run: |
+          winget validate 'packaging\winget\1.0.0'
+          if ($LASTEXITCODE -ne 0) {
+            throw 'winget validate failed.'
+          }
+
+      - name: Upload the validated manifest set for manual submission
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Kaname.winTerm-1.0.0-winget
+          path: packaging/winget/1.0.0
+          if-no-files-found: error
+          retention-days: 30

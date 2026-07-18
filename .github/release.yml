@@ -1,0 +1,35 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - internal
+      - skip-changelog
+    authors:
+      - dependabot
+  categories:
+    - title: Security
+      labels:
+        - security
+    - title: Accessibility
+      labels:
+        - accessibility
+    - title: Performance
+      labels:
+        - performance
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Features
+      labels:
+        - feature
+        - enhancement
+    - title: Other changes
+      labels:
+        - "*"

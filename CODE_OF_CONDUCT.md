@@ -1,9 +1,9 @@
-# Microsoft Open Source Code of Conduct
+# Code of Conduct
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+winTerm contributors are expected to provide a welcoming, harassment-free, and professional environment.
 
-Resources:
+We adopt the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) as the behavioral standard for project spaces and public interactions representing the project.
 
-- [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/)
-- [Microsoft Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
-- Contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions or concerns
+Report conduct concerns privately to the repository owner through GitHub. Do not place personal, confidential, or security-sensitive details in a public Issue. Maintainers may remove content or restrict participation when behavior is abusive, threatening, discriminatory, harassing, or persistently disruptive.
+
+This policy is administered by the independent winTerm project and does not imply Microsoft affiliation or endorsement.

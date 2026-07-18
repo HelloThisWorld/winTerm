@@ -1,6 +1,6 @@
 # Workspace schema
 
-`WorkspaceSchemaVersion` is `2`, `DockingModelVersion` is `1`, and both are independent from application version `0.5.0`. A document is UTF-8 JSON with a 5 MB maximum size. The strict parser rejects comments, duplicate keys, special floating-point values, trailing data, excessive strings, and excessive nesting.
+`WorkspaceSchemaVersion` is `2`, `DockingModelVersion` is `1`, and both remain independent from application version `1.0.0`. A document is UTF-8 JSON with a 5 MB maximum size. The strict parser rejects comments, duplicate keys, special floating-point values, trailing data, excessive strings, and excessive nesting.
 
 The top-level object contains `schemaVersion`, `id`, `name`, `description`, `createdAt`, `updatedAt`, `source`, `applicationVersion`, `protocolVersion`, `startupBehavior`, `activeWindowId`, and `windows`. Optional metadata includes tags, default state, last-opened time, capture reason, and recovery generation. IDs are globally unique and are not user-visible file names.
 

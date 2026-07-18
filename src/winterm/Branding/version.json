@@ -1,0 +1,13 @@
+{
+  "applicationVersion": "1.0.0",
+  "packageVersion": "1.0.0.0",
+  "moduleVersion": "1.0.0",
+  "channel": "stable",
+  "tag": "v1.0.0",
+  "workspaceSchemaVersion": 2,
+  "dockingModelVersion": 1,
+  "shellProtocolVersion": 1,
+  "themeSchemaVersion": 1,
+  "updateManifestSchemaVersion": 1,
+  "microsoftTerminalUpstreamRevision": "1cea42d433253d95c4487a3037db48197b5e72f4"
+}
