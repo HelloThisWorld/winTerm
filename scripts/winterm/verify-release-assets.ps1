@@ -14,6 +14,9 @@ param(
     [switch]$RequireSigned,
 
     [Parameter()]
+    [switch]$RequireSelfSigned,
+
+    [Parameter()]
     [string]$ExpectedPublisher
 )
 
@@ -37,6 +40,36 @@ function Assert-Condition
     Write-Host "PASS: $Message" -ForegroundColor Green
 }
 
+function Resolve-WindowsSdkTool
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name
+    )
+
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($null -ne $command)
+    {
+        return $command.Source
+    }
+
+    $sdkBinRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+    if (Test-Path -LiteralPath $sdkBinRoot)
+    {
+        foreach ($version in @(Get-ChildItem -LiteralPath $sdkBinRoot -Directory |
+            Sort-Object Name -Descending))
+        {
+            $candidate = Join-Path $version.FullName "x64\$Name"
+            if (Test-Path -LiteralPath $candidate -PathType Leaf)
+            {
+                return $candidate
+            }
+        }
+    }
+
+    throw "$Name was not found. Install the Windows SDK declared in .vsconfig."
+}
+
 function Test-TrustedSignature
 {
     param(
@@ -53,17 +86,58 @@ function Test-TrustedSignature
         Assert-Condition ($signature.SignerCertificate.Subject -ceq $ExpectedPublisher) "$($Artifact.Name) signer matches the protected publisher"
     }
 
-    $signTool = Get-Command signtool.exe -ErrorAction SilentlyContinue
-    if ($null -eq $signTool)
-    {
-        throw 'signtool.exe is required for trusted signature verification.'
-    }
-    & $signTool.Source verify /pa /all /v $Artifact.FullName
+    $signTool = Resolve-WindowsSdkTool -Name 'signtool.exe'
+    & $signTool verify /pa /all /v $Artifact.FullName
     if ($LASTEXITCODE -ne 0)
     {
         throw "signtool.exe trust verification failed for '$($Artifact.Name)' with exit code $LASTEXITCODE."
     }
     Write-Host "PASS: signtool.exe verified $($Artifact.Name)" -ForegroundColor Green
+}
+
+function Test-SelfSignedSignature
+{
+    param(
+        [Parameter(Mandatory)]
+        [System.IO.FileInfo]$Artifact,
+
+        [Parameter(Mandatory)]
+        [string]$SignaturePath,
+
+        [Parameter(Mandatory)]
+        [Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
+    )
+
+    try
+    {
+        Add-Type -AssemblyName System.Security.Cryptography.Pkcs -ErrorAction Stop
+    }
+    catch
+    {
+        Add-Type -AssemblyName System.Security
+    }
+
+    $signatureBytes = [IO.File]::ReadAllBytes($SignaturePath)
+    Assert-Condition (
+        $signatureBytes.Length -gt 4 -and
+        [Text.Encoding]::ASCII.GetString($signatureBytes, 0, 4) -ceq 'PKCX'
+    ) "$($Artifact.Name) contains a valid MSIX signature header"
+
+    $cmsBytes = New-Object byte[] ($signatureBytes.Length - 4)
+    [Array]::Copy($signatureBytes, 4, $cmsBytes, 0, $cmsBytes.Length)
+    $cms = New-Object Security.Cryptography.Pkcs.SignedCms
+    $cms.Decode($cmsBytes)
+    $cms.CheckSignature($true)
+    Assert-Condition ($cms.SignerInfos.Count -eq 1) "$($Artifact.Name) contains exactly one signer"
+    Assert-Condition (
+        $cms.SignerInfos[0].Certificate.Thumbprint -ceq $Certificate.Thumbprint
+    ) "$($Artifact.Name) signer matches the published certificate"
+
+    $signature = Get-AuthenticodeSignature -LiteralPath $Artifact.FullName
+    Assert-Condition ($null -ne $signature.SignerCertificate) "$($Artifact.Name) contains an Authenticode signer"
+    Assert-Condition (
+        $signature.SignerCertificate.Thumbprint -ceq $Certificate.Thumbprint
+    ) "$($Artifact.Name) Authenticode signer matches the published certificate"
 }
 
 function Test-MsixPackage
@@ -76,18 +150,17 @@ function Test-MsixPackage
         [string]$ExpectedArchitecture,
 
         [Parameter(Mandatory)]
-        [string]$TemporaryRoot
+        [string]$TemporaryRoot,
+
+        [Parameter()]
+        [Security.Cryptography.X509Certificates.X509Certificate2]$SelfSignedCertificate
     )
 
-    $makeAppx = Get-Command makeappx.exe -ErrorAction SilentlyContinue
-    if ($null -eq $makeAppx)
-    {
-        throw 'makeappx.exe is required for release package verification.'
-    }
+    $makeAppx = Resolve-WindowsSdkTool -Name 'makeappx.exe'
 
     $unpackDirectory = Join-Path $TemporaryRoot $ExpectedArchitecture
     New-Item -ItemType Directory -Path $unpackDirectory | Out-Null
-    & $makeAppx.Source unpack /p $Package.FullName /d $unpackDirectory /o
+    & $makeAppx unpack /p $Package.FullName /d $unpackDirectory /o
     if ($LASTEXITCODE -ne 0)
     {
         throw "makeappx.exe failed to unpack '$($Package.Name)'."
@@ -101,8 +174,8 @@ function Test-MsixPackage
     $identity = $manifest.SelectSingleNode('/f:Package/f:Identity', $namespace)
     $aliases = @($manifest.SelectNodes('//uap3:AppExecutionAlias/desktop:ExecutionAlias', $namespace) | ForEach-Object { $_.Alias })
 
-    Assert-Condition ($identity.Name -eq 'Kaname.winTerm') "$($Package.Name) uses package identity Kaname.winTerm"
-    Assert-Condition ($identity.Version -eq '1.0.0.0') "$($Package.Name) contains package version 1.0.0.0"
+    Assert-Condition ($identity.Name -eq 'HelloThisWorld.winTerm') "$($Package.Name) uses package identity HelloThisWorld.winTerm"
+    Assert-Condition ($identity.Version -eq '1.0.1.0') "$($Package.Name) contains package version 1.0.1.0"
     Assert-Condition ($identity.ProcessorArchitecture.ToLowerInvariant() -eq $ExpectedArchitecture) "$($Package.Name) contains architecture $ExpectedArchitecture"
     Assert-Condition ($aliases -contains 'winterm.exe') "$($Package.Name) registers winterm.exe"
     Assert-Condition ($aliases -notcontains 'wt.exe') "$($Package.Name) does not register wt.exe"
@@ -116,6 +189,13 @@ function Test-MsixPackage
     if ($RequireSigned)
     {
         Test-TrustedSignature -Artifact $Package
+    }
+    elseif ($RequireSelfSigned)
+    {
+        Test-SelfSignedSignature `
+            -Artifact $Package `
+            -SignaturePath (Join-Path $unpackDirectory 'AppxSignature.p7x') `
+            -Certificate $SelfSignedCertificate
     }
     else
     {
@@ -131,18 +211,17 @@ function Test-MsixBundle
         [System.IO.FileInfo]$Bundle,
 
         [Parameter(Mandatory)]
-        [string]$TemporaryRoot
+        [string]$TemporaryRoot,
+
+        [Parameter()]
+        [Security.Cryptography.X509Certificates.X509Certificate2]$SelfSignedCertificate
     )
 
-    $makeAppx = Get-Command makeappx.exe -ErrorAction SilentlyContinue
-    if ($null -eq $makeAppx)
-    {
-        throw 'makeappx.exe is required for release bundle verification.'
-    }
+    $makeAppx = Resolve-WindowsSdkTool -Name 'makeappx.exe'
 
     $unpackDirectory = Join-Path $TemporaryRoot 'bundle'
     New-Item -ItemType Directory -Path $unpackDirectory | Out-Null
-    & $makeAppx.Source unpack /p $Bundle.FullName /d $unpackDirectory /o
+    & $makeAppx unpack /p $Bundle.FullName /d $unpackDirectory /o
     if ($LASTEXITCODE -ne 0)
     {
         throw "makeappx.exe failed to unpack '$($Bundle.Name)'."
@@ -155,8 +234,8 @@ function Test-MsixBundle
     $packages = @($manifest.SelectNodes('/b:Bundle/b:Packages/b:Package', $namespace))
     $architectures = @($packages | ForEach-Object { $_.Architecture.ToLowerInvariant() })
 
-    Assert-Condition ($identity.Name -eq 'Kaname.winTerm') "$($Bundle.Name) uses bundle identity Kaname.winTerm"
-    Assert-Condition ($identity.Version -eq '1.0.0.0') "$($Bundle.Name) contains bundle version 1.0.0.0"
+    Assert-Condition ($identity.Name -eq 'HelloThisWorld.winTerm') "$($Bundle.Name) uses bundle identity HelloThisWorld.winTerm"
+    Assert-Condition ($identity.Version -eq '1.0.1.0') "$($Bundle.Name) contains bundle version 1.0.1.0"
     if (-not [string]::IsNullOrWhiteSpace($ExpectedPublisher))
     {
         Assert-Condition ($identity.Publisher -ceq $ExpectedPublisher) "$($Bundle.Name) publisher matches the protected publisher"
@@ -172,6 +251,13 @@ function Test-MsixBundle
     {
         Test-TrustedSignature -Artifact $Bundle
     }
+    elseif ($RequireSelfSigned)
+    {
+        Test-SelfSignedSignature `
+            -Artifact $Bundle `
+            -SignaturePath (Join-Path $unpackDirectory 'AppxSignature.p7x') `
+            -Certificate $SelfSignedCertificate
+    }
     else
     {
         $signature = Get-AuthenticodeSignature -LiteralPath $Bundle.FullName
@@ -180,13 +266,22 @@ function Test-MsixBundle
 }
 
 $temporaryDirectory = $null
+$selfSignedCertificate = $null
 
 try
 {
     $root = (Resolve-Path -LiteralPath $Directory).Path
+    if ($RequireSigned -and $RequireSelfSigned)
+    {
+        throw 'RequireSigned and RequireSelfSigned cannot be enabled together.'
+    }
     if ($RequireSigned -and [string]::IsNullOrWhiteSpace($ExpectedPublisher))
     {
         throw 'ExpectedPublisher is required when RequireSigned is enabled.'
+    }
+    if ($RequireSelfSigned -and [string]::IsNullOrWhiteSpace($ExpectedPublisher))
+    {
+        throw 'ExpectedPublisher is required when RequireSelfSigned is enabled.'
     }
     $required = [System.Collections.Generic.List[string]]::new()
     foreach ($name in @(
@@ -195,19 +290,24 @@ try
         'SBOM.spdx.json',
         'SBOM.cyclonedx.json',
         'release-metadata.json',
-        'winTerm-1.0.0-release-notes.md',
-        'winTerm-1.0.0-symbols.zip'
+        'winTerm-1.0.1-release-notes.md',
+        'winTerm-1.0.1-symbols.zip'
     ))
     {
         [void]$required.Add($name)
     }
     foreach ($arch in $Architecture)
     {
-        [void]$required.Add("winTerm-1.0.0-$arch.msix")
+        [void]$required.Add("winTerm-1.0.1-$arch.msix")
     }
     if ($Architecture.Count -eq 2)
     {
-        [void]$required.Add('winTerm-1.0.0.msixbundle')
+        [void]$required.Add('winTerm-1.0.1.msixbundle')
+    }
+    if ($RequireSelfSigned)
+    {
+        [void]$required.Add('winTerm-1.0.1.cer')
+        [void]$required.Add('INSTALL.txt')
     }
 
     $allowed = [System.Collections.Generic.HashSet[string]]::new($required, [StringComparer]::OrdinalIgnoreCase)
@@ -239,12 +339,12 @@ try
     $expectedChecksumNames = @($required | Where-Object { $_ -ne 'SHA256SUMS.txt' } | Sort-Object)
     Assert-Condition (((($checksumNames | Sort-Object) -join "`n") -ceq (($expectedChecksumNames | Sort-Object) -join "`n"))) 'SHA256SUMS.txt covers every release asset except itself'
 
-    $releaseNotes = Get-Content -LiteralPath (Join-Path $root 'winTerm-1.0.0-release-notes.md') -Raw
-    Assert-Condition ($releaseNotes.Contains('# winTerm 1.0.0')) 'Release notes contain the stable release title'
+    $releaseNotes = Get-Content -LiteralPath (Join-Path $root 'winTerm-1.0.1-release-notes.md') -Raw
+    Assert-Condition ($releaseNotes.Contains('# winTerm 1.0.1')) 'Release notes contain the stable release title'
 
     $metadata = Get-Content -LiteralPath (Join-Path $root 'release-metadata.json') -Raw | ConvertFrom-Json
-    Assert-Condition ($metadata.version -eq '1.0.0') 'Release metadata version is 1.0.0'
-    Assert-Condition ($metadata.packageVersion -eq '1.0.0.0') 'Release metadata package version is 1.0.0.0'
+    Assert-Condition ($metadata.version -eq '1.0.1') 'Release metadata version is 1.0.1'
+    Assert-Condition ($metadata.packageVersion -eq '1.0.1.0') 'Release metadata package version is 1.0.1.0'
     Assert-Condition ($metadata.channel -eq 'stable') 'Release metadata channel is stable'
     Assert-Condition ($metadata.commitSha -match '^[0-9a-f]{40}$') 'Release metadata contains a full commit SHA'
     Assert-Condition ($metadata.microsoftTerminalUpstreamRevision -match '^[0-9a-f]{40}$') 'Release metadata contains the upstream revision'
@@ -257,17 +357,38 @@ try
         Assert-Condition ($sbomText -notmatch '(?i)(certificatePassword|github_token|BEGIN PRIVATE KEY)') "$sbomName contains no signing or repository secret"
     }
 
+    if ($RequireSelfSigned)
+    {
+        Assert-Condition ($metadata.signing -eq 'self-signed') 'Release metadata declares self-signed distribution'
+        $certificatePath = Join-Path $root 'winTerm-1.0.1.cer'
+        $selfSignedCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $certificatePath)
+        Assert-Condition (-not $selfSignedCertificate.HasPrivateKey) 'Published certificate does not contain a private key'
+        Assert-Condition ($selfSignedCertificate.Subject -ceq $ExpectedPublisher) 'Published certificate subject matches the package publisher'
+        Assert-Condition ($selfSignedCertificate.NotAfter.ToUniversalTime() -gt [DateTime]::UtcNow) 'Published certificate is not expired'
+        $installationText = Get-Content -LiteralPath (Join-Path $root 'INSTALL.txt') -Raw
+        Assert-Condition ($installationText.Contains('winTerm-1.0.1.cer')) 'Installation instructions name the published certificate'
+        Assert-Condition ($installationText.Contains('winTerm-1.0.1-x64.msix')) 'Installation instructions name the x64 installer'
+    }
+
     $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("winterm-release-verify-{0}" -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
     foreach ($arch in $Architecture)
     {
-        $package = Get-Item -LiteralPath (Join-Path $root "winTerm-1.0.0-$arch.msix")
-        Test-MsixPackage -Package $package -ExpectedArchitecture $arch -TemporaryRoot $temporaryDirectory
+        $package = Get-Item -LiteralPath (Join-Path $root "winTerm-1.0.1-$arch.msix")
+        Test-MsixPackage `
+            -Package $package `
+            -ExpectedArchitecture $arch `
+            -TemporaryRoot $temporaryDirectory `
+            -SelfSignedCertificate $selfSignedCertificate
     }
     if ($Architecture.Count -eq 2)
     {
-        $bundle = Get-Item -LiteralPath (Join-Path $root 'winTerm-1.0.0.msixbundle')
-        Test-MsixBundle -Bundle $bundle -TemporaryRoot $temporaryDirectory
+        $bundle = Get-Item -LiteralPath (Join-Path $root 'winTerm-1.0.1.msixbundle')
+        Test-MsixBundle `
+            -Bundle $bundle `
+            -TemporaryRoot $temporaryDirectory `
+            -SelfSignedCertificate $selfSignedCertificate
     }
 
     Write-Host 'winTerm release asset verification passed.' -ForegroundColor Green
@@ -282,5 +403,9 @@ finally
     if ($null -ne $temporaryDirectory -and (Test-Path -LiteralPath $temporaryDirectory))
     {
         Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
+    }
+    if ($null -ne $selfSignedCertificate)
+    {
+        $selfSignedCertificate.Dispose()
     }
 }

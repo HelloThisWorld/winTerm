@@ -2,7 +2,7 @@
 
 ## Supported releases
 
-The latest public Stable winTerm release is supported. A prerelease is supported for testing and feedback only. At present, winTerm 1.0.0 remains a release candidate and is not a supported public Stable release until every publication gate passes.
+The latest public Stable winTerm release is supported. A prerelease is supported for testing and feedback only. winTerm 1.0.1 is the current Stable release.
 
 ## Platforms and architectures
 

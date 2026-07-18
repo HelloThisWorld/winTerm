@@ -29,21 +29,22 @@ Build and test x64 with PowerShell 7, Visual Studio, and Windows SDK 10.0.22621.
 .\scripts\winterm\package.ps1 -Platform x64
 ```
 
-Then validate a production-signed package on a clean Windows 11 x64 machine: install, launch, PowerShell, CMD, tabs, panes, Workspace save/restore, restart, upgrade from 0.6, uninstall, reinstall, `winterm.exe`, Windows Terminal coexistence, and continued ownership of `wt.exe` by Windows Terminal.
+Then validate the self-signed package on a clean Windows 11 x64 machine: verify hashes, import the attached CER into Trusted People, install, launch, exercise PowerShell, CMD, tabs, panes, and Workspace save/restore, restart, uninstall, reinstall, run `winterm.exe`, and confirm Windows Terminal retains `wt.exe`.
 
 Complete Narrator, keyboard, contrast, scaling, privacy, diagnostics, performance, and soak evidence. ARM64 is published only after separate native evidence.
 
-## 3. Configure protected signing
+## 3. Self-sign without a public CA
 
-The `winterm-stable-release` GitHub environment owns:
+The Release workflow:
 
-- `WINTERM_SIGNING_PFX_BASE64` secret;
-- `WINTERM_SIGNING_PFX_PASSWORD` secret;
-- `WINTERM_PACKAGE_PUBLISHER` protected variable;
-- `WINTERM_TIMESTAMP_URL` protected variable;
-- required reviewers.
+- creates a one-year RSA 3072-bit code-signing certificate for `CN=winTerm Development`;
+- marks the private key non-exportable;
+- signs the exact-tag MSIX without a public timestamp;
+- exports only the public CER;
+- verifies the embedded PKCS#7 signature against that CER;
+- removes the private key after signing.
 
-The workflow validates certificate purpose, subject, expiry, private key, timestamp, package Publisher, package identity, alias, and signature. It deletes the ephemeral PFX. Never echo or commit signing material.
+The public certificate is uploaded beside the installer. Never commit or upload a private key, PFX, password, token, or signing-service credential.
 
 ## 4. Merge, tag, and prepare Draft
 
@@ -51,21 +52,17 @@ After every pre-tag gate is reviewed:
 
 1. merge the release PR to `main`;
 2. record the exact merge commit;
-3. create annotated tag `v1.0.0` on that commit;
+3. create annotated tag `v1.0.1` on that commit;
 4. push only the tag;
 5. let `.github/workflows/release.yml` build from the clean tag checkout.
 
-The prepare mode creates a Draft, uploads an allowlist, generates Attestations, re-downloads every asset, verifies hashes, package identity, architecture, alias, Publisher, signature when present, and Attestation. It never uses `--clobber`.
-
-If production signing is unavailable, the Draft is explicitly blocked and remains unsigned. Do not promote it.
+The workflow creates a Draft, uploads only the allowlisted installer, public CER, installation instructions, checksums, notices, SBOMs, symbols, metadata, and notes, then generates Attestations. It re-downloads every asset and verifies hashes, package identity, architecture, alias, Publisher, self-signed signature, public certificate, and Attestation. It never uses `--clobber`.
 
 ## 5. Publish deliberately
 
-Run workflow dispatch from the `v1.0.0` tag in `publish` mode. Supply the exact commit that passed clean install, upgrade, uninstall, alias, and coexistence validation. The protected environment reviewers confirm all manual evidence.
+After the Draft assets pass re-download verification, the same exact-tag workflow sets Draft false, Prerelease false, and Latest. It then downloads the public assets into a new directory and repeats package, certificate, signature, checksum, and Attestation verification.
 
-The workflow re-downloads the Draft, requires a valid trusted signature and timestamp, verifies checksums and Attestation, then sets Draft false, Prerelease false, and Latest. It re-downloads the public assets into a new directory and verifies hashes again.
-
-The phase remains open until a clean Windows 11 machine installs and launches the publicly downloaded package. If that smoke test fails, do not replace the `v1.0.0` asset; record the incident and prepare `v1.0.1`.
+The installer is self-signed and not publicly trusted. Users must verify the repository URL and hashes before importing the attached CER into Trusted People. If the public package fails verification or installation, never replace the `v1.0.1` asset; record the incident and prepare a new version and Tag.
 
 ## 6. Post-release metadata
 

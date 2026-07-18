@@ -56,8 +56,8 @@ try
 
     $stagingDirectory = Join-Path ([IO.Path]::GetTempPath()) ("winterm-bundle-{0}" -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
-    Copy-Item -LiteralPath $x64.FullName -Destination (Join-Path $stagingDirectory 'winTerm-1.0.0-x64.msix')
-    Copy-Item -LiteralPath $arm64.FullName -Destination (Join-Path $stagingDirectory 'winTerm-1.0.0-arm64.msix')
+    Copy-Item -LiteralPath $x64.FullName -Destination (Join-Path $stagingDirectory 'winTerm-1.0.1-x64.msix')
+    Copy-Item -LiteralPath $arm64.FullName -Destination (Join-Path $stagingDirectory 'winTerm-1.0.1-arm64.msix')
 
     & $makeAppx.Source bundle /d $stagingDirectory /p $resolvedOutput /o
     if ($LASTEXITCODE -ne 0)

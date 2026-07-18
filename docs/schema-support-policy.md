@@ -17,4 +17,4 @@
 - Unknown fields are preserved only when doing so is demonstrably safe.
 - Imported data may not add commands, executables, environment variables, remote includes, or external URLs.
 
-Application version 1.0.0 does not change any schema version.
+Application version 1.0.1 does not change any schema version.

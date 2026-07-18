@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/download/v1\.0\.0/winTerm-1\.0\.0-x64\.msix$')]
+    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/download/v1\.0\.1/winTerm-1\.0\.1-x64\.msix$')]
     [string]$InstallerUrl,
 
     [Parameter(Mandatory)]
@@ -48,19 +48,19 @@ try
     New-Item -ItemType Directory -Path $output | Out-Null
     $sha = $InstallerSha256.ToUpperInvariant()
 
-    Write-Utf8File -Path (Join-Path $output 'Kaname.winTerm.yaml') -Lines @(
-        '# Generated only from the public winTerm v1.0.0 GitHub Release.'
-        'PackageIdentifier: Kaname.winTerm'
-        'PackageVersion: 1.0.0'
+    Write-Utf8File -Path (Join-Path $output 'HelloThisWorld.winTerm.yaml') -Lines @(
+        '# Generated only from the public winTerm v1.0.1 GitHub Release.'
+        'PackageIdentifier: HelloThisWorld.winTerm'
+        'PackageVersion: 1.0.1'
         'DefaultLocale: en-US'
         'ManifestType: version'
         'ManifestVersion: 1.6.0'
     )
 
-    Write-Utf8File -Path (Join-Path $output 'Kaname.winTerm.installer.yaml') -Lines @(
-        '# Generated only from the public winTerm v1.0.0 GitHub Release.'
-        'PackageIdentifier: Kaname.winTerm'
-        'PackageVersion: 1.0.0'
+    Write-Utf8File -Path (Join-Path $output 'HelloThisWorld.winTerm.installer.yaml') -Lines @(
+        '# Generated only from the public winTerm v1.0.1 GitHub Release.'
+        'PackageIdentifier: HelloThisWorld.winTerm'
+        'PackageVersion: 1.0.1'
         'InstallerType: msix'
         'Scope: user'
         'InstallModes:'
@@ -75,10 +75,10 @@ try
         'ManifestVersion: 1.6.0'
     )
 
-    Write-Utf8File -Path (Join-Path $output 'Kaname.winTerm.locale.en-US.yaml') -Lines @(
-        '# Generated only from the public winTerm v1.0.0 GitHub Release.'
-        'PackageIdentifier: Kaname.winTerm'
-        'PackageVersion: 1.0.0'
+    Write-Utf8File -Path (Join-Path $output 'HelloThisWorld.winTerm.locale.en-US.yaml') -Lines @(
+        '# Generated only from the public winTerm v1.0.1 GitHub Release.'
+        'PackageIdentifier: HelloThisWorld.winTerm'
+        'PackageVersion: 1.0.1'
         'PackageLocale: en-US'
         'Publisher: winTerm contributors'
         'PublisherUrl: https://github.com/HelloThisWorld/winTerm'
@@ -86,7 +86,7 @@ try
         'PackageName: winTerm'
         'PackageUrl: https://github.com/HelloThisWorld/winTerm'
         'License: MIT'
-        'LicenseUrl: https://github.com/HelloThisWorld/winTerm/blob/v1.0.0/LICENSE'
+        'LicenseUrl: https://github.com/HelloThisWorld/winTerm/blob/v1.0.1/LICENSE'
         'ShortDescription: Independent open-source terminal application based on Microsoft Windows Terminal.'
         'Moniker: winterm'
         'Tags:'

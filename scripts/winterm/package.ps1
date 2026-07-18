@@ -34,9 +34,9 @@ function Assert-WinTermManifest
     $namespaceManager.AddNamespace('uap3', 'http://schemas.microsoft.com/appx/manifest/uap/windows10/3')
 
     $identity = $manifest.SelectSingleNode('/f:Package/f:Identity', $namespaceManager)
-    if ($null -eq $identity -or $identity.Name -ne 'Kaname.winTerm')
+    if ($null -eq $identity -or $identity.Name -ne 'HelloThisWorld.winTerm')
     {
-        throw "Package '$Path' does not use the Kaname.winTerm identity."
+        throw "Package '$Path' does not use the HelloThisWorld.winTerm identity."
     }
     if ($identity.Publisher -match 'Microsoft' -or $identity.Publisher -cne $Publisher)
     {
@@ -48,9 +48,9 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' must claim winterm.exe and must not claim wt.exe."
     }
-    if ($identity.Version -ne '1.0.0.0')
+    if ($identity.Version -ne '1.0.1.0')
     {
-        throw "Package '$Path' must use the winTerm 1.0.0.0 package version."
+        throw "Package '$Path' must use the winTerm 1.0.1.0 package version."
     }
 }
 
