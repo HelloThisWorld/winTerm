@@ -71,6 +71,73 @@ Build output remains in upstream `bin` and intermediate directories. MSIX output
 
 The wrapper builds Release with MSIX generation and signing disabled, locates the package, unpacks it with `makeappx.exe`, revalidates the embedded manifest, and reports path, architecture, signature status, and installation guidance. See [Release process](release-process.md) before signing or installing.
 
+## Self-signed local development package
+
+Use the following command when a public CA or production signing service is
+not available and the package will be used only for local or controlled
+internal testing:
+
+```powershell
+.\scripts\winterm\build-local-development.ps1 -IncludeTests
+```
+
+The wrapper:
+
+1. verifies the 1.0.0 version and runs the source-level Smoke suite;
+2. builds the x64 Release MSIX with signing disabled;
+3. validates the generated package;
+4. runs the Relevant compiled tests when `-IncludeTests` is present;
+5. creates a one-year, non-exportable, self-signed development key for
+   `CN=winTerm Development`;
+6. signs the MSIX without a timestamp and exports only the public `.cer`;
+7. validates the package identity, version, architecture, `winterm.exe`
+   alias, absence of `wt.exe`, and the cryptographic PKCS#7 signature;
+8. removes the private key and writes installation instructions and
+   `SHA256SUMS.txt`.
+
+The default output directory is ignored by Git:
+
+```text
+artifacts/local/winTerm-1.0.0-development-x64/
+    INSTALL.txt
+    SHA256SUMS.txt
+    winTerm-1.0.0-development.cer
+    winTerm-1.0.0-development-x64.msix
+```
+
+The wrapper refuses to overwrite an existing output directory. Use a new
+directory when preserving an earlier build:
+
+```powershell
+.\scripts\winterm\build-local-development.ps1 `
+  -OutputDirectory artifacts/local/winTerm-development-test-2
+```
+
+An existing unsigned MSIX can be validated and signed without compiling it
+again:
+
+```powershell
+.\scripts\winterm\build-local-development.ps1 `
+  -PackagePath .\path\to\CascadiaPackage_1.0.0.0_x64.msix `
+  -OutputDirectory artifacts/local/winTerm-development-from-existing-package
+```
+
+Do not pass a previously signed package. The wrapper refuses to replace or
+append a signature.
+
+To install the result:
+
+1. verify the files against `SHA256SUMS.txt`;
+2. open `winTerm-1.0.0-development.cer`;
+3. choose **Install Certificate**, **Local Machine**, and **Trusted People**,
+   and approve the administrator prompt;
+4. open `winTerm-1.0.0-development-x64.msix` and select **Install**.
+
+Equivalent elevated PowerShell commands are included in `INSTALL.txt`.
+Remove the development certificate after testing. A self-signed development
+package is not a substitute for the production-signed and timestamped Stable
+installer required by the [release process](release-process.md).
+
 ## CI runner
 
 The validation and full-build workflows use GitHub-hosted Windows runners. The Stable workflow uses the protected `winterm-stable-release` environment and an exact `v1.0.0` checkout. Only the protected prepare job may access production signing configuration; pull-request workflows never receive those secrets.
