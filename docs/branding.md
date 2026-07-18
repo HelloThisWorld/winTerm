@@ -5,14 +5,14 @@
 | Surface | winTerm 1.0 value |
 | --- | --- |
 | Product and display name | `winTerm` |
-| Package name | `Kaname.winTerm` |
+| Package name | `HelloThisWorld.winTerm` |
 | Application ID | `winTerm` |
 | Execution alias | `winterm.exe` |
 | Forbidden alias | `wt.exe` |
 | Development publisher | `CN=winTerm Development` |
-| Stable publisher | Injected only from the protected signing environment and required to match the production certificate subject |
-| Package version | `1.0.0.0` |
-| Application version | `1.0.0` |
+| Stable publisher | `CN=winTerm Development`, matching the public self-signed Release certificate |
+| Package version | `1.0.1.0` |
+| Application version | `1.0.1` |
 | Release channel | `stable` |
 | Package description | `Independent open-source terminal based on Microsoft Windows Terminal` |
 
@@ -22,9 +22,9 @@ The terminal host may retain the internal filename `WindowsTerminal.exe`, and up
 
 ## Publisher and signing
 
-`CN=winTerm Development` is a source-controlled development placeholder, not a production publisher. The protected Release workflow may replace it only in the clean tag checkout immediately before packaging. The certificate subject must exactly match the injected Publisher. A private key, PFX, password, token, or signing-service credential must never be committed or uploaded as a release asset.
+`CN=winTerm Development` is the v1.0.1 self-signed publisher. The Release workflow creates a temporary non-exportable key and exports only its public CER. The certificate subject must exactly match the package Publisher. A private key, PFX, password, token, or signing-service credential must never be committed or uploaded as a release asset.
 
-An unsigned package can exist only in an explicitly blocked Draft Release. It cannot be described or published as a Stable installer.
+An unsigned package may exist only as an intermediate CI build. The public installer must contain a cryptographically valid signature matching the CER attached to the same Release.
 
 ## Application data and coexistence
 

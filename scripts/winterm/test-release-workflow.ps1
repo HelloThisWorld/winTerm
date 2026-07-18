@@ -16,13 +16,17 @@ try
 
     foreach ($required in @(
         "push:",
-        "- 'v1.0.0'",
-        'workflow_dispatch:',
-        'environment: winterm-stable-release',
+        "- 'v1.0.1'",
         'permissions:',
         'contents: write',
         'id-token: write',
         'attestations: write',
+        'build-local-development.ps1',
+        '-ReleaseAsset',
+        '-RequireSelfSigned',
+        'winTerm-1.0.1-x64.msix',
+        'winTerm-1.0.1.cer',
+        'INSTALL.txt',
         'gh release create',
         '--draft',
         'verify-release-assets.ps1',
@@ -41,7 +45,8 @@ try
 
     if ($workflow -match '(?m)^\s*pull_request_target\s*:' -or
         $workflow -match '(?m)^\s*permissions:\s*write-all\s*$' -or
-        $workflow.Contains('--clobber'))
+        $workflow.Contains('--clobber') -or
+        $workflow.Contains('WINTERM_SIGNING_PFX'))
     {
         throw 'Release workflow contains a forbidden trigger, permission, or asset replacement option.'
     }

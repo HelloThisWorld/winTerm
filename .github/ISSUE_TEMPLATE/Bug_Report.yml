@@ -11,7 +11,7 @@ body:
     id: version
     attributes:
       label: winTerm version
-      placeholder: 1.0.0 or exact commit
+      placeholder: 1.0.1 or exact commit
     validations:
       required: true
   - type: dropdown

@@ -1,9 +1,11 @@
 # winTerm
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](docs/releases/1.0.0.md)
+[Download winTerm v1.0.1](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.1)
+
+[![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.1)
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
-[![Stable release](https://img.shields.io/badge/stable%20release-blocked-critical)](docs/release-checklist-v1.0.md)
+[![Stable release](https://img.shields.io/badge/stable%20release-v1.0.1-success)](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
 winTerm is an independent open-source terminal application based on Microsoft Windows Terminal.
 
@@ -11,9 +13,7 @@ winTerm is not affiliated with or endorsed by Microsoft. It does not use Microso
 
 ## Latest stable release
 
-There is no approved public winTerm Stable release yet. The 1.0.0 candidate is blocked on production signing, clean Windows 11 installation, upgrade, uninstall, accessibility, packaged runtime, and performance evidence. A download link is intentionally withheld so an unsigned Draft or Actions artifact is not presented as a user installer.
-
-When the real public Release exists and its assets pass re-download verification, this section must link to the repository’s `/releases/latest` page.
+Download the latest verified installer from the [GitHub Releases page](https://github.com/HelloThisWorld/winTerm/releases/latest). The v1.0.1 installer is self-signed rather than signed by a public certificate authority, so Windows does not trust it automatically. Download the `.msix`, matching `.cer`, `INSTALL.txt`, and `SHA256SUMS.txt` from the same Release, verify the hashes, then follow the included certificate installation steps.
 
 ## Supported Windows versions
 
@@ -21,15 +21,15 @@ The intended winTerm 1.0 support target is Windows 11 x64. Windows 10 is unsuppo
 
 ## Installation
 
-Do not install a development or Draft package as a Stable release. An approved installer must:
+The official installer must:
 
-- be downloaded from the public `v1.0.0` Release in this repository;
-- be named `winTerm-1.0.0-x64.msix`;
+- be downloaded from the public `v1.0.1` Release in this repository;
+- be named `winTerm-1.0.1-x64.msix`;
 - match `SHA256SUMS.txt`;
-- have a trusted production signature and timestamp whose subject matches the package Publisher;
+- have a cryptographically valid signature matching the included `winTerm-1.0.1.cer`;
 - install without Visual Studio, Git, Developer Mode, registry edits, global font installation, or profile modification.
 
-See [installation guidance](docs/user/installation.md).
+Because the certificate is self-signed, an administrator must import it into the Local Machine `Trusted People` certificate store before installing the MSIX. See [installation guidance](docs/user/installation.md).
 
 ## Screenshots
 
@@ -37,7 +37,7 @@ Release screenshots must be captured from the signed winTerm package after brand
 
 ## Core features
 
-- independent `Kaname.winTerm` package identity and `winterm.exe` alias;
+- independent `HelloThisWorld.winTerm` package identity and `winterm.exe` alias;
 - PowerShell 7, Windows PowerShell 5.1, CMD, and dynamic WSL profile foundations;
 - conservative Linux-style Safe Compatibility for local PowerShell and CMD;
 - built-in and open-source Themes with pinned hashes and license records;
@@ -63,9 +63,9 @@ The exact gate status is recorded in:
 - [security review](docs/security-review-v1.0.md);
 - [accessibility audit](docs/accessibility-audit-v1.0.md);
 - [performance validation](docs/performance-v1.0.md);
-- [release notes](docs/releases/1.0.0.md).
+- [release notes](docs/releases/1.0.1.md).
 
-GitHub Actions may prepare an explicitly blocked Draft Release. It cannot publish an unsigned or untested installer, replace an existing Stable asset, or upload ARM64 without exact native-validation evidence.
+GitHub Actions builds from the exact immutable `v1.0.1` Tag, creates a temporary non-exportable self-signed key, verifies the package identity and embedded signature, uploads only allowlisted assets, re-downloads them for verification, and then publishes the Release. It never replaces an existing Release asset.
 
 ## Build
 
@@ -86,7 +86,7 @@ development wrapper from PowerShell 7:
 It builds and validates Release, creates a disposable self-signed code-signing
 certificate, signs the MSIX, exports only the public `.cer`, verifies the
 package signature and identity, and writes `SHA256SUMS.txt` under
-`artifacts/local/winTerm-1.0.0-development-x64`. The private key is removed
+`artifacts/local/winTerm-1.0.1-development-x64`. The private key is removed
 after signing.
 
 Before installation, an administrator must import the included `.cer` into

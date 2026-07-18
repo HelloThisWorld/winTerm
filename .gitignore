@@ -18,6 +18,7 @@
 !docs/releases/
 docs/releases/*
 !docs/releases/1.0.0.md
+!docs/releases/1.0.1.md
 x64/
 x86/
 ARM64/

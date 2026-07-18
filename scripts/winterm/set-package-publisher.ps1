@@ -25,7 +25,7 @@ try
     $namespace = [System.Xml.XmlNamespaceManager]::new($manifest.NameTable)
     $namespace.AddNamespace('f', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
     $identity = $manifest.SelectSingleNode('/f:Package/f:Identity', $namespace)
-    if ($null -eq $identity -or $identity.Name -ne 'Kaname.winTerm' -or $identity.Version -ne '1.0.0.0')
+    if ($null -eq $identity -or $identity.Name -ne 'HelloThisWorld.winTerm' -or $identity.Version -ne '1.0.1.0')
     {
         throw 'The winTerm package identity or version is not the expected stable value.'
     }

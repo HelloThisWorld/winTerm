@@ -16,7 +16,10 @@ param(
     [string]$MakeAppxPath,
 
     [Parameter()]
-    [switch]$IncludeTests
+    [switch]$IncludeTests,
+
+    [Parameter()]
+    [switch]$ReleaseAsset
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,7 +89,7 @@ function Invoke-NativeTool
     }
 }
 
-function Assert-DevelopmentPackageManifest
+function Assert-WinTermPackageManifest
 {
     param(
         [Parameter(Mandatory)]
@@ -100,7 +103,7 @@ function Assert-DevelopmentPackageManifest
     {
         throw 'The package manifest does not contain an Identity element.'
     }
-    if ($identity.Name -cne 'Kaname.winTerm')
+    if ($identity.Name -cne 'HelloThisWorld.winTerm')
     {
         throw "Unexpected package identity '$($identity.Name)'."
     }
@@ -108,7 +111,7 @@ function Assert-DevelopmentPackageManifest
     {
         throw "Unexpected package publisher '$($identity.Publisher)'."
     }
-    if ($identity.Version -cne '1.0.0.0')
+    if ($identity.Version -cne $script:packageVersion)
     {
         throw "Unexpected package version '$($identity.Version)'."
     }
@@ -122,7 +125,7 @@ function Assert-DevelopmentPackageManifest
         ForEach-Object { $_.Alias })
     if ($aliases -notcontains 'winterm.exe' -or $aliases -contains 'wt.exe')
     {
-        throw 'The development package must register winterm.exe and must not register wt.exe.'
+        throw 'The winTerm package must register winterm.exe and must not register wt.exe.'
     }
 }
 
@@ -169,6 +172,10 @@ function Assert-CryptographicPackageSignature
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$releaseMetadata = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Branding\version.json') -Raw |
+    ConvertFrom-Json
+$applicationVersion = [string]$releaseMetadata.applicationVersion
+$packageVersion = [string]$releaseMetadata.packageVersion
 $packageOutputRoot = Join-Path $repositoryRoot 'src\cascadia\CascadiaPackage\AppPackages'
 $temporaryDirectory = $null
 $gitExcludesPath = $null
@@ -274,9 +281,17 @@ try
         throw 'The source MSIX is already signed. Refusing to replace or append a signature.'
     }
 
+    $defaultOutputName = if ($ReleaseAsset)
+    {
+        "winTerm-$applicationVersion-self-signed-x64"
+    }
+    else
+    {
+        "winTerm-$applicationVersion-development-x64"
+    }
     $outputRoot = if ([string]::IsNullOrWhiteSpace($OutputDirectory))
     {
-        Join-Path $repositoryRoot 'artifacts\local\winTerm-1.0.0-development-x64'
+        Join-Path $repositoryRoot "artifacts\local\$defaultOutputName"
     }
     elseif ([IO.Path]::IsPathRooted($OutputDirectory))
     {
@@ -293,14 +308,30 @@ try
     New-Item -ItemType Directory -Path $outputRoot | Out-Null
     $createdOutputDirectory = $true
 
-    $signedPackagePath = Join-Path $outputRoot 'winTerm-1.0.0-development-x64.msix'
-    $certificatePath = Join-Path $outputRoot 'winTerm-1.0.0-development.cer'
+    $signedPackageName = if ($ReleaseAsset)
+    {
+        "winTerm-$applicationVersion-x64.msix"
+    }
+    else
+    {
+        "winTerm-$applicationVersion-development-x64.msix"
+    }
+    $certificateName = if ($ReleaseAsset)
+    {
+        "winTerm-$applicationVersion.cer"
+    }
+    else
+    {
+        "winTerm-$applicationVersion-development.cer"
+    }
+    $signedPackagePath = Join-Path $outputRoot $signedPackageName
+    $certificatePath = Join-Path $outputRoot $certificateName
     Copy-Item -LiteralPath $sourcePackage.FullName -Destination $signedPackagePath
 
     $certificate = New-SelfSignedCertificate `
         -Type CodeSigningCert `
         -Subject 'CN=winTerm Development' `
-        -FriendlyName 'winTerm Local Development Signing' `
+        -FriendlyName $(if ($ReleaseAsset) { 'winTerm Self-Signed Release Signing' } else { 'winTerm Local Development Signing' }) `
         -CertStoreLocation 'Cert:\CurrentUser\My' `
         -KeyAlgorithm RSA `
         -KeyLength 3072 `
@@ -313,17 +344,17 @@ try
     Invoke-NativeTool `
         -Path $signTool `
         -Arguments @('sign', '/fd', 'SHA256', '/s', 'My', '/sha1', $certificateThumbprint, $signedPackagePath) `
-        -Description 'Development MSIX signing'
+        -Description 'Self-signed MSIX signing'
 
     $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) (
-        "winterm-development-msix-{0}" -f [guid]::NewGuid().ToString('N'))
+        "winterm-self-signed-msix-{0}" -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
     Invoke-NativeTool `
         -Path $makeAppx `
         -Arguments @('unpack', '/p', $signedPackagePath, '/d', $temporaryDirectory, '/o') `
-        -Description 'Signed development MSIX inspection'
+        -Description 'Signed MSIX inspection'
 
-    Assert-DevelopmentPackageManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml')
+    Assert-WinTermPackageManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml')
     Assert-CryptographicPackageSignature `
         -SignaturePath (Join-Path $temporaryDirectory 'AppxSignature.p7x') `
         -ExpectedThumbprint $certificateThumbprint
@@ -370,13 +401,27 @@ try
     $workingTreeDirty = -not [string]::IsNullOrWhiteSpace(
         ($statusOutput -join [Environment]::NewLine))
 
-    $instructions = @'
-winTerm 1.0.0 x64 Development Build
-=====================================
-
+    $packageDescription = if ($ReleaseAsset)
+    {
+        @'
+This is the official GitHub self-signed release package. It is not signed by
+a public certificate authority. Verify the GitHub Release URL and hashes
+before trusting only the included public certificate.
+'@
+    }
+    else
+    {
+        @'
 This package is self-signed for local or controlled internal testing.
-It is not signed by a public certificate authority and is not the Stable
-release.
+It is not signed by a public certificate authority or intended for public
+redistribution.
+'@
+    }
+    $instructions = @'
+winTerm __APPLICATION_VERSION__ x64 Self-Signed Package
+=======================================================
+
+__PACKAGE_DESCRIPTION__
 
 Source commit: __COMMIT_SHA__
 Working tree dirty when packaged: __WORKING_TREE_DIRTY__
@@ -388,31 +433,35 @@ Installation
 ------------
 
 1. Verify the files with SHA256SUMS.txt.
-2. Open winTerm-1.0.0-development.cer.
+2. Open __CERTIFICATE_FILE__.
 3. Select Install Certificate, choose Local Machine, approve the
    administrator prompt, and place the certificate in Trusted People.
-4. Open winTerm-1.0.0-development-x64.msix and select Install.
+4. Open __PACKAGE_FILE__ and select Install.
 
 PowerShell equivalent (run PowerShell as administrator):
 
   Import-Certificate `
-    -FilePath .\winTerm-1.0.0-development.cer `
+    -FilePath .\__CERTIFICATE_FILE__ `
     -CertStoreLocation Cert:\LocalMachine\TrustedPeople
 
-  Add-AppxPackage .\winTerm-1.0.0-development-x64.msix
+  Add-AppxPackage .\__PACKAGE_FILE__
 
 The package registers winterm.exe. It does not register or replace wt.exe.
 
-Remove development trust
+Remove self-signed trust
 ------------------------
 
 After uninstalling winTerm, run PowerShell as administrator:
 
   $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
-    (Resolve-Path .\winTerm-1.0.0-development.cer))
+    (Resolve-Path .\__CERTIFICATE_FILE__))
   Remove-Item "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
 '@
     $instructions = $instructions.
+        Replace('__APPLICATION_VERSION__', $applicationVersion).
+        Replace('__PACKAGE_DESCRIPTION__', $packageDescription.Trim()).
+        Replace('__CERTIFICATE_FILE__', $certificateName).
+        Replace('__PACKAGE_FILE__', $signedPackageName).
         Replace('__COMMIT_SHA__', $commitSha).
         Replace('__WORKING_TREE_DIRTY__', $workingTreeDirty.ToString().ToLowerInvariant()).
         Replace('__CERTIFICATE_THUMBPRINT__', $certificateThumbprint).
@@ -436,10 +485,10 @@ After uninstalling winTerm, run PowerShell as administrator:
     }
 
     $completed = $true
-    Write-Host "Created self-signed winTerm development package: $signedPackagePath" -ForegroundColor Green
-    Write-Host "Public development certificate: $certificatePath"
+    Write-Host "Created self-signed winTerm package: $signedPackagePath" -ForegroundColor Green
+    Write-Host "Public signing certificate: $certificatePath"
     Write-Host "Checksums: $(Join-Path $outputRoot 'SHA256SUMS.txt')"
-    Write-Warning 'Install the public certificate only on machines used for controlled development testing.'
+    Write-Warning 'Trust the included public certificate only after verifying the package source and SHA-256 hashes.'
 }
 catch
 {

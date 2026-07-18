@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.1 - Stable
+
+### Changed
+
+- Replaced the previous package and WinGet identity with `HelloThisWorld.winTerm`.
+- Updated application, package, shell module, About, Workspace metadata, and release versions to 1.0.1.
+- Added a direct GitHub Release download link and v1.0.1 badge to the README.
+- Changed the exact-tag Release workflow to build and cryptographically verify a self-signed x64 MSIX.
+
+### Security
+
+- The Release uploads the final MSIX, public CER, installation instructions, checksums, notices, SBOMs, symbols, and provenance from the exact immutable `v1.0.1` commit.
+- The temporary signing key is non-exportable and removed after signing; no private key is published.
+- Release assets are allowlisted, re-downloaded, and verified before and after publication.
+
+### Known issues
+
+- The installer is self-signed, is not publicly trusted or timestamped, and requires administrators to import the attached CER into Trusted People.
+- ARM64 and Windows 10 are not supported by this Release.
+
 ## 1.0.0 - Release candidate
 
 ### Added

@@ -10,7 +10,7 @@ This policy commits to:
 - preserving unsupported newer Workspace files rather than overwriting them;
 - creating a backup before a migration replaces persisted data;
 - deterministic and idempotent migrations;
-- preserving the `winterm.exe` alias and the `Kaname.winTerm` package boundary throughout 1.x;
+- preserving the `winterm.exe` alias and the `HelloThisWorld.winTerm` package boundary throughout 1.x;
 - leaving Windows Terminal settings, package identity, and `wt.exe` untouched.
 
 This is not a promise to read every future schema forever. A future incompatible schema must use a new schema version, publish a migration policy, and never silently downgrade or overwrite newer data.

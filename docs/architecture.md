@@ -33,7 +33,7 @@ Limited conditional changes in upstream integration files select the manifest, p
 
 | State | winTerm location or behavior |
 | --- | --- |
-| Packaged settings and state | Package-local data under `%LOCALAPPDATA%\Packages\<Kaname.winTerm package family>\LocalState` |
+| Packaged settings and state | Package-local data under `%LOCALAPPDATA%\Packages\<HelloThisWorld.winTerm package family>\LocalState` |
 | Unpackaged settings and state | `%LOCALAPPDATA%\winTerm` |
 | `settings.json` | The selected winTerm base settings directory |
 | `state.json` and elevated state | The selected winTerm base settings directory |

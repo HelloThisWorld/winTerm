@@ -21,7 +21,7 @@ Cross-process transfer remains unsupported. `ControlInteractivity`, `ControlCore
 | Microsoft Terminal source baseline | `release-1.25@1cea42d433253d95c4487a3037db48197b5e72f4` |
 | Remotes | `origin` exists; `upstream` is absent |
 | Uncommitted files before v0.5 work | None observed |
-| Package identity | `Kaname.winTerm`; alias `winterm.exe` |
+| Package identity | `HelloThisWorld.winTerm`; alias `winterm.exe` |
 | Application/package version before v0.5 | `0.4.0-dev` / `0.4.0.0` |
 | Workspace schema before v0.5 | `1` |
 

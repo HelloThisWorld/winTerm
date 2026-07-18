@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/tag/v1\.0\.0$')]
+    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/tag/v1\.0\.1$')]
     [string]$ReleaseUrl,
 
     [Parameter(Mandatory)]
@@ -49,15 +49,15 @@ try
     $manifest = [ordered]@{
         schemaVersion = 1
         channel = 'stable'
-        version = '1.0.0'
-        tag = 'v1.0.0'
+        version = '1.0.1'
+        tag = 'v1.0.1'
         publishedAt = $timestamp
         releaseUrl = $ReleaseUrl
         artifacts = @(
             [ordered]@{
                 architecture = 'x64'
                 type = 'msix'
-                fileName = 'winTerm-1.0.0-x64.msix'
+                fileName = 'winTerm-1.0.1-x64.msix'
                 sha256 = $X64Sha256.ToLowerInvariant()
             }
         )

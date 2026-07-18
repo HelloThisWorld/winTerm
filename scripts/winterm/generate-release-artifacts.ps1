@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('1.0.0')]
+    [ValidateSet('1.0.1')]
     [string]$Version,
 
     [Parameter(Mandatory)]
@@ -15,6 +15,12 @@ param(
 
     [Parameter()]
     [string]$BundlePath,
+
+    [Parameter()]
+    [string]$CertificatePath,
+
+    [Parameter()]
+    [string]$InstallationInstructionsPath,
 
     [Parameter(Mandatory)]
     [string]$SymbolsDirectory,
@@ -39,7 +45,7 @@ param(
     [string]$WorkflowRunId = '0',
 
     [Parameter()]
-    [ValidateSet('valid-production-signature', 'unsigned-draft')]
+    [ValidateSet('valid-production-signature', 'self-signed', 'unsigned-draft')]
     [string]$SigningStatus = 'unsigned-draft'
 )
 
@@ -142,6 +148,22 @@ try
     $releaseFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
     [void]$releaseFiles.Add((Copy-ReleaseFile -Source $X64PackagePath -TargetName "winTerm-$Version-x64.msix"))
 
+    if ($SigningStatus -eq 'self-signed')
+    {
+        if ([string]::IsNullOrWhiteSpace($CertificatePath) -or
+            [string]::IsNullOrWhiteSpace($InstallationInstructionsPath))
+        {
+            throw 'Self-signed releases require the public certificate and installation instructions.'
+        }
+        [void]$releaseFiles.Add((Copy-ReleaseFile -Source $CertificatePath -TargetName "winTerm-$Version.cer"))
+        [void]$releaseFiles.Add((Copy-ReleaseFile -Source $InstallationInstructionsPath -TargetName 'INSTALL.txt'))
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($CertificatePath) -or
+        -not [string]::IsNullOrWhiteSpace($InstallationInstructionsPath))
+    {
+        throw 'Certificate and installation instructions may be supplied only for a self-signed release.'
+    }
+
     $hasArm64 = -not [string]::IsNullOrWhiteSpace($Arm64PackagePath)
     if ($hasArm64)
     {
@@ -159,7 +181,7 @@ try
 
     $notices = Copy-ReleaseFile -Source (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') -TargetName 'THIRD_PARTY_NOTICES.md'
     [void]$releaseFiles.Add($notices)
-    $releaseNotes = Copy-ReleaseFile -Source (Join-Path $repositoryRoot 'docs\releases\1.0.0.md') -TargetName "winTerm-$Version-release-notes.md"
+    $releaseNotes = Copy-ReleaseFile -Source (Join-Path $repositoryRoot 'docs\releases\1.0.1.md') -TargetName "winTerm-$Version-release-notes.md"
     [void]$releaseFiles.Add($releaseNotes)
 
     $symbolsRoot = (Resolve-Path -LiteralPath $SymbolsDirectory).Path
@@ -188,9 +210,9 @@ try
     $components = [System.Collections.Generic.List[object]]::new()
     [void]$components.Add((New-SbomComponent -Name 'winTerm' -VersionInfo $Version -Type 'application' -License 'MIT' -Revision $commit))
     [void]$components.Add((New-SbomComponent -Name 'Microsoft Terminal upstream source' -VersionInfo 'release-1.25' -Type 'framework' -License 'MIT' -Revision $upstream))
-    [void]$components.Add((New-SbomComponent -Name 'winTerm PowerShell Module' -VersionInfo '1.0.0' -Type 'library' -License 'MIT' -Revision $commit))
-    [void]$components.Add((New-SbomComponent -Name 'winterm-shim' -VersionInfo '1.0.0' -Type 'application' -License 'MIT' -Revision $commit))
-    [void]$components.Add((New-SbomComponent -Name 'winTerm MSIX installer' -VersionInfo '1.0.0.0' -Type 'installer' -License 'MIT' -Revision $commit))
+    [void]$components.Add((New-SbomComponent -Name 'winTerm PowerShell Module' -VersionInfo '1.0.1' -Type 'library' -License 'MIT' -Revision $commit))
+    [void]$components.Add((New-SbomComponent -Name 'winterm-shim' -VersionInfo '1.0.1' -Type 'application' -License 'MIT' -Revision $commit))
+    [void]$components.Add((New-SbomComponent -Name 'winTerm MSIX installer' -VersionInfo '1.0.1.0' -Type 'installer' -License 'MIT' -Revision $commit))
 
     $themeManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'assets\winterm\themes\manifest.json') -Raw | ConvertFrom-Json
     foreach ($theme in $themeManifest.themes)
@@ -272,7 +294,7 @@ try
         version = 1
         metadata = [ordered]@{
             timestamp = $timestamp
-            component = [ordered]@{ type = 'application'; 'bom-ref' = 'component:winTerm:1.0.0'; name = 'winTerm'; version = $Version }
+            component = [ordered]@{ type = 'application'; 'bom-ref' = "component:winTerm:$Version"; name = 'winTerm'; version = $Version }
             properties = @(
                 [ordered]@{ name = 'winterm:commitSha'; value = $commit },
                 [ordered]@{ name = 'winterm:microsoftTerminalUpstreamRevision'; value = $upstream }
@@ -287,7 +309,7 @@ try
     $metadata = [ordered]@{
         schemaVersion = 1
         version = $Version
-        packageVersion = '1.0.0.0'
+        packageVersion = '1.0.1.0'
         channel = 'stable'
         tag = "v$Version"
         commitSha = $commit
