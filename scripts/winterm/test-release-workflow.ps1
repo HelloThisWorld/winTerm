@@ -13,6 +13,8 @@ try
 {
     $workflowPath = Join-Path $repositoryRoot '.github\workflows\release.yml'
     $workflow = Get-Content -LiteralPath $workflowPath -Raw
+    $wingetGeneratorPath = Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1'
+    $wingetGenerator = Get-Content -LiteralPath $wingetGeneratorPath -Raw
 
     foreach ($required in @(
         "push:",
@@ -65,6 +67,13 @@ try
     if ($workflow -match '(?m)^\s*path:\s+.*\*\*' -or $workflow -match '(?m)^\s*path:\s+.*\/\*\s*$')
     {
         throw 'Release workflow must not upload broad workspace globs.'
+    }
+
+    $expectedWinGetInstallerPattern = "^https://github\.com/HelloThisWorld/winTerm/releases/download/v1\.0\.2/winTerm-1\.0\.2-x64\.msix$"
+    if (-not $wingetGenerator.Contains("[ValidatePattern('$expectedWinGetInstallerPattern')]") -or
+        $wingetGenerator.Contains('/v1\.0\.1/winTerm-1\.0\.1-x64\.msix'))
+    {
+        throw 'WinGet manifest generation does not accept only the current v1.0.2 public installer URL.'
     }
 
     Write-Host 'PASS: stable release workflow security and publication boundaries.' -ForegroundColor Green
