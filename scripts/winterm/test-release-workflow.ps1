@@ -13,6 +13,8 @@ try
 {
     $workflowPath = Join-Path $repositoryRoot '.github\workflows\release.yml'
     $workflow = Get-Content -LiteralPath $workflowPath -Raw
+    $wingetWorkflowPath = Join-Path $repositoryRoot '.github\workflows\winget.yml'
+    $wingetWorkflow = Get-Content -LiteralPath $wingetWorkflowPath -Raw
     $wingetGeneratorPath = Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1'
     $wingetGenerator = Get-Content -LiteralPath $wingetGeneratorPath -Raw
 
@@ -53,13 +55,16 @@ try
         throw 'Release workflow contains a forbidden trigger, permission, or asset replacement option.'
     }
 
-    foreach ($line in $workflow -split "`r?`n")
+    foreach ($workflowToInspect in @($workflow, $wingetWorkflow))
     {
-        if ($line -match '^\s*uses:\s*(?<action>[^@\s]+)@(?<reference>[^\s#]+)')
+        foreach ($line in $workflowToInspect -split "`r?`n")
         {
-            if ($Matches.reference -notmatch '^[0-9a-f]{40}$')
+            if ($line -match '^\s*uses:\s*(?<action>[^@\s]+)@(?<reference>[^\s#]+)')
             {
-                throw "GitHub Action '$($Matches.action)' is not pinned to an immutable commit SHA."
+                if ($Matches.reference -notmatch '^[0-9a-f]{40}$')
+                {
+                    throw "GitHub Action '$($Matches.action)' is not pinned to an immutable commit SHA."
+                }
             }
         }
     }
@@ -74,6 +79,24 @@ try
         $wingetGenerator.Contains('/v1\.0\.1/winTerm-1\.0\.1-x64\.msix'))
     {
         throw 'WinGet manifest generation does not accept only the current v1.0.2 public installer URL.'
+    }
+
+    foreach ($required in @(
+        'pull_request:',
+        'Microsoft.WinGet.Client',
+        "-RequiredVersion '1.29.280'",
+        "Repair-WinGetPackageManager -Version '1.29.280' -Force",
+        "winget validate --manifest 'packaging\winget\1.0.2' --disable-interactivity"
+    ))
+    {
+        if (-not $wingetWorkflow.Contains($required))
+        {
+            throw "WinGet workflow is missing required validator boundary '$required'."
+        }
+    }
+    if ($wingetWorkflow.Contains('Repair-WinGetPackageManager -Latest'))
+    {
+        throw 'WinGet workflow must pin the manifest validator instead of installing the latest version.'
     }
 
     Write-Host 'PASS: stable release workflow security and publication boundaries.' -ForegroundColor Green

@@ -1,6 +1,11 @@
 name: Prepare winTerm WinGet manifests
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/winget.yml'
+      - 'scripts/winterm/generate-winget-manifests.ps1'
+      - 'scripts/winterm/test-release-workflow.ps1'
   release:
     types:
       - published
@@ -12,7 +17,7 @@ permissions:
 jobs:
   validate:
     name: Generate and validate public-release manifests
-    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v1.0.2'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v1.0.2'
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -49,10 +54,30 @@ jobs:
             -InstallerSha256 $sha `
             -OutputDirectory 'packaging\winget\1.0.2'
 
+      - name: Install the pinned WinGet manifest validator
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Install-Module `
+            -Name Microsoft.WinGet.Client `
+            -RequiredVersion '1.29.280' `
+            -Repository PSGallery `
+            -Scope CurrentUser `
+            -Force
+          Import-Module Microsoft.WinGet.Client -RequiredVersion '1.29.280' -Force
+          Repair-WinGetPackageManager -Version '1.29.280' -Force
+
+          $winget = Get-Command winget.exe -ErrorAction Stop
+          & $winget.Source --version
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The pinned WinGet manifest validator is not executable.'
+          }
+
       - name: Validate WinGet manifests
         shell: pwsh
         run: |
-          winget validate 'packaging\winget\1.0.2'
+          winget validate --manifest 'packaging\winget\1.0.2' --disable-interactivity
           if ($LASTEXITCODE -ne 0) {
             throw 'winget validate failed.'
           }
