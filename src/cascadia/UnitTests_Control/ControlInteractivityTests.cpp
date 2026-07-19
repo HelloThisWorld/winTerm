@@ -42,6 +42,7 @@ namespace ControlUnitTests
 
         TEST_METHOD(GetMouseEventsInTest);
         TEST_METHOD(AltBufferClampMouse);
+        TEST_METHOD(RightClickCopiesSelectionThenPastes);
 
         TEST_CLASS_SETUP(ClassSetup)
         {
@@ -934,6 +935,42 @@ namespace ControlUnitTests
                                       0, // timestamp
                                       modifiers,
                                       cursorPosition0.to_core_point());
+    }
+
+    void ControlInteractivityTests::RightClickCopiesSelectionThenPastes()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->CopyOnSelect(false);
+        settings->RightClickContextMenu(false);
+
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+
+        size_t copyCount = 0;
+        size_t pasteCount = 0;
+        core->WriteToClipboard([&](auto&&, auto&&) {
+            ++copyCount;
+        });
+        interactivity->PasteFromClipboard([&](auto&&, auto&&) {
+            ++pasteCount;
+        });
+
+        conn->WriteInput(winrt_wstring_to_array_view(L"copy me"));
+        core->SelectAll();
+        VERIFY_IS_TRUE(core->HasSelection());
+
+        const auto rightMouseDown{ Control::MouseButtonState::IsRightButtonDown };
+        const auto modifiers = ControlKeyStates{};
+        const auto position = til::point{ 0, 0 }.to_core_point();
+
+        interactivity->PointerPressed(rightMouseDown, WM_RBUTTONDOWN, 0, modifiers, position);
+        VERIFY_ARE_EQUAL(1u, copyCount);
+        VERIFY_ARE_EQUAL(0u, pasteCount);
+        VERIFY_IS_FALSE(core->HasSelection());
+
+        interactivity->PointerPressed(rightMouseDown, WM_RBUTTONDOWN, 0, modifiers, position);
+        VERIFY_ARE_EQUAL(1u, copyCount);
+        VERIFY_ARE_EQUAL(1u, pasteCount);
     }
 
     void ControlInteractivityTests::AltBufferClampMouse()

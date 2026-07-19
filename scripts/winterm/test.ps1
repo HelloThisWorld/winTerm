@@ -101,7 +101,7 @@ function Test-ShellExperienceFoundations
     }
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
-    if ($manifest.ModuleVersion -ne '1.0.1' -or $manifest.PowerShellVersion -ne '5.1')
+    if ($manifest.ModuleVersion -ne '1.0.2' -or $manifest.PowerShellVersion -ne '5.1')
     {
         throw 'The winTerm PowerShell module manifest does not declare the supported version boundary.'
     }
@@ -138,6 +138,37 @@ function Test-ShellExperienceFoundations
     {
         throw 'Paste protection source validation failed.'
     }
+
+    $userDefaults = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src\cascadia\TerminalSettingsModel\userDefaults.json') -Raw
+    $inboxDefaults = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src\cascadia\TerminalSettingsModel\defaults.json') -Raw
+    $actionMapSerialization = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src\cascadia\TerminalSettingsModel\ActionMapSerialization.cpp') -Raw
+    $controlSettings = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src\cascadia\TerminalSettingsModel\MTSMSettings.h') -Raw
+    $controlInteractivity = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'src\cascadia\TerminalControl\ControlInteractivity.cpp') -Raw
+    if ($userDefaults.Contains('{ "id": "Terminal.CopyToClipboard", "keys": "ctrl+c" }'))
+    {
+        throw 'Ctrl+C must not be assigned to Copy in winTerm user defaults.'
+    }
+    if (-not $inboxDefaults.Contains('{ "keys": "ctrl+shift+c", "id": "Terminal.CopyToClipboard" }'))
+    {
+        throw 'The Ctrl+Shift+C copy shortcut is missing from inbox defaults.'
+    }
+    if (-not ($actionMapSerialization.Contains('idJson == L"Terminal.CopyToClipboard"') -and
+        $actionMapSerialization.Contains('keyJson->asString() == "ctrl+c"') -and
+        $actionMapSerialization.Contains('_fixupsAppliedDuringLoad = true;')))
+    {
+        throw 'The legacy Ctrl+C copy-binding migration is missing.'
+    }
+    Write-Host 'PASS: Ctrl+C is reserved for terminal interrupt input' -ForegroundColor Green
+
+    if (-not ($userDefaults.Contains('"copyOnSelect": false') -and
+        $controlSettings.Contains('RightClickContextMenu, "rightClickContextMenu", false') -and
+        $controlInteractivity.Contains('CopySelectionToClipboard(shiftEnabled') -and
+        $controlInteractivity.Contains('_core->ClearSelection();') -and
+        $controlInteractivity.Contains('RequestPasteTextFromClipboard();')))
+    {
+        throw 'The default right-click copy-then-paste workflow is incomplete.'
+    }
+    Write-Host 'PASS: Right-click copies a selection and then pastes without a selection' -ForegroundColor Green
 
     Write-Host 'PASS: Shell Experience source foundations' -ForegroundColor Green
 }

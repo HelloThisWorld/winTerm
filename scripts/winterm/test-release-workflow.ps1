@@ -16,7 +16,7 @@ try
 
     foreach ($required in @(
         "push:",
-        "- 'v1.0.1'",
+        "- 'v1.0.2'",
         'permissions:',
         'contents: write',
         'id-token: write',
@@ -24,8 +24,8 @@ try
         'build-local-development.ps1',
         '-ReleaseAsset',
         '-RequireSelfSigned',
-        'winTerm-1.0.1-x64.msix',
-        'winTerm-1.0.1.cer',
+        'winTerm-1.0.2-x64.msix',
+        'winTerm-1.0.2.cer',
         'INSTALL.txt',
         'gh release create',
         '--draft',

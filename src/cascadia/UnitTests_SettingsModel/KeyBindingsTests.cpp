@@ -40,6 +40,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(TestMoveTabArgs);
         TEST_METHOD(TestGetKeyBindingForAction);
         TEST_METHOD(KeybindingsWithoutVkey);
+        TEST_METHOD(ControlCIsReservedForTerminalInput);
     };
 
     void KeyBindingsTests::KeyChords()
@@ -129,6 +130,27 @@ namespace SettingsModelUnitTests
 
         actionMap->LayerJson(bindings2Json, OriginTag::None);
         VERIFY_ARE_EQUAL(4u, actionMap->_KeyMap.size());
+    }
+
+    void KeyBindingsTests::ControlCIsReservedForTerminalInput()
+    {
+        const auto userBindings = VerifyParseSucceeded(R"([
+            { "id": "Terminal.CopyToClipboard", "keys": "ctrl+c" },
+            { "id": "Terminal.CopyToClipboard", "keys": "ctrl+shift+c" },
+            { "id": "Terminal.PasteFromClipboard", "keys": "ctrl+v" }
+        ])");
+
+        auto actionMap = winrt::make_self<implementation::ActionMap>();
+        actionMap->LayerJson(userBindings, OriginTag::User);
+
+        const KeyChord controlC{ true, false, false, false, static_cast<int32_t>('C'), 0 };
+        const KeyChord controlShiftC{ true, false, true, false, static_cast<int32_t>('C'), 0 };
+        const KeyChord controlV{ true, false, false, false, static_cast<int32_t>('V'), 0 };
+
+        VERIFY_IS_TRUE(actionMap->FixupsAppliedDuringLoad());
+        VERIFY_IS_FALSE(actionMap->_KeyMap.contains(controlC));
+        VERIFY_IS_TRUE(actionMap->_KeyMap.contains(controlShiftC));
+        VERIFY_IS_TRUE(actionMap->_KeyMap.contains(controlV));
     }
 
     void KeyBindingsTests::LayerKeybindings()

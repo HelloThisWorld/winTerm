@@ -3,18 +3,18 @@ name: winTerm self-signed stable release
 on:
   push:
     tags:
-      - 'v1.0.1'
+      - 'v1.0.2'
 
 permissions:
   contents: read
 
 concurrency:
-  group: winterm-v1.0.1-stable-release
+  group: winterm-v1.0.2-stable-release
   cancel-in-progress: false
 
 env:
-  WINTERM_VERSION: 1.0.1
-  WINTERM_TAG: v1.0.1
+  WINTERM_VERSION: 1.0.2
+  WINTERM_TAG: v1.0.2
   WINTERM_PUBLISHER: CN=winTerm Development
   WINTERM_UPSTREAM_REVISION: 1cea42d433253d95c4487a3037db48197b5e72f4
 
@@ -33,12 +33,12 @@ jobs:
       - name: Verify tag, commit, and clean checkout
         shell: pwsh
         run: |
-          if ('${{ github.ref }}' -ne 'refs/tags/v1.0.1') {
-            throw 'Stable release runs must check out refs/tags/v1.0.1.'
+          if ('${{ github.ref }}' -ne 'refs/tags/v1.0.2') {
+            throw 'Stable release runs must check out refs/tags/v1.0.2.'
           }
-          $tagCommit = (git rev-list -n 1 v1.0.1).Trim()
+          $tagCommit = (git rev-list -n 1 v1.0.2).Trim()
           if ($tagCommit -ne '${{ github.sha }}') {
-            throw 'v1.0.1 does not point to the checked-out release commit.'
+            throw 'v1.0.2 does not point to the checked-out release commit.'
           }
           if (-not [string]::IsNullOrWhiteSpace((git status --porcelain))) {
             throw 'The release checkout is not clean.'
@@ -120,15 +120,15 @@ jobs:
             -PackagePath $env:WINTERM_UNSIGNED_X64_PACKAGE `
             -OutputDirectory $output `
             -ReleaseAsset
-          "WINTERM_X64_PACKAGE=$(Join-Path $output 'winTerm-1.0.1-x64.msix')" >> $env:GITHUB_ENV
-          "WINTERM_PUBLIC_CERTIFICATE=$(Join-Path $output 'winTerm-1.0.1.cer')" >> $env:GITHUB_ENV
+          "WINTERM_X64_PACKAGE=$(Join-Path $output 'winTerm-1.0.2-x64.msix')" >> $env:GITHUB_ENV
+          "WINTERM_PUBLIC_CERTIFICATE=$(Join-Path $output 'winTerm-1.0.2.cer')" >> $env:GITHUB_ENV
           "WINTERM_INSTALL_INSTRUCTIONS=$(Join-Path $output 'INSTALL.txt')" >> $env:GITHUB_ENV
 
       - name: Generate allowlisted release assets, SBOMs, symbols, and checksums
         shell: pwsh
         run: |
           .\scripts\winterm\generate-release-artifacts.ps1 `
-            -Version '1.0.1' `
+            -Version '1.0.2' `
             -X64PackagePath $env:WINTERM_X64_PACKAGE `
             -CertificatePath $env:WINTERM_PUBLIC_CERTIFICATE `
             -InstallationInstructionsPath $env:WINTERM_INSTALL_INSTRUCTIONS `
@@ -160,34 +160,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.0.1 --repo '${{ github.repository }}' *> $null
+          gh release view v1.0.2 --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
-            throw 'A v1.0.1 Release already exists. This workflow never replaces or clobbers Release assets.'
+            throw 'A v1.0.2 Release already exists. This workflow never replaces or clobbers Release assets.'
           }
 
-          $notesPath = Join-Path $env:RUNNER_TEMP 'winTerm-1.0.1-release-notes.md'
-          Copy-Item -LiteralPath 'docs\releases\1.0.1.md' -Destination $notesPath
+          $notesPath = Join-Path $env:RUNNER_TEMP 'winTerm-1.0.2-release-notes.md'
+          Copy-Item -LiteralPath 'docs\releases\1.0.2.md' -Destination $notesPath
           Add-Content -LiteralPath $notesPath -Value @'
 
-          > **Self-signed installer:** download `winTerm-1.0.1-x64.msix`, `winTerm-1.0.1.cer`, `INSTALL.txt`, and `SHA256SUMS.txt`. Windows does not trust this certificate by default. Verify the hashes and repository URL before importing the certificate into Trusted People.
+          > **Self-signed installer:** download `winTerm-1.0.2-x64.msix`, `winTerm-1.0.2.cer`, `INSTALL.txt`, and `SHA256SUMS.txt`. Windows does not trust this certificate by default. Verify the hashes and repository URL before importing the certificate into Trusted People.
           '@
 
           $assets = @(
-            'artifacts\release\winTerm-1.0.1-x64.msix',
-            'artifacts\release\winTerm-1.0.1.cer',
+            'artifacts\release\winTerm-1.0.2-x64.msix',
+            'artifacts\release\winTerm-1.0.2.cer',
             'artifacts\release\INSTALL.txt',
             'artifacts\release\SHA256SUMS.txt',
             'artifacts\release\THIRD_PARTY_NOTICES.md',
             'artifacts\release\SBOM.spdx.json',
             'artifacts\release\SBOM.cyclonedx.json',
             'artifacts\release\release-metadata.json',
-            'artifacts\release\winTerm-1.0.1-symbols.zip',
-            'artifacts\release\winTerm-1.0.1-release-notes.md'
+            'artifacts\release\winTerm-1.0.2-symbols.zip',
+            'artifacts\release\winTerm-1.0.2-release-notes.md'
           )
-          gh release create v1.0.1 @assets `
+          gh release create v1.0.2 @assets `
             --repo '${{ github.repository }}' `
             --verify-tag `
-            --title 'winTerm 1.0.1' `
+            --title 'winTerm 1.0.2' `
             --notes-file $notesPath `
             --draft
           if ($LASTEXITCODE -ne 0) {
@@ -201,7 +201,7 @@ jobs:
         run: |
           $verificationDirectory = Join-Path $env:RUNNER_TEMP 'winterm-draft-download'
           New-Item -ItemType Directory -Path $verificationDirectory | Out-Null
-          gh release download v1.0.1 --repo '${{ github.repository }}' --dir $verificationDirectory
+          gh release download v1.0.2 --repo '${{ github.repository }}' --dir $verificationDirectory
           if ($LASTEXITCODE -ne 0) {
             throw 'Draft Release asset download failed.'
           }
@@ -211,12 +211,12 @@ jobs:
             -Architecture x64 `
             -RequireSelfSigned `
             -ExpectedPublisher $env:WINTERM_PUBLISHER
-          gh attestation verify (Join-Path $verificationDirectory 'winTerm-1.0.1-x64.msix') --repo '${{ github.repository }}'
+          gh attestation verify (Join-Path $verificationDirectory 'winTerm-1.0.2-x64.msix') --repo '${{ github.repository }}'
           if ($LASTEXITCODE -ne 0) {
             throw 'Artifact attestation verification failed.'
           }
-          $release = gh release view v1.0.1 --repo '${{ github.repository }}' --json tagName,name,isDraft,isPrerelease,url | ConvertFrom-Json
-          if ($release.tagName -ne 'v1.0.1' -or $release.name -ne 'winTerm 1.0.1' -or -not $release.isDraft -or $release.isPrerelease) {
+          $release = gh release view v1.0.2 --repo '${{ github.repository }}' --json tagName,name,isDraft,isPrerelease,url | ConvertFrom-Json
+          if ($release.tagName -ne 'v1.0.2' -or $release.name -ne 'winTerm 1.0.2' -or -not $release.isDraft -or $release.isPrerelease) {
             throw 'Draft Release state verification failed.'
           }
 
@@ -225,7 +225,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release edit v1.0.1 `
+          gh release edit v1.0.2 `
             --repo '${{ github.repository }}' `
             --draft=false `
             --prerelease=false `
@@ -233,8 +233,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw 'GitHub Release publication failed.'
           }
-          $release = gh release view v1.0.1 --repo '${{ github.repository }}' --json tagName,name,isDraft,isPrerelease,assets,url | ConvertFrom-Json
-          if ($release.isDraft -or $release.isPrerelease -or $release.tagName -ne 'v1.0.1') {
+          $release = gh release view v1.0.2 --repo '${{ github.repository }}' --json tagName,name,isDraft,isPrerelease,assets,url | ConvertFrom-Json
+          if ($release.isDraft -or $release.isPrerelease -or $release.tagName -ne 'v1.0.2') {
             throw 'Published Release state verification failed.'
           }
           "Published Release URL: $($release.url)" >> $env:GITHUB_STEP_SUMMARY
@@ -246,7 +246,7 @@ jobs:
         run: |
           $publicDirectory = Join-Path $env:RUNNER_TEMP 'winterm-public-download'
           New-Item -ItemType Directory -Path $publicDirectory | Out-Null
-          gh release download v1.0.1 --repo '${{ github.repository }}' --dir $publicDirectory
+          gh release download v1.0.2 --repo '${{ github.repository }}' --dir $publicDirectory
           if ($LASTEXITCODE -ne 0) {
             throw 'Public Release asset download failed.'
           }
@@ -256,7 +256,7 @@ jobs:
             -Architecture x64 `
             -RequireSelfSigned `
             -ExpectedPublisher $env:WINTERM_PUBLISHER
-          gh attestation verify (Join-Path $publicDirectory 'winTerm-1.0.1-x64.msix') --repo '${{ github.repository }}'
+          gh attestation verify (Join-Path $publicDirectory 'winTerm-1.0.2-x64.msix') --repo '${{ github.repository }}'
           if ($LASTEXITCODE -ne 0) {
             throw 'Public artifact attestation verification failed.'
           }

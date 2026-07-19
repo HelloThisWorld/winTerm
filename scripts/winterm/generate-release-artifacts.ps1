@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('1.0.1')]
+    [ValidateSet('1.0.2')]
     [string]$Version,
 
     [Parameter(Mandatory)]
@@ -181,7 +181,7 @@ try
 
     $notices = Copy-ReleaseFile -Source (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') -TargetName 'THIRD_PARTY_NOTICES.md'
     [void]$releaseFiles.Add($notices)
-    $releaseNotes = Copy-ReleaseFile -Source (Join-Path $repositoryRoot 'docs\releases\1.0.1.md') -TargetName "winTerm-$Version-release-notes.md"
+    $releaseNotes = Copy-ReleaseFile -Source (Join-Path $repositoryRoot 'docs\releases\1.0.2.md') -TargetName "winTerm-$Version-release-notes.md"
     [void]$releaseFiles.Add($releaseNotes)
 
     $symbolsRoot = (Resolve-Path -LiteralPath $SymbolsDirectory).Path
@@ -210,9 +210,9 @@ try
     $components = [System.Collections.Generic.List[object]]::new()
     [void]$components.Add((New-SbomComponent -Name 'winTerm' -VersionInfo $Version -Type 'application' -License 'MIT' -Revision $commit))
     [void]$components.Add((New-SbomComponent -Name 'Microsoft Terminal upstream source' -VersionInfo 'release-1.25' -Type 'framework' -License 'MIT' -Revision $upstream))
-    [void]$components.Add((New-SbomComponent -Name 'winTerm PowerShell Module' -VersionInfo '1.0.1' -Type 'library' -License 'MIT' -Revision $commit))
-    [void]$components.Add((New-SbomComponent -Name 'winterm-shim' -VersionInfo '1.0.1' -Type 'application' -License 'MIT' -Revision $commit))
-    [void]$components.Add((New-SbomComponent -Name 'winTerm MSIX installer' -VersionInfo '1.0.1.0' -Type 'installer' -License 'MIT' -Revision $commit))
+    [void]$components.Add((New-SbomComponent -Name 'winTerm PowerShell Module' -VersionInfo '1.0.2' -Type 'library' -License 'MIT' -Revision $commit))
+    [void]$components.Add((New-SbomComponent -Name 'winterm-shim' -VersionInfo '1.0.2' -Type 'application' -License 'MIT' -Revision $commit))
+    [void]$components.Add((New-SbomComponent -Name 'winTerm MSIX installer' -VersionInfo '1.0.2.0' -Type 'installer' -License 'MIT' -Revision $commit))
 
     $themeManifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'assets\winterm\themes\manifest.json') -Raw | ConvertFrom-Json
     foreach ($theme in $themeManifest.themes)
@@ -309,7 +309,7 @@ try
     $metadata = [ordered]@{
         schemaVersion = 1
         version = $Version
-        packageVersion = '1.0.1.0'
+        packageVersion = '1.0.2.0'
         channel = 'stable'
         tag = "v$Version"
         commitSha = $commit

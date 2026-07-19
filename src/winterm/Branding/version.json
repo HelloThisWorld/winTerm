@@ -1,9 +1,9 @@
 {
-  "applicationVersion": "1.0.1",
-  "packageVersion": "1.0.1.0",
-  "moduleVersion": "1.0.1",
+  "applicationVersion": "1.0.2",
+  "packageVersion": "1.0.2.0",
+  "moduleVersion": "1.0.2",
   "channel": "stable",
-  "tag": "v1.0.1",
+  "tag": "v1.0.2",
   "workspaceSchemaVersion": 2,
   "dockingModelVersion": 1,
   "shellProtocolVersion": 1,
