@@ -4,7 +4,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/download/v1\.0\.1/winTerm-1\.0\.1-x64\.msix$')]
+    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/download/v1\.0\.2/winTerm-1\.0\.2-x64\.msix$')]
     [string]$InstallerUrl,
 
     [Parameter(Mandatory)]
