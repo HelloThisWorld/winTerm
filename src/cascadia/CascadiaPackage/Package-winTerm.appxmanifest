@@ -18,7 +18,7 @@
   <Identity
     Name="HelloThisWorld.winTerm"
     Publisher="CN=winTerm Development"
-    Version="1.0.1.0" />
+    Version="1.0.2.0" />
 
   <Properties>
     <DisplayName>winTerm</DisplayName>

@@ -175,7 +175,7 @@ function Test-MsixPackage
     $aliases = @($manifest.SelectNodes('//uap3:AppExecutionAlias/desktop:ExecutionAlias', $namespace) | ForEach-Object { $_.Alias })
 
     Assert-Condition ($identity.Name -eq 'HelloThisWorld.winTerm') "$($Package.Name) uses package identity HelloThisWorld.winTerm"
-    Assert-Condition ($identity.Version -eq '1.0.1.0') "$($Package.Name) contains package version 1.0.1.0"
+    Assert-Condition ($identity.Version -eq '1.0.2.0') "$($Package.Name) contains package version 1.0.2.0"
     Assert-Condition ($identity.ProcessorArchitecture.ToLowerInvariant() -eq $ExpectedArchitecture) "$($Package.Name) contains architecture $ExpectedArchitecture"
     Assert-Condition ($aliases -contains 'winterm.exe') "$($Package.Name) registers winterm.exe"
     Assert-Condition ($aliases -notcontains 'wt.exe') "$($Package.Name) does not register wt.exe"
@@ -235,7 +235,7 @@ function Test-MsixBundle
     $architectures = @($packages | ForEach-Object { $_.Architecture.ToLowerInvariant() })
 
     Assert-Condition ($identity.Name -eq 'HelloThisWorld.winTerm') "$($Bundle.Name) uses bundle identity HelloThisWorld.winTerm"
-    Assert-Condition ($identity.Version -eq '1.0.1.0') "$($Bundle.Name) contains bundle version 1.0.1.0"
+    Assert-Condition ($identity.Version -eq '1.0.2.0') "$($Bundle.Name) contains bundle version 1.0.2.0"
     if (-not [string]::IsNullOrWhiteSpace($ExpectedPublisher))
     {
         Assert-Condition ($identity.Publisher -ceq $ExpectedPublisher) "$($Bundle.Name) publisher matches the protected publisher"
@@ -290,23 +290,23 @@ try
         'SBOM.spdx.json',
         'SBOM.cyclonedx.json',
         'release-metadata.json',
-        'winTerm-1.0.1-release-notes.md',
-        'winTerm-1.0.1-symbols.zip'
+        'winTerm-1.0.2-release-notes.md',
+        'winTerm-1.0.2-symbols.zip'
     ))
     {
         [void]$required.Add($name)
     }
     foreach ($arch in $Architecture)
     {
-        [void]$required.Add("winTerm-1.0.1-$arch.msix")
+        [void]$required.Add("winTerm-1.0.2-$arch.msix")
     }
     if ($Architecture.Count -eq 2)
     {
-        [void]$required.Add('winTerm-1.0.1.msixbundle')
+        [void]$required.Add('winTerm-1.0.2.msixbundle')
     }
     if ($RequireSelfSigned)
     {
-        [void]$required.Add('winTerm-1.0.1.cer')
+        [void]$required.Add('winTerm-1.0.2.cer')
         [void]$required.Add('INSTALL.txt')
     }
 
@@ -339,12 +339,12 @@ try
     $expectedChecksumNames = @($required | Where-Object { $_ -ne 'SHA256SUMS.txt' } | Sort-Object)
     Assert-Condition (((($checksumNames | Sort-Object) -join "`n") -ceq (($expectedChecksumNames | Sort-Object) -join "`n"))) 'SHA256SUMS.txt covers every release asset except itself'
 
-    $releaseNotes = Get-Content -LiteralPath (Join-Path $root 'winTerm-1.0.1-release-notes.md') -Raw
-    Assert-Condition ($releaseNotes.Contains('# winTerm 1.0.1')) 'Release notes contain the stable release title'
+    $releaseNotes = Get-Content -LiteralPath (Join-Path $root 'winTerm-1.0.2-release-notes.md') -Raw
+    Assert-Condition ($releaseNotes.Contains('# winTerm 1.0.2')) 'Release notes contain the stable release title'
 
     $metadata = Get-Content -LiteralPath (Join-Path $root 'release-metadata.json') -Raw | ConvertFrom-Json
-    Assert-Condition ($metadata.version -eq '1.0.1') 'Release metadata version is 1.0.1'
-    Assert-Condition ($metadata.packageVersion -eq '1.0.1.0') 'Release metadata package version is 1.0.1.0'
+    Assert-Condition ($metadata.version -eq '1.0.2') 'Release metadata version is 1.0.2'
+    Assert-Condition ($metadata.packageVersion -eq '1.0.2.0') 'Release metadata package version is 1.0.2.0'
     Assert-Condition ($metadata.channel -eq 'stable') 'Release metadata channel is stable'
     Assert-Condition ($metadata.commitSha -match '^[0-9a-f]{40}$') 'Release metadata contains a full commit SHA'
     Assert-Condition ($metadata.microsoftTerminalUpstreamRevision -match '^[0-9a-f]{40}$') 'Release metadata contains the upstream revision'
@@ -360,22 +360,22 @@ try
     if ($RequireSelfSigned)
     {
         Assert-Condition ($metadata.signing -eq 'self-signed') 'Release metadata declares self-signed distribution'
-        $certificatePath = Join-Path $root 'winTerm-1.0.1.cer'
+        $certificatePath = Join-Path $root 'winTerm-1.0.2.cer'
         $selfSignedCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
             $certificatePath)
         Assert-Condition (-not $selfSignedCertificate.HasPrivateKey) 'Published certificate does not contain a private key'
         Assert-Condition ($selfSignedCertificate.Subject -ceq $ExpectedPublisher) 'Published certificate subject matches the package publisher'
         Assert-Condition ($selfSignedCertificate.NotAfter.ToUniversalTime() -gt [DateTime]::UtcNow) 'Published certificate is not expired'
         $installationText = Get-Content -LiteralPath (Join-Path $root 'INSTALL.txt') -Raw
-        Assert-Condition ($installationText.Contains('winTerm-1.0.1.cer')) 'Installation instructions name the published certificate'
-        Assert-Condition ($installationText.Contains('winTerm-1.0.1-x64.msix')) 'Installation instructions name the x64 installer'
+        Assert-Condition ($installationText.Contains('winTerm-1.0.2.cer')) 'Installation instructions name the published certificate'
+        Assert-Condition ($installationText.Contains('winTerm-1.0.2-x64.msix')) 'Installation instructions name the x64 installer'
     }
 
     $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("winterm-release-verify-{0}" -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
     foreach ($arch in $Architecture)
     {
-        $package = Get-Item -LiteralPath (Join-Path $root "winTerm-1.0.1-$arch.msix")
+        $package = Get-Item -LiteralPath (Join-Path $root "winTerm-1.0.2-$arch.msix")
         Test-MsixPackage `
             -Package $package `
             -ExpectedArchitecture $arch `
@@ -384,7 +384,7 @@ try
     }
     if ($Architecture.Count -eq 2)
     {
-        $bundle = Get-Item -LiteralPath (Join-Path $root 'winTerm-1.0.1.msixbundle')
+        $bundle = Get-Item -LiteralPath (Join-Path $root 'winTerm-1.0.2.msixbundle')
         Test-MsixBundle `
             -Bundle $bundle `
             -TemporaryRoot $temporaryDirectory `

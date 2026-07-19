@@ -83,7 +83,7 @@ internal testing:
 
 The wrapper:
 
-1. verifies the 1.0.1 version and runs the source-level Smoke suite;
+1. verifies the 1.0.2 version and runs the source-level Smoke suite;
 2. builds the x64 Release MSIX with signing disabled;
 3. validates the generated package;
 4. runs the Relevant compiled tests when `-IncludeTests` is present;
@@ -98,11 +98,11 @@ The wrapper:
 The default output directory is ignored by Git:
 
 ```text
-artifacts/local/winTerm-1.0.1-development-x64/
+artifacts/local/winTerm-1.0.2-development-x64/
     INSTALL.txt
     SHA256SUMS.txt
-    winTerm-1.0.1-development.cer
-    winTerm-1.0.1-development-x64.msix
+    winTerm-1.0.2-development.cer
+    winTerm-1.0.2-development-x64.msix
 ```
 
 The wrapper refuses to overwrite an existing output directory. Use a new
@@ -118,7 +118,7 @@ again:
 
 ```powershell
 .\scripts\winterm\build-local-development.ps1 `
-  -PackagePath .\path\to\CascadiaPackage_1.0.1.0_x64.msix `
+  -PackagePath .\path\to\CascadiaPackage_1.0.2.0_x64.msix `
   -OutputDirectory artifacts/local/winTerm-development-from-existing-package
 ```
 
@@ -128,19 +128,19 @@ append a signature.
 To install the result:
 
 1. verify the files against `SHA256SUMS.txt`;
-2. open `winTerm-1.0.1-development.cer`;
+2. open `winTerm-1.0.2-development.cer`;
 3. choose **Install Certificate**, **Local Machine**, and **Trusted People**,
    and approve the administrator prompt;
-4. open `winTerm-1.0.1-development-x64.msix` and select **Install**.
+4. open `winTerm-1.0.2-development-x64.msix` and select **Install**.
 
 Equivalent elevated PowerShell commands are included in `INSTALL.txt`.
-Remove the development certificate after testing. Public v1.0.1 uses the same
+Remove the development certificate after testing. Public v1.0.2 uses the same
 self-signing trust model but generates a distinct certificate from the exact
 release Tag; trust only the CER downloaded from that GitHub Release.
 
 ## CI runner
 
-The validation and full-build workflows use GitHub-hosted Windows runners. The Stable workflow accepts only an exact `v1.0.1` Tag checkout. It creates a temporary non-exportable self-signed key, publishes only the public CER, deletes the private key after signing, and verifies the released MSIX against that CER.
+The validation and full-build workflows use GitHub-hosted Windows runners. The Stable workflow accepts only an exact `v1.0.2` Tag checkout. It creates a temporary non-exportable self-signed key, publishes only the public CER, deletes the private key after signing, and verifies the released MSIX against that CER.
 
 ## Known build issues in the implementation environment
 

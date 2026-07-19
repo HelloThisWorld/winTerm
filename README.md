@@ -1,11 +1,11 @@
 # winTerm
 
-[Download winTerm v1.0.1](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.1)
+[Download winTerm v1.0.2](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.2)
 
-[![Version](https://img.shields.io/badge/version-1.0.1-blue)](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.1)
+[![Version](https://img.shields.io/badge/version-1.0.2-blue)](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.2)
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
-[![Stable release](https://img.shields.io/badge/stable%20release-v1.0.1-success)](https://github.com/HelloThisWorld/winTerm/releases/latest)
+[![Stable release](https://img.shields.io/badge/stable%20release-v1.0.2-success)](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
 winTerm is an independent open-source terminal application based on Microsoft Windows Terminal.
 
@@ -13,7 +13,7 @@ winTerm is not affiliated with or endorsed by Microsoft. It does not use Microso
 
 ## Latest stable release
 
-Download the latest verified installer from the [GitHub Releases page](https://github.com/HelloThisWorld/winTerm/releases/latest). The v1.0.1 installer is self-signed rather than signed by a public certificate authority, so Windows does not trust it automatically. Download the `.msix`, matching `.cer`, `INSTALL.txt`, and `SHA256SUMS.txt` from the same Release, verify the hashes, then follow the included certificate installation steps.
+Download the latest verified installer from the [GitHub Releases page](https://github.com/HelloThisWorld/winTerm/releases/latest). The v1.0.2 installer is self-signed rather than signed by a public certificate authority, so Windows does not trust it automatically. Download the `.msix`, matching `.cer`, `INSTALL.txt`, and `SHA256SUMS.txt` from the same Release, verify the hashes, then follow the included certificate installation steps.
 
 ## Supported Windows versions
 
@@ -23,10 +23,10 @@ The intended winTerm 1.0 support target is Windows 11 x64. Windows 10 is unsuppo
 
 The official installer must:
 
-- be downloaded from the public `v1.0.1` Release in this repository;
-- be named `winTerm-1.0.1-x64.msix`;
+- be downloaded from the public `v1.0.2` Release in this repository;
+- be named `winTerm-1.0.2-x64.msix`;
 - match `SHA256SUMS.txt`;
-- have a cryptographically valid signature matching the included `winTerm-1.0.1.cer`;
+- have a cryptographically valid signature matching the included `winTerm-1.0.2.cer`;
 - install without Visual Studio, Git, Developer Mode, registry edits, global font installation, or profile modification.
 
 Because the certificate is self-signed, an administrator must import it into the Local Machine `Trusted People` certificate store before installing the MSIX. See [installation guidance](docs/user/installation.md).
@@ -50,6 +50,26 @@ Release screenshots must be captured from the signed winTerm package after brand
 
 Runtime evidence is tracked in [feature status](docs/feature-status.md) and the [compatibility matrix](docs/compatibility-matrix.md). Runtime Docking, cross-process Pane transfer, Update Check, Git Bash integration, and ARM64 are Disabled.
 
+## Keyboard and mouse operations
+
+winTerm keeps the standard terminal interrupt shortcut separate from clipboard operations:
+
+- `Ctrl+C` sends an interrupt to the foreground terminal process. Use it to stop a Python development server, web server, build, or other running command.
+- `Ctrl+Shift+C` copies the current terminal selection.
+- `Ctrl+V` or `Ctrl+Shift+V` pastes clipboard text through winTerm's paste handling.
+
+The default right-click workflow is designed for quick copy and paste:
+
+1. Select text by holding the left mouse button and dragging across the terminal output.
+2. Right-click once while the selection is active. winTerm copies the selected text to the clipboard and clears the selection.
+3. Right-click again after the selection has cleared. Because there is no active selection, winTerm pastes the current clipboard text at the terminal cursor.
+
+Multiline or large clipboard content may show a confirmation before it is sent to the shell. Cancelling that confirmation sends no input.
+
+This workflow uses the default settings `copyOnSelect: false` and `rightClickContextMenu: false`. Enabling `copyOnSelect` copies immediately when the selection is completed. Enabling `rightClickContextMenu` changes right-click to open a context menu instead of performing the copy/paste workflow.
+
+Full-screen terminal applications such as editors, multiplexers, and text user interfaces can enable VT mouse reporting. In that mode, mouse actions are sent to the running application. Hold `Shift` while selecting or right-clicking to temporarily use winTerm's local mouse handling.
+
 ## Privacy
 
 winTerm does not collect command text, terminal output, clipboard content, Workspace contents, working directories, or usage analytics. Crash upload is off and opt-in. Update checks are disabled until explicit consent exists. See [PRIVACY.md](PRIVACY.md).
@@ -63,9 +83,9 @@ The exact gate status is recorded in:
 - [security review](docs/security-review-v1.0.md);
 - [accessibility audit](docs/accessibility-audit-v1.0.md);
 - [performance validation](docs/performance-v1.0.md);
-- [release notes](docs/releases/1.0.1.md).
+- [release notes](docs/releases/1.0.2.md).
 
-GitHub Actions builds from the exact immutable `v1.0.1` Tag, creates a temporary non-exportable self-signed key, verifies the package identity and embedded signature, uploads only allowlisted assets, re-downloads them for verification, and then publishes the Release. It never replaces an existing Release asset.
+GitHub Actions builds from the exact immutable `v1.0.2` Tag, creates a temporary non-exportable self-signed key, verifies the package identity and embedded signature, uploads only allowlisted assets, re-downloads them for verification, and then publishes the Release. It never replaces an existing Release asset.
 
 ## Build
 
@@ -86,7 +106,7 @@ development wrapper from PowerShell 7:
 It builds and validates Release, creates a disposable self-signed code-signing
 certificate, signs the MSIX, exports only the public `.cer`, verifies the
 package signature and identity, and writes `SHA256SUMS.txt` under
-`artifacts/local/winTerm-1.0.1-development-x64`. The private key is removed
+`artifacts/local/winTerm-1.0.2-development-x64`. The private key is removed
 after signing.
 
 Before installation, an administrator must import the included `.cer` into

@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate:
     name: Generate and validate public-release manifests
-    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v1.0.1'
+    if: github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v1.0.2'
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -26,33 +26,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $release = gh release view v1.0.1 --repo '${{ github.repository }}' --json tagName,isDraft,isPrerelease,url,assets | ConvertFrom-Json
-          if ($release.tagName -ne 'v1.0.1' -or $release.isDraft -or $release.isPrerelease) {
-            throw 'WinGet manifests may be generated only from the public stable v1.0.1 Release.'
+          $release = gh release view v1.0.2 --repo '${{ github.repository }}' --json tagName,isDraft,isPrerelease,url,assets | ConvertFrom-Json
+          if ($release.tagName -ne 'v1.0.2' -or $release.isDraft -or $release.isPrerelease) {
+            throw 'WinGet manifests may be generated only from the public stable v1.0.2 Release.'
           }
-          $asset = @($release.assets | Where-Object { $_.name -eq 'winTerm-1.0.1-x64.msix' })
+          $asset = @($release.assets | Where-Object { $_.name -eq 'winTerm-1.0.2-x64.msix' })
           if ($asset.Count -ne 1) {
             throw 'The public Release does not contain exactly one x64 installer.'
           }
 
           $downloadDirectory = Join-Path $env:RUNNER_TEMP 'winterm-winget-source'
           New-Item -ItemType Directory -Path $downloadDirectory | Out-Null
-          gh release download v1.0.1 --repo '${{ github.repository }}' --pattern 'winTerm-1.0.1-x64.msix' --dir $downloadDirectory
+          gh release download v1.0.2 --repo '${{ github.repository }}' --pattern 'winTerm-1.0.2-x64.msix' --dir $downloadDirectory
           if ($LASTEXITCODE -ne 0) {
             throw 'Public installer download failed.'
           }
-          $packagePath = Join-Path $downloadDirectory 'winTerm-1.0.1-x64.msix'
+          $packagePath = Join-Path $downloadDirectory 'winTerm-1.0.2-x64.msix'
           $sha = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
-          $url = 'https://github.com/${{ github.repository }}/releases/download/v1.0.1/winTerm-1.0.1-x64.msix'
+          $url = 'https://github.com/${{ github.repository }}/releases/download/v1.0.2/winTerm-1.0.2-x64.msix'
           .\scripts\winterm\generate-winget-manifests.ps1 `
             -InstallerUrl $url `
             -InstallerSha256 $sha `
-            -OutputDirectory 'packaging\winget\1.0.1'
+            -OutputDirectory 'packaging\winget\1.0.2'
 
       - name: Validate WinGet manifests
         shell: pwsh
         run: |
-          winget validate 'packaging\winget\1.0.1'
+          winget validate 'packaging\winget\1.0.2'
           if ($LASTEXITCODE -ne 0) {
             throw 'winget validate failed.'
           }
@@ -60,7 +60,7 @@ jobs:
       - name: Upload the validated manifest set for manual submission
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: HelloThisWorld.winTerm-1.0.1-winget
-          path: packaging/winget/1.0.1
+          name: HelloThisWorld.winTerm-1.0.2-winget
+          path: packaging/winget/1.0.2
           if-no-files-found: error
           retention-days: 30

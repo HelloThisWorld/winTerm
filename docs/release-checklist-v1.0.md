@@ -6,8 +6,8 @@ Recorded on 2026-07-18. `Passed` means evidence exists. `Not available` is never
 | --- | --- | --- |
 | Feature freeze complete | Passed | `docs/feature-status.md` and `docs/roadmap-post-1.0.md`. |
 | P0 count is zero | Passed | Connected GitHub repository returned no open Issues; no known P0 was found in source review. |
-| P1 count is zero or explicitly approved | Accepted limitation | v1.0.1 is intentionally self-signed; the Release notes require explicit certificate trust and do not claim public-CA signing. |
-| Version is 1.0.1 everywhere | Required | Enforced by `scripts/winterm/verify-version.ps1`. |
+| P1 count is zero or explicitly approved | Accepted limitation | v1.0.2 is intentionally self-signed; the Release notes require explicit certificate trust and do not claim public-CA signing. |
+| Version is 1.0.2 everywhere | Required | Enforced by `scripts/winterm/verify-version.ps1`. |
 | Full CI passes | Not available | v1.0 branch has not been pushed or run in GitHub Actions. |
 | Security review passes | Not available | Static review exists; runtime evidence is incomplete. |
 | Privacy review passes | Passed | Static privacy and diagnostic checks exist; end-to-end bundle inspection remains separately open. |
@@ -39,10 +39,10 @@ Recorded on 2026-07-18. `Passed` means evidence exists. `Not available` is never
 | Release marked Latest | Automated | Workflow sets Latest, non-Draft, and non-Prerelease. |
 | Release URL verified | Automated | Workflow reads back and records the public URL. |
 | Public download smoke test passes | User validation | Installation requires importing the attached self-signed CER into Trusted People. |
-| README download link updated | Passed | README links the v1.0.1 and Latest Release pages. |
+| README download link updated | Passed | README links the v1.0.2 and Latest Release pages. |
 | Stable update manifest updated | Skipped with reason | It must contain the actual public URL, publication time, and downloaded hash. |
 | Final report completed | Not available | Release phase remains blocked. |
 
 ## Publication decision
 
-**Publication boundary:** only the exact immutable `v1.0.1` Tag workflow may create the Release. It cannot publish an unsigned installer, replace existing assets, expose a private key, or skip re-download verification.
+**Publication boundary:** only the exact immutable `v1.0.2` Tag workflow may create the Release. It cannot publish an unsigned installer, replace existing assets, expose a private key, or skip re-download verification.

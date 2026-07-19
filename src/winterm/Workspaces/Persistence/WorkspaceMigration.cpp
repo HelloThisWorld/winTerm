@@ -36,7 +36,7 @@ WorkspaceMigrationResult WorkspaceMigration::Migrate(const Json::Value& document
                 result.document.removeMember("workspaceId");
             }
             if (result.document["source"].isNull()) result.document["source"] = "user";
-            if (result.document["applicationVersion"].isNull()) result.document["applicationVersion"] = "1.0.1";
+            if (result.document["applicationVersion"].isNull()) result.document["applicationVersion"] = "1.0.2";
             if (result.document["protocolVersion"].isNull()) result.document["protocolVersion"] = 1;
             if (result.document["description"].isNull()) result.document["description"] = "";
             if (result.document["startupBehavior"].isNull())

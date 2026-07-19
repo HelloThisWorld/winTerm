@@ -52,7 +52,7 @@ After every pre-tag gate is reviewed:
 
 1. merge the release PR to `main`;
 2. record the exact merge commit;
-3. create annotated tag `v1.0.1` on that commit;
+3. create annotated tag `v1.0.2` on that commit;
 4. push only the tag;
 5. let `.github/workflows/release.yml` build from the clean tag checkout.
 
@@ -62,7 +62,7 @@ The workflow creates a Draft, uploads only the allowlisted installer, public CER
 
 After the Draft assets pass re-download verification, the same exact-tag workflow sets Draft false, Prerelease false, and Latest. It then downloads the public assets into a new directory and repeats package, certificate, signature, checksum, and Attestation verification.
 
-The installer is self-signed and not publicly trusted. Users must verify the repository URL and hashes before importing the attached CER into Trusted People. If the public package fails verification or installation, never replace the `v1.0.1` asset; record the incident and prepare a new version and Tag.
+The installer is self-signed and not publicly trusted. Users must verify the repository URL and hashes before importing the attached CER into Trusted People. If the public package fails verification or installation, never replace the `v1.0.2` asset; record the incident and prepare a new version and Tag.
 
 ## 6. Post-release metadata
 

@@ -2,9 +2,9 @@
 
 Install winTerm only from the official GitHub Release. Do not install an Actions artifact, an unsigned Draft package, or a package from a mirror.
 
-For `v1.0.1`:
+For `v1.0.2`:
 
-1. download `winTerm-1.0.1-x64.msix`, `winTerm-1.0.1.cer`, `INSTALL.txt`, and `SHA256SUMS.txt` from the official Release;
+1. download `winTerm-1.0.2-x64.msix`, `winTerm-1.0.2.cer`, `INSTALL.txt`, and `SHA256SUMS.txt` from the official Release;
 2. verify SHA-256;
 3. open the CER, select **Install Certificate**, choose **Local Machine**, and place it in **Trusted People**;
 4. open the MSIX or run `Add-AppxPackage`;

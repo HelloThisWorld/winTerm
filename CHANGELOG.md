@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.2 - Stable
+
+### Fixed
+
+- Reserved `Ctrl+C` for interrupting the foreground terminal process, including Python development servers and other long-running commands.
+- Migrated the legacy generated `Ctrl+C` copy binding out of existing user settings while preserving `Ctrl+Shift+C` for copying selected text.
+- Added regression coverage for the default right-click workflow: copy and clear an active selection, then paste when no selection remains.
+
+### Documentation
+
+- Added detailed keyboard, mouse, clipboard, paste-warning, and VT mouse-reporting instructions to the README.
+- Updated clipboard documentation to match the integrated runtime behavior and its current safety boundaries.
+
+### Security
+
+- The Release continues to publish a self-signed x64 MSIX, public CER, installation instructions, checksums, notices, SBOMs, symbols, and provenance from the exact immutable `v1.0.2` commit.
+- Existing `v1.0.1` assets are not replaced or modified.
+
+### Known issues
+
+- The installer is self-signed, is not publicly trusted or timestamped, and requires administrators to import the attached CER into Trusted People.
+- ARM64 and Windows 10 are not supported by this Release.
+
 ## 1.0.1 - Stable
 
 ### Changed

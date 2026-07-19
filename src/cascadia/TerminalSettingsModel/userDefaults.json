@@ -23,7 +23,6 @@
     },
     "keybindings":
     [
-        { "id": "Terminal.CopyToClipboard", "keys": "ctrl+c" },
         { "id": "Terminal.PasteFromClipboard", "keys": "ctrl+v" },
         { "id": "Terminal.DuplicatePaneAuto", "keys": "alt+shift+d" }
     ]
