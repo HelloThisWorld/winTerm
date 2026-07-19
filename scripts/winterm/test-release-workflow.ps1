@@ -85,7 +85,7 @@ try
         'pull_request:',
         'Microsoft.WinGet.Client',
         "-RequiredVersion '1.29.280'",
-        "Repair-WinGetPackageManager -Version '1.29.280' -Force",
+        "Repair-WinGetPackageManager -Version 'v1.29.280' -Force",
         "winget validate --manifest 'packaging\winget\1.0.2' --disable-interactivity"
     ))
     {

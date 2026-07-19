@@ -66,7 +66,7 @@ jobs:
             -Scope CurrentUser `
             -Force
           Import-Module Microsoft.WinGet.Client -RequiredVersion '1.29.280' -Force
-          Repair-WinGetPackageManager -Version '1.29.280' -Force
+          Repair-WinGetPackageManager -Version 'v1.29.280' -Force
 
           $winget = Get-Command winget.exe -ErrorAction Stop
           & $winget.Source --version
