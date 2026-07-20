@@ -1951,7 +1951,7 @@ winrt::hstring Pane::_PaneHeaderTitle() const
         title.resize(MaximumPaneHeaderTitleLength - 3);
         title += L"...";
     }
-    return title;
+    return winrt::hstring{ title };
 }
 
 winrt::hstring Pane::_PaneHeaderAccessibleTitle() const
@@ -1981,7 +1981,7 @@ winrt::hstring Pane::_PaneHeaderAccessibleTitle() const
     {
         title = title.substr(pathSeparator + 1);
     }
-    return title;
+    return winrt::hstring{ title };
 }
 
 // Method Description:
