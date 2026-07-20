@@ -17,6 +17,10 @@ using namespace winrt::TerminalApp;
 
 static const int PaneBorderSize = 2;
 static const int CombinedPaneBorderSize = 2 * PaneBorderSize;
+static constexpr double PaneHeaderHeight = 26.0;
+static constexpr double PaneHeaderButtonWidth = 32.0;
+static constexpr uint64_t PaneTaskbarStateError = 2;
+static constexpr uint64_t PaneTaskbarStateIndeterminate = 3;
 
 // WARNING: Don't do this! This won't work
 //   Duration duration{ std::chrono::milliseconds{ 200 } };
@@ -31,12 +35,10 @@ Pane::Pane(IPaneContent content, const bool lastFocused) :
     _lastActive{ lastFocused }
 {
     _setPaneContent(std::move(content));
-    _root.Children().Append(_borderFirst);
-
-    const auto& control{ _content.GetRoot() };
-    _borderFirst.Child(control);
+    _AttachLeafVisual();
 
     // Register an event with the control to have it inform us when it gains focus.
+    const auto& control{ _content.GetRoot() };
     if (control)
     {
         _gotFocusRevoker = control.GotFocus(winrt::auto_revoke, { this, &Pane::_ContentGotFocusHandler });
@@ -1150,6 +1152,25 @@ void Pane::SetActive()
     UpdateVisuals();
 }
 
+void Pane::SetPaneHeadersVisible(const bool visible)
+{
+    _paneHeadersVisible = visible;
+    if (_IsLeaf())
+    {
+        if (_paneHeader && _paneHeaderRow)
+        {
+            _paneHeader.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
+            _paneHeaderRow.Height(GridLengthHelper::FromValueAndType(
+                visible ? PaneHeaderHeight : 0.0,
+                GridUnitType::Pixel));
+            _UpdatePaneHeader();
+        }
+        return;
+    }
+    _firstChild->SetPaneHeadersVisible(visible);
+    _secondChild->SetPaneHeadersVisible(visible);
+}
+
 // Method Description:
 // - Returns nullptr if no children of this pane were the last control to be
 //   focused, or the profile of the last control to be focused (if there was
@@ -1228,6 +1249,11 @@ void Pane::UpdateVisuals()
     const auto& brush{ _ComputeBorderColor() };
     _borderFirst.BorderBrush(brush);
     _borderSecond.BorderBrush(brush);
+    if (_paneHeader)
+    {
+        _paneHeader.Background(brush);
+        _UpdatePaneHeader();
+    }
 }
 
 // Method Description:
@@ -1449,16 +1475,14 @@ void Pane::_CloseChild(const bool closeFirst)
         _root.ColumnDefinitions().Clear();
         _root.RowDefinitions().Clear();
 
-        // Reattach the TermControl to our grid.
-        _root.Children().Append(_borderFirst);
         const auto& control{ _content.GetRoot() };
-        _borderFirst.Child(control);
 
         // Make sure to set our _splitState before focusing the control. If you
         // fail to do this, when the tab handles the GotFocus event and asks us
         // what our active control is, we won't technically be a "leaf", and
         // GetTerminalControl will return null.
         _splitState = SplitState::None;
+        _AttachLeafVisual();
 
         // re-attach our handler for the control's GotFocus event.
         if (control)
@@ -1732,6 +1756,13 @@ void Pane::_SetupChildCloseHandlers()
 IPaneContent Pane::_takePaneContent()
 {
     _closeRequestedRevoker.revoke();
+    _paneTitleChangedRevoker.revoke();
+    _paneTaskbarProgressChangedRevoker.revoke();
+    _paneReadOnlyChangedRevoker.revoke();
+    if (_contentHost)
+    {
+        _contentHost.Child(nullptr);
+    }
     return std::move(_content);
 }
 
@@ -1751,7 +1782,206 @@ void Pane::_setPaneContent(IPaneContent content)
     {
         _content = std::move(content);
         _closeRequestedRevoker = _content.CloseRequested(winrt::auto_revoke, [this](auto&&, auto&&) { Close(); });
+        _paneTitleChangedRevoker = _content.TitleChanged(
+            winrt::auto_revoke,
+            [this](auto&&, auto&&) { _UpdatePaneHeader(); });
+        _paneTaskbarProgressChangedRevoker = _content.TaskbarProgressChanged(
+            winrt::auto_revoke,
+            [this](auto&&, auto&&) { _UpdatePaneHeader(); });
+        _paneReadOnlyChangedRevoker = _content.ReadOnlyChanged(
+            winrt::auto_revoke,
+            [this](auto&&, auto&&) { _UpdatePaneHeader(); });
     }
+}
+
+void Pane::_AttachLeafVisual()
+{
+    _root.Children().Clear();
+    _borderFirst.Child(nullptr);
+
+    _leafLayout = Controls::Grid{};
+    _paneHeader = Controls::Grid{};
+    _contentHost = Controls::Border{};
+    _paneGrip = Controls::Button{};
+    _paneOverflow = Controls::Button{};
+    _paneTitle = Controls::TextBlock{};
+    _paneStatus = Controls::TextBlock{};
+    _paneHeaderRow = Controls::RowDefinition{};
+
+    _paneHeaderRow.Height(GridLengthHelper::FromValueAndType(
+        _paneHeadersVisible ? PaneHeaderHeight : 0.0,
+        GridUnitType::Pixel));
+    auto contentRow = Controls::RowDefinition{};
+    contentRow.Height(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
+    _leafLayout.RowDefinitions().Append(_paneHeaderRow);
+    _leafLayout.RowDefinitions().Append(contentRow);
+
+    auto gripColumn = Controls::ColumnDefinition{};
+    gripColumn.Width(GridLengthHelper::FromValueAndType(PaneHeaderButtonWidth, GridUnitType::Pixel));
+    auto titleColumn = Controls::ColumnDefinition{};
+    titleColumn.Width(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
+    auto statusColumn = Controls::ColumnDefinition{};
+    statusColumn.Width(GridLengthHelper::Auto());
+    auto overflowColumn = Controls::ColumnDefinition{};
+    overflowColumn.Width(GridLengthHelper::FromValueAndType(PaneHeaderButtonWidth, GridUnitType::Pixel));
+    _paneHeader.ColumnDefinitions().Append(gripColumn);
+    _paneHeader.ColumnDefinitions().Append(titleColumn);
+    _paneHeader.ColumnDefinitions().Append(statusColumn);
+    _paneHeader.ColumnDefinitions().Append(overflowColumn);
+
+    Controls::FontIcon gripIcon{};
+    gripIcon.Glyph(L"\u2807");
+    _paneGrip.Content(gripIcon);
+    _paneGrip.Width(PaneHeaderButtonWidth);
+    _paneGrip.Height(PaneHeaderHeight);
+    _paneGrip.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
+    Automation::AutomationProperties::SetHelpText(
+        _paneGrip,
+        L"Drag to move this pane. Use Start Pane Move Mode for keyboard docking.");
+
+    _paneTitle.VerticalAlignment(VerticalAlignment::Center);
+    _paneTitle.TextTrimming(TextTrimming::CharacterEllipsis);
+    _paneTitle.Margin(ThicknessHelper::FromLengths(4, 0, 4, 0));
+
+    _paneStatus.VerticalAlignment(VerticalAlignment::Center);
+    _paneStatus.Margin(ThicknessHelper::FromLengths(4, 0, 4, 0));
+
+    Controls::FontIcon overflowIcon{};
+    overflowIcon.Glyph(L"\xE712");
+    _paneOverflow.Content(overflowIcon);
+    _paneOverflow.Width(PaneHeaderButtonWidth);
+    _paneOverflow.Height(PaneHeaderHeight);
+    _paneOverflow.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
+    Automation::AutomationProperties::SetName(_paneOverflow, L"Open pane menu");
+
+    Controls::Grid::SetColumn(_paneGrip, 0);
+    Controls::Grid::SetColumn(_paneTitle, 1);
+    Controls::Grid::SetColumn(_paneStatus, 2);
+    Controls::Grid::SetColumn(_paneOverflow, 3);
+    _paneHeader.Children().Append(_paneGrip);
+    _paneHeader.Children().Append(_paneTitle);
+    _paneHeader.Children().Append(_paneStatus);
+    _paneHeader.Children().Append(_paneOverflow);
+    _paneHeader.Visibility(_paneHeadersVisible ? Visibility::Visible : Visibility::Collapsed);
+
+    Controls::Grid::SetRow(_paneHeader, 0);
+    Controls::Grid::SetRow(_contentHost, 1);
+    _leafLayout.Children().Append(_paneHeader);
+    _leafLayout.Children().Append(_contentHost);
+    _contentHost.Child(_content.GetRoot());
+
+    if (const auto terminal = GetTerminalControl())
+    {
+        const auto paneMenu = terminal.ContextMenu();
+        _paneHeader.ContextFlyout(paneMenu);
+        _paneGrip.ContextFlyout(paneMenu);
+        _paneOverflow.Flyout(paneMenu);
+    }
+
+    _paneHeader.PointerPressed([this](auto&&, auto&&) { _Focus(); });
+    _paneHeader.Tapped([this](auto&&, auto&&) { _Focus(); });
+    _paneHeader.RightTapped([this](auto&&, auto&&) { _Focus(); });
+    _paneOverflow.Click([this](auto&&, auto&&) { _Focus(); });
+    _borderFirst.Child(_leafLayout);
+    _root.Children().Append(_borderFirst);
+    _UpdatePaneHeader();
+}
+
+void Pane::_UpdatePaneHeader()
+{
+    if (!_paneHeader || !_paneTitle || !_paneGrip || !_paneStatus)
+    {
+        return;
+    }
+    const auto title = _PaneHeaderTitle();
+    const auto accessibleTitle = _PaneHeaderAccessibleTitle();
+    _paneTitle.Text(title);
+    std::wstring status;
+    if (_lastActive)
+    {
+        status = L"Active";
+    }
+    if (_content && _content.ReadOnly())
+    {
+        if (!status.empty())
+        {
+            status += L" · ";
+        }
+        status += L"Read-only";
+    }
+    switch (_content ? _content.TaskbarState() : 0)
+    {
+    case PaneTaskbarStateError:
+        if (!status.empty())
+        {
+            status += L" · ";
+        }
+        status += L"Error";
+        break;
+    case PaneTaskbarStateIndeterminate:
+        if (!status.empty())
+        {
+            status += L" · ";
+        }
+        status += L"Running";
+        break;
+    default:
+        break;
+    }
+    _paneStatus.Text(winrt::hstring{ status });
+    auto headerName = std::wstring{ accessibleTitle.c_str() };
+    headerName += L" pane";
+    auto gripName = std::wstring{ L"Move " };
+    gripName += accessibleTitle.c_str();
+    gripName += L" pane";
+    Automation::AutomationProperties::SetName(_paneHeader, winrt::hstring{ headerName });
+    Automation::AutomationProperties::SetName(_paneGrip, winrt::hstring{ gripName });
+    const auto accessibleStatus = status.empty() ?
+                                      std::wstring{ _lastActive ? L"Focused pane" : L"Unfocused pane" } :
+                                      status;
+    Automation::AutomationProperties::SetName(_paneStatus, winrt::hstring{ accessibleStatus });
+}
+
+winrt::hstring Pane::_PaneHeaderTitle() const
+{
+    auto title = std::wstring{ _PaneHeaderAccessibleTitle().c_str() };
+    constexpr size_t MaximumPaneHeaderTitleLength = 80;
+    if (title.size() > MaximumPaneHeaderTitleLength)
+    {
+        title.resize(MaximumPaneHeaderTitleLength - 3);
+        title += L"...";
+    }
+    return title;
+}
+
+winrt::hstring Pane::_PaneHeaderAccessibleTitle() const
+{
+    std::wstring title;
+    if (_content)
+    {
+        title = _content.Title().c_str();
+    }
+    if (title.empty())
+    {
+        if (const auto profile = GetProfile())
+        {
+            title = profile.Name().c_str();
+        }
+    }
+    if (title.empty())
+    {
+        title = L"Terminal";
+    }
+    const auto pathSeparator = title.find_last_of(L"\\/");
+    const auto looksLikePath =
+        (title.size() > 2 && title[1] == L':' &&
+         (title[2] == L'\\' || title[2] == L'/')) ||
+        (!title.empty() && (title.front() == L'\\' || title.front() == L'/'));
+    if (looksLikePath && pathSeparator != std::wstring::npos && pathSeparator + 1 < title.size())
+    {
+        title = title.substr(pathSeparator + 1);
+    }
+    return title;
 }
 
 // Method Description:
@@ -2652,8 +2882,13 @@ Pane::SnapSizeResult Pane::_CalcSnappedDimension(const bool widthOrHeight, const
             return { minDimension, minDimension };
         }
 
-        auto lower = snappable.SnapDownToGrid(widthOrHeight ? PaneSnapDirection::Width : PaneSnapDirection::Height,
-                                              dimension);
+        const auto headerHeight = !widthOrHeight && _paneHeadersVisible ?
+                                      static_cast<float>(PaneHeaderHeight) :
+                                      0.0f;
+        const auto contentDimension = std::max(0.0f, dimension - headerHeight);
+        auto lower = snappable.SnapDownToGrid(
+            widthOrHeight ? PaneSnapDirection::Width : PaneSnapDirection::Height,
+            contentDimension);
 
         if (direction == PaneSnapDirection::Width)
         {
@@ -2664,6 +2899,7 @@ Pane::SnapSizeResult Pane::_CalcSnappedDimension(const bool widthOrHeight, const
         {
             lower += WI_IsFlagSet(_borders, Borders::Top) ? PaneBorderSize : 0;
             lower += WI_IsFlagSet(_borders, Borders::Bottom) ? PaneBorderSize : 0;
+            lower += headerHeight;
         }
 
         if (lower == dimension)
@@ -2863,6 +3099,7 @@ Size Pane::_GetMinSize() const
         newWidth += WI_IsFlagSet(_borders, Borders::Right) ? PaneBorderSize : 0;
         newHeight += WI_IsFlagSet(_borders, Borders::Top) ? PaneBorderSize : 0;
         newHeight += WI_IsFlagSet(_borders, Borders::Bottom) ? PaneBorderSize : 0;
+        newHeight += _paneHeadersVisible ? static_cast<float>(PaneHeaderHeight) : 0.0f;
 
         return { newWidth, newHeight };
     }

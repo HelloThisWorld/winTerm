@@ -283,6 +283,31 @@ namespace winrt::TerminalApp::implementation
             const auto& duplicateFromTab{ realArgs.SplitMode() == SplitType::Duplicate ? _GetFocusedTab() : nullptr };
 
             const auto& activeTab{ _senderOrFocusedTab(sender) };
+            if (activeTab)
+            {
+                const auto availableSpace = winrt::Windows::Foundation::Size{
+                    static_cast<float>(_tabContent.ActualWidth()),
+                    static_cast<float>(_tabContent.ActualHeight()),
+                };
+                if (!activeTab->PreCalculateCanSplit(
+                        realArgs.SplitDirection(),
+                        realArgs.SplitSize(),
+                        availableSpace))
+                {
+                    // Validate before _MakePane so an impossible split never
+                    // starts a shell session that must immediately be discarded.
+                    if (auto autoPeer = Automation::Peers::FrameworkElementAutomationPeer::FromElement(*this))
+                    {
+                        autoPeer.RaiseNotificationEvent(
+                            Automation::Peers::AutomationNotificationKind::ActionAborted,
+                            Automation::Peers::AutomationNotificationProcessing::ImportantMostRecent,
+                            RS_(L"SplitPaneUnavailableText"),
+                            L"TerminalPageSplitPaneUnavailable");
+                    }
+                    args.Handled(true);
+                    return;
+                }
+            }
 
             _SplitPane(activeTab,
                        realArgs.SplitDirection(),

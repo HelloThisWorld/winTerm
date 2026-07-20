@@ -97,6 +97,7 @@ public:
     void UpdateVisuals();
     void ClearActive();
     void SetActive();
+    void SetPaneHeadersVisible(bool visible);
 
     struct BuildStartupState
     {
@@ -234,6 +235,14 @@ private:
     winrt::Windows::UI::Xaml::Controls::Grid _root{};
     winrt::Windows::UI::Xaml::Controls::Border _borderFirst{};
     winrt::Windows::UI::Xaml::Controls::Border _borderSecond{};
+    winrt::Windows::UI::Xaml::Controls::Grid _leafLayout{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Grid _paneHeader{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _contentHost{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Button _paneGrip{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Button _paneOverflow{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::TextBlock _paneTitle{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::TextBlock _paneStatus{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::RowDefinition _paneHeaderRow{ nullptr };
 
     PaneResources _themeResources;
 
@@ -255,17 +264,25 @@ private:
     winrt::Windows::UI::Xaml::UIElement::GotFocus_revoker _gotFocusRevoker;
     winrt::Windows::UI::Xaml::UIElement::LostFocus_revoker _lostFocusRevoker;
     winrt::TerminalApp::IPaneContent::CloseRequested_revoker _closeRequestedRevoker;
+    winrt::TerminalApp::IPaneContent::TitleChanged_revoker _paneTitleChangedRevoker;
+    winrt::TerminalApp::IPaneContent::TaskbarProgressChanged_revoker _paneTaskbarProgressChangedRevoker;
+    winrt::TerminalApp::IPaneContent::ReadOnlyChanged_revoker _paneReadOnlyChangedRevoker;
 
     Borders _borders{ Borders::None };
 
     bool _zoomed{ false };
     bool _broadcastEnabled{ false };
+    bool _paneHeadersVisible{ false };
 
     bool _IsLeaf() const noexcept;
     bool _HasFocusedChild() const noexcept;
     void _SetupChildCloseHandlers();
     winrt::TerminalApp::IPaneContent _takePaneContent();
     void _setPaneContent(winrt::TerminalApp::IPaneContent content);
+    void _AttachLeafVisual();
+    void _UpdatePaneHeader();
+    winrt::hstring _PaneHeaderTitle() const;
+    winrt::hstring _PaneHeaderAccessibleTitle() const;
     bool _HasChild(const std::shared_ptr<Pane> child);
     winrt::TerminalApp::TerminalPaneContent _getTerminalContent() const;
 
