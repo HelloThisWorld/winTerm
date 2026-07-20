@@ -294,6 +294,37 @@ DockingPlan LayoutTransformer::BuildProposedLayout(
         plan.invalidReason = capabilities.DisabledReason(plan.source, plan.target, zone, sameProcess);
         return plan;
     }
+    const auto sameTabMove =
+        plan.source.type == DockSourceType::Pane &&
+        plan.source.paneId &&
+        !plan.source.tabId.empty() &&
+        plan.target.tabId &&
+        plan.source.windowId == plan.target.windowId &&
+        plan.source.tabId == *plan.target.tabId &&
+        plan.target.nodeId &&
+        (plan.target.type == DockTargetType::Pane ||
+         plan.target.type == DockTargetType::EmptySlot) &&
+        zone != DockZone::Center;
+    if (sameTabMove)
+    {
+        const auto transformed = MoveWithin(
+            targetLayout,
+            *plan.source.paneId,
+            *plan.target.nodeId,
+            zone,
+            std::move(emptySlotId),
+            {},
+            settings);
+        if (!transformed.Succeeded())
+        {
+            plan.invalidReason = transformed.error;
+            return plan;
+        }
+        plan.proposedSourceLayout = LayoutTree::Clone(transformed.root);
+        plan.proposedTargetLayout = LayoutTree::Clone(transformed.root);
+        plan.status = DockingStatus::Ready;
+        return plan;
+    }
     if (plan.target.type == DockTargetType::TabStrip ||
         plan.target.type == DockTargetType::NewWindow ||
         zone == DockZone::Center)
