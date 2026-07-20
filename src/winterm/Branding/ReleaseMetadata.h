@@ -24,8 +24,8 @@
 
 namespace winTerm::Branding
 {
-    inline constexpr std::wstring_view ApplicationVersion{ L"1.0.2" };
-    inline constexpr std::wstring_view ReleaseChannel{ L"Stable" };
+    inline constexpr std::wstring_view ApplicationVersion{ L"0.7.0-beta.1" };
+    inline constexpr std::wstring_view ReleaseChannel{ L"Beta" };
     inline constexpr std::wstring_view CommitSha{ WINTERM_BUILD_COMMIT_SHA };
     inline constexpr std::wstring_view BuildTimestamp{ WINTERM_BUILD_TIMESTAMP };
     inline constexpr std::wstring_view WorkflowRunId{ WINTERM_BUILD_WORKFLOW_RUN_ID };

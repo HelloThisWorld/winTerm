@@ -4,8 +4,8 @@
   <PropertyGroup Label="Version">
     <XesUseOneStoreVersioning>true</XesUseOneStoreVersioning>
     <XesBaseYearForStoreVersion>2026</XesBaseYearForStoreVersion>
-    <VersionMajor>1</VersionMajor>
-    <VersionMinor>0</VersionMinor>
+    <VersionMajor>0</VersionMajor>
+    <VersionMinor>7</VersionMinor>
     <VersionInfoProductName Condition="'$(WindowsTerminalBranding)'=='WinTerm'">winTerm</VersionInfoProductName>
     <VersionInfoProductName Condition="'$(VersionInfoProductName)'==''">Windows Terminal</VersionInfoProductName>
     <VersionInfoCulture>1033</VersionInfoCulture>
