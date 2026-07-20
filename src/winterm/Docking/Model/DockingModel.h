@@ -44,6 +44,9 @@ namespace winTerm::Docking
     enum class DockOperation
     {
         Move,
+        Split,
+        MoveToNewTab,
+        MoveToNewWindow,
     };
 
     enum class DockingStatus
