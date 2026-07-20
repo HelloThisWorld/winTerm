@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "../../PaneControls/PaneHeaderSettings.h"
+
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -45,6 +47,8 @@ namespace winTerm::Settings
         bool enableKeyboardDockingMode{ true };
         bool showZoneLabels{ true };
         bool useHighContrastOverlay{ false };
+
+        PaneControls::PaneHeaderSettings paneControls;
 
         // The UI adapter must opt in only after runtime build and rollback verification.
         bool enableRuntimeDocking{ false };
