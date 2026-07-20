@@ -193,19 +193,34 @@
     <value>Split pane</value>
   </data>
   <data name="SplitPaneToolTipText" xml:space="preserve">
-    <value>Right click for split directions - right/down/up/left</value>
+    <value>Choose a direction and profile for the focused pane</value>
+  </data>
+  <data name="SplitPaneUnavailableText" xml:space="preserve">
+    <value>The focused pane is too small to split in this direction.</value>
   </data>
   <data name="SplitPaneDownText" xml:space="preserve">
-    <value>Split pane down</value>
+    <value>Bottom</value>
   </data>
   <data name="SplitPaneRightText" xml:space="preserve">
-    <value>Split pane right</value>
+    <value>Right</value>
   </data>
   <data name="SplitPaneUpText" xml:space="preserve">
-    <value>Split pane up</value>
+    <value>Top</value>
   </data>
   <data name="SplitPaneLeftText" xml:space="preserve">
-    <value>Split pane left</value>
+    <value>Left</value>
+  </data>
+  <data name="MovePaneText" xml:space="preserve">
+    <value>Move</value>
+  </data>
+  <data name="MovePaneToNewTabText" xml:space="preserve">
+    <value>Move to New Tab</value>
+  </data>
+  <data name="MovePaneToNewWindowText" xml:space="preserve">
+    <value>Move to New Window</value>
+  </data>
+  <data name="MovePaneToNewWindowDisabledText" xml:space="preserve">
+    <value>Live pane transfer to a new window is unavailable until the transactional runtime adapter is verified.</value>
   </data>
   <data name="SplitPaneDuplicateText" xml:space="preserve">
     <value>Duplicate</value>

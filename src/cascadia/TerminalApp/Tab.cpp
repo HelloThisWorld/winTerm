@@ -78,6 +78,7 @@ namespace winrt::TerminalApp::implementation
     // - <none>
     void Tab::_Setup()
     {
+        _rootPane->SetPaneHeadersVisible(_rootPane->GetLeafPaneCount() >= 2);
         _rootClosedToken = _rootPane->Closed([=](auto&& /*s*/, auto&& /*e*/) {
             Closed.raise(nullptr, nullptr);
         });
@@ -642,6 +643,7 @@ namespace winrt::TerminalApp::implementation
         // either the first or second child, but this will always return the
         // original pane first.
         auto [original, newPane] = _activePane->Split(splitType, splitSize, pane);
+        _rootPane->SetPaneHeadersVisible(true);
 
         // After split, Close Pane Menu Item should be visible
         _closePaneMenuItem.Visibility(WUX::Visibility::Visible);
@@ -688,6 +690,7 @@ namespace winrt::TerminalApp::implementation
         // Attempt to remove the active pane from the tree
         if (const auto pane = _rootPane->DetachPane(_activePane))
         {
+            _rootPane->SetPaneHeadersVisible(_rootPane->GetLeafPaneCount() >= 2);
             // Just make sure that the remaining pane is marked active
             _UpdateActivePane(_rootPane->GetActivePane());
 
@@ -771,6 +774,7 @@ namespace winrt::TerminalApp::implementation
         // Make sure that we have the right pane set as the active pane
         if (const auto focus = pane->GetActivePane())
         {
+            _rootPane->SetPaneHeadersVisible(true);
             _UpdateActivePane(focus);
         }
     }
@@ -1321,7 +1325,9 @@ namespace winrt::TerminalApp::implementation
             _mruPanes.insert(_mruPanes.begin(), paneId.value());
         }
 
-        if (_rootPane->GetLeafPaneCount() == 1)
+        const auto paneCount = _rootPane->GetLeafPaneCount();
+        _rootPane->SetPaneHeadersVisible(paneCount >= 2);
+        if (paneCount == 1)
         {
             _closePaneMenuItem.Visibility(WUX::Visibility::Collapsed);
         }

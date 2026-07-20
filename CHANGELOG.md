@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.0-beta.1 - Unreleased
+
+### Added
+
+- Directed split planning for Top, Bottom, Left, and Right relative to the focused pane.
+- Compact pane-header, drag-handle, capability-aware pane-menu, and Snap-layout presentation models.
+- Transaction-ready Move Pane to New Tab and Move Pane to New Window plans that retain the existing pane and session identity.
+- Keyboard pane-move target cycling, accessible announcements, and configurable pane-control settings.
+- Unit and source-boundary coverage for directed splits, pane menus, pane headers, handle input isolation, drag previews, moves, and keyboard movement.
+
+### Changed
+
+- Development metadata now identifies `0.7.0-beta.1`; the numeric MSIX version is `0.7.0.1`.
+- Same-tab pane dragging now uses the existing `LayoutTransformer` to remove, normalize, and reinsert the pane relative to the selected target.
+- Pane movement previews are derived from the proposed layout and must validate before a drop can be requested.
+
+### Release status
+
+- The existing Stable workflow remains isolated from this Beta tag.
+- No `v0.7.0-beta.1` tag or Beta Release is created until the v0.7 acceptance report is complete.
+- No new Stable Release is produced from this development branch.
+
 ## 1.0.2 - Stable
 
 ### Fixed

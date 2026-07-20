@@ -11,6 +11,8 @@
 #include <til/unicode.h>
 #include <Utils.h>
 
+#include <limits>
+
 #include "../../types/inc/ColorFix.hpp"
 #include "../../types/inc/utils.hpp"
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
@@ -956,6 +958,74 @@ namespace winrt::TerminalApp::implementation
         for (const auto& item : items)
         {
             newTabFlyout.Items().Append(item);
+        }
+
+        // Directed split is explicit at this common entry point. Each
+        // direction retains the complete active-profile selection.
+        if (_settings.ActiveProfiles().Size() > 0)
+        {
+            auto splitPaneItem = WUX::Controls::MenuFlyoutSubItem{};
+            splitPaneItem.Text(RS_(L"SplitPaneText"));
+            WUX::Controls::FontIcon splitIcon{};
+            splitIcon.Glyph(L"\xF246");
+            splitIcon.FontFamily(Media::FontFamily{ L"Segoe Fluent Icons, Segoe MDL2 Assets" });
+            splitPaneItem.Icon(splitIcon);
+
+            const std::array directions{
+                std::pair{ SplitDirection::Up, RS_(L"SplitPaneUpText") },
+                std::pair{ SplitDirection::Down, RS_(L"SplitPaneDownText") },
+                std::pair{ SplitDirection::Left, RS_(L"SplitPaneLeftText") },
+                std::pair{ SplitDirection::Right, RS_(L"SplitPaneRightText") },
+            };
+            for (const auto& [direction, directionText] : directions)
+            {
+                auto directionItem = WUX::Controls::MenuFlyoutSubItem{};
+                directionItem.Text(directionText);
+                Automation::AutomationProperties::SetName(directionItem, directionText);
+                if (const auto activeTab = _GetFocusedTabImpl())
+                {
+                    const auto availableSpace = winrt::Windows::Foundation::Size{
+                        static_cast<float>(_tabContent.ActualWidth()),
+                        static_cast<float>(_tabContent.ActualHeight()),
+                    };
+                    if (!activeTab->PreCalculateCanSplit(direction, .5f, availableSpace))
+                    {
+                        const auto reason = RS_(L"SplitPaneUnavailableText");
+                        directionItem.IsEnabled(false);
+                        WUX::Controls::ToolTipService::SetToolTip(directionItem, box_value(reason));
+                        Automation::AutomationProperties::SetHelpText(directionItem, reason);
+                    }
+                }
+
+                for (const auto& profile : _settings.ActiveProfiles())
+                {
+                    auto profileItem = WUX::Controls::MenuFlyoutItem{};
+                    profileItem.Text(profile.Name());
+                    if (!profile.Icon().Resolved().empty())
+                    {
+                        profileItem.Icon(_CreateNewTabFlyoutIcon(profile.Icon().Resolved()));
+                    }
+                    Automation::AutomationProperties::SetName(
+                        profileItem,
+                        fmt::format(FMT_COMPILE(L"{}, {}"), directionText, profile.Name()));
+
+                    NewTerminalArgs terminalArgs{};
+                    terminalArgs.Profile(profile.Name());
+                    const auto action = ActionAndArgs{
+                        ShortcutAction::SplitPane,
+                        SplitPaneArgs{ SplitType::Manual, direction, .5f, terminalArgs },
+                    };
+                    profileItem.Click([weakThis{ get_weak() }, action](auto&&, auto&&) {
+                        if (const auto page = weakThis.get())
+                        {
+                            page->_actionDispatch->DoAction(action);
+                        }
+                    });
+                    directionItem.Items().Append(profileItem);
+                }
+                splitPaneItem.Items().Append(directionItem);
+            }
+            newTabFlyout.Items().Append(splitPaneItem);
         }
 
         // add menu separator
@@ -5382,6 +5452,7 @@ namespace winrt::TerminalApp::implementation
             button.Label(label);
             button.Click(makeCallback(action));
             targetMenu.SecondaryCommands().Append(button);
+            return button;
         };
 
         auto makeMenuItem = [](const winrt::hstring& label,
@@ -5400,28 +5471,7 @@ namespace winrt::TerminalApp::implementation
             button.Label(label);
             button.Flyout(subMenu);
             targetMenu.SecondaryCommands().Append(button);
-        };
-
-        auto makeContextItem = [&makeCallback](const winrt::hstring& label,
-                                               const winrt::hstring& icon,
-                                               const winrt::hstring& tooltip,
-                                               const auto& action,
-                                               const auto& subMenu,
-                                               auto& targetMenu) {
-            AppBarButton button{};
-
-            if (!icon.empty())
-            {
-                auto iconElement = UI::IconPathConverter::IconWUX(icon);
-                Automation::AutomationProperties::SetAccessibilityView(iconElement, Automation::Peers::AccessibilityView::Raw);
-                button.Icon(iconElement);
-            }
-
-            button.Label(label);
-            button.Click(makeCallback(action));
-            WUX::Controls::ToolTipService::SetToolTip(button, box_value(tooltip));
-            button.ContextFlyout(subMenu);
-            targetMenu.SecondaryCommands().Append(button);
+            return button;
         };
 
         const auto focusedProfile = _GetFocusedTabImpl()->GetFocusedProfile();
@@ -5445,37 +5495,58 @@ namespace winrt::TerminalApp::implementation
         const auto splitPaneDownText = RS_(L"SplitPaneDownText");
         const auto splitPaneUpText = RS_(L"SplitPaneUpText");
         const auto splitPaneLeftText = RS_(L"SplitPaneLeftText");
-        const auto splitPaneToolTipText = RS_(L"SplitPaneToolTipText");
-
-        MUX::Controls::CommandBarFlyout splitPaneContextMenu{};
-        makeItem(splitPaneRightText, focusedProfileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Duplicate, SplitDirection::Right, .5, nullptr } }, splitPaneContextMenu);
-        makeItem(splitPaneDownText, focusedProfileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Duplicate, SplitDirection::Down, .5, nullptr } }, splitPaneContextMenu);
-        makeItem(splitPaneUpText, focusedProfileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Duplicate, SplitDirection::Up, .5, nullptr } }, splitPaneContextMenu);
-        makeItem(splitPaneLeftText, focusedProfileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Duplicate, SplitDirection::Left, .5, nullptr } }, splitPaneContextMenu);
-
-        makeContextItem(splitPaneDuplicateText, focusedProfileIcon, splitPaneToolTipText, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Duplicate, SplitDirection::Automatic, .5, nullptr } }, splitPaneContextMenu, splitPaneMenu);
-
-        // add menu separator
-        const auto separatorAutoItem = AppBarSeparator{};
-
-        splitPaneMenu.SecondaryCommands().Append(separatorAutoItem);
-
-        for (auto profileIndex = 0; profileIndex < activeProfileCount; profileIndex++)
+        const std::array splitDirections{
+            std::pair{ SplitDirection::Up, splitPaneUpText },
+            std::pair{ SplitDirection::Down, splitPaneDownText },
+            std::pair{ SplitDirection::Left, splitPaneLeftText },
+            std::pair{ SplitDirection::Right, splitPaneRightText },
+        };
+        for (const auto& [direction, directionText] : splitDirections)
         {
-            const auto profile = activeProfiles.GetAt(profileIndex);
-            const auto profileName = profile.Name();
-            const auto profileIcon = profile.Icon().Resolved();
+            MUX::Controls::CommandBarFlyout profileMenu{};
+            makeItem(
+                splitPaneDuplicateText,
+                focusedProfileIcon,
+                ActionAndArgs{
+                    ShortcutAction::SplitPane,
+                    SplitPaneArgs{ SplitType::Duplicate, direction, .5, nullptr },
+                },
+                profileMenu);
+            profileMenu.SecondaryCommands().Append(AppBarSeparator{});
 
-            NewTerminalArgs args{};
-            args.Profile(profileName);
-
-            MUX::Controls::CommandBarFlyout splitPaneContextMenu{};
-            makeItem(splitPaneRightText, profileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Manual, SplitDirection::Right, .5, args } }, splitPaneContextMenu);
-            makeItem(splitPaneDownText, profileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Manual, SplitDirection::Down, .5, args } }, splitPaneContextMenu);
-            makeItem(splitPaneUpText, profileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Manual, SplitDirection::Up, .5, args } }, splitPaneContextMenu);
-            makeItem(splitPaneLeftText, profileIcon, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Manual, SplitDirection::Left, .5, args } }, splitPaneContextMenu);
-
-            makeContextItem(profileName, profileIcon, splitPaneToolTipText, ActionAndArgs{ ShortcutAction::SplitPane, SplitPaneArgs{ SplitType::Manual, SplitDirection::Automatic, .5, args } }, splitPaneContextMenu, splitPaneMenu);
+            for (auto profileIndex = 0; profileIndex < activeProfileCount; profileIndex++)
+            {
+                const auto profile = activeProfiles.GetAt(profileIndex);
+                const auto profileName = profile.Name();
+                const auto profileIcon = profile.Icon().Resolved();
+                NewTerminalArgs terminalArgs{};
+                terminalArgs.Profile(profileName);
+                makeItem(
+                    profileName,
+                    profileIcon,
+                    ActionAndArgs{
+                        ShortcutAction::SplitPane,
+                        SplitPaneArgs{ SplitType::Manual, direction, .5, terminalArgs },
+                    },
+                    profileMenu);
+            }
+            const auto directionItem = makeMenuItem(
+                directionText,
+                winrt::hstring{},
+                profileMenu,
+                splitPaneMenu);
+            const auto activeTab = _GetFocusedTabImpl();
+            const auto availableSpace = winrt::Windows::Foundation::Size{
+                static_cast<float>(_tabContent.ActualWidth()),
+                static_cast<float>(_tabContent.ActualHeight()),
+            };
+            if (!activeTab || !activeTab->PreCalculateCanSplit(direction, .5f, availableSpace))
+            {
+                const auto reason = RS_(L"SplitPaneUnavailableText");
+                directionItem.IsEnabled(false);
+                WUX::Controls::ToolTipService::SetToolTip(directionItem, box_value(reason));
+                Automation::AutomationProperties::SetHelpText(directionItem, reason);
+            }
         }
 
         makeMenuItem(RS_(L"SplitPaneText"), L"\xF246", splitPaneMenu, menu);
@@ -5483,6 +5554,29 @@ namespace winrt::TerminalApp::implementation
         // Only wire up "Close Pane" if there's multiple panes.
         if (_GetFocusedTabImpl()->GetLeafPaneCount() > 1)
         {
+            MUX::Controls::CommandBarFlyout movePaneMenu{};
+            makeItem(
+                RS_(L"MovePaneToNewTabText"),
+                L"\xE8A7",
+                ActionAndArgs{
+                    ShortcutAction::MovePane,
+                    MovePaneArgs{ std::numeric_limits<uint32_t>::max(), L"" },
+                },
+                movePaneMenu);
+            const auto moveToNewWindow = makeItem(
+                RS_(L"MovePaneToNewWindowText"),
+                L"\xE737",
+                ActionAndArgs{
+                    ShortcutAction::MovePane,
+                    MovePaneArgs{ 0, L"new" },
+                },
+                movePaneMenu);
+            const auto moveToNewWindowReason = RS_(L"MovePaneToNewWindowDisabledText");
+            moveToNewWindow.IsEnabled(false);
+            WUX::Controls::ToolTipService::SetToolTip(moveToNewWindow, box_value(moveToNewWindowReason));
+            Automation::AutomationProperties::SetHelpText(moveToNewWindow, moveToNewWindowReason);
+            makeMenuItem(RS_(L"MovePaneText"), L"\xE8AB", movePaneMenu, menu);
+
             MUX::Controls::CommandBarFlyout swapPaneMenu{};
             const auto rootPane = _GetFocusedTabImpl()->GetRootPane();
             const auto mruPanes = _GetFocusedTabImpl()->GetMruPanes();

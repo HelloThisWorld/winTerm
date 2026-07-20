@@ -48,27 +48,50 @@ bool KeyboardDockingController::Start(
     std::vector<DockZone> availableZones,
     const DockZone initialZone)
 {
+    KeyboardDockingTarget target;
+    target.id = "target";
+    target.name = std::move(targetName);
+    target.availableZones = std::move(availableZones);
+    return StartMoveMode(
+        std::move(sourceName),
+        { std::move(target) },
+        0,
+        initialZone);
+}
+
+bool KeyboardDockingController::StartMoveMode(
+    std::string sourceName,
+    std::vector<KeyboardDockingTarget> targets,
+    const size_t initialTarget,
+    const DockZone initialZone)
+{
     Reset();
-    if (sourceName.empty() || targetName.empty() || availableZones.empty())
+    if (sourceName.empty() || targets.empty() || initialTarget >= targets.size())
     {
         return false;
     }
-    std::sort(
-        availableZones.begin(),
-        availableZones.end(),
-        [](const auto first, const auto second) {
-            return static_cast<int>(first) < static_cast<int>(second);
-        });
-    availableZones.erase(std::unique(availableZones.begin(), availableZones.end()), availableZones.end());
+    for (auto& target : targets)
+    {
+        if (target.id.empty() || target.name.empty() || target.availableZones.empty())
+        {
+            Reset();
+            return false;
+        }
+        std::sort(
+            target.availableZones.begin(),
+            target.availableZones.end(),
+            [](const auto first, const auto second) {
+                return static_cast<int>(first) < static_cast<int>(second);
+            });
+        target.availableZones.erase(
+            std::unique(target.availableZones.begin(), target.availableZones.end()),
+            target.availableZones.end());
+    }
 
     _sourceName = std::move(sourceName);
-    _targetName = std::move(targetName);
-    _availableZones = std::move(availableZones);
+    _targets = std::move(targets);
     _state = KeyboardDockingState::SelectingZone;
-    if (!_select(initialZone))
-    {
-        _selectedZone = _availableZones.front();
-    }
+    _activateTarget(initialTarget, initialZone);
     return true;
 }
 
@@ -84,6 +107,8 @@ bool KeyboardDockingController::Handle(const DockingNavigationKey key)
     case DockingNavigationKey::Right: return _move(1, 0);
     case DockingNavigationKey::Up: return _move(0, -1);
     case DockingNavigationKey::Down: return _move(0, 1);
+    case DockingNavigationKey::Tab: return _changeTarget(1);
+    case DockingNavigationKey::ShiftTab: return _changeTarget(-1);
     case DockingNavigationKey::Enter:
         _state = KeyboardDockingState::CommitRequested;
         return true;
@@ -100,6 +125,8 @@ void KeyboardDockingController::Reset() noexcept
     _state = KeyboardDockingState::Inactive;
     _sourceName.clear();
     _targetName.clear();
+    _targets.clear();
+    _selectedTarget.reset();
     _availableZones.clear();
     _selectedZone.reset();
 }
@@ -112,6 +139,11 @@ KeyboardDockingState KeyboardDockingController::State() const noexcept
 std::optional<DockZone> KeyboardDockingController::SelectedZone() const noexcept
 {
     return _selectedZone;
+}
+
+std::optional<size_t> KeyboardDockingController::SelectedTarget() const noexcept
+{
+    return _selectedTarget;
 }
 
 std::string KeyboardDockingController::Announcement() const
@@ -133,11 +165,11 @@ std::string KeyboardDockingController::Announcement() const
                   std::string{ AccessibleZoneName(*_selectedZone) } + " of " + _targetName + ".";
     if (_state == KeyboardDockingState::CommitRequested)
     {
-        result += " Docking requested.";
+        result += " Move requested.";
     }
     else
     {
-        result += " Press Enter to dock. Press Escape to cancel.";
+        result += " Press Enter to move. Press Escape to cancel.";
     }
     return result;
 }
@@ -147,10 +179,10 @@ std::string_view KeyboardDockingController::AccessibleZoneName(const DockZone zo
     switch (zone)
     {
     case DockZone::Center: return "new tab area";
-    case DockZone::Left: return "left side";
-    case DockZone::Right: return "right side";
-    case DockZone::Top: return "top side";
-    case DockZone::Bottom: return "bottom side";
+    case DockZone::Left: return "left";
+    case DockZone::Right: return "right";
+    case DockZone::Top: return "top";
+    case DockZone::Bottom: return "bottom";
     case DockZone::TopLeft: return "top-left corner";
     case DockZone::TopRight: return "top-right corner";
     case DockZone::BottomLeft: return "bottom-left corner";
@@ -179,6 +211,13 @@ const std::vector<DockingCommandDescriptor>& KeyboardDockingController::Commands
         { "winTerm.dockPaneRight", "Dock pane right", DockZone::Right, DockSourceType::Pane },
         { "winTerm.dockPaneTop", "Dock pane top", DockZone::Top, DockSourceType::Pane },
         { "winTerm.dockPaneBottom", "Dock pane bottom", DockZone::Bottom, DockSourceType::Pane },
+        { "splitPaneTop", "Split pane top", DockZone::Top, DockSourceType::Pane },
+        { "splitPaneBottom", "Split pane bottom", DockZone::Bottom, DockSourceType::Pane },
+        { "splitPaneLeft", "Split pane left", DockZone::Left, DockSourceType::Pane },
+        { "splitPaneRight", "Split pane right", DockZone::Right, DockSourceType::Pane },
+        { "closeFocusedPane", "Close focused pane", std::nullopt, DockSourceType::Pane },
+        { "startPaneMoveMode", "Start pane move mode", std::nullopt, DockSourceType::Pane },
+        { "openPaneMenu", "Open pane menu", std::nullopt, DockSourceType::Pane },
         { "winTerm.undoLayoutChange", "Undo layout change", std::nullopt, DockSourceType::LayoutSubtree },
         { "winTerm.redoLayoutChange", "Redo layout change", std::nullopt, DockSourceType::LayoutSubtree },
     };
@@ -240,4 +279,31 @@ bool KeyboardDockingController::_select(const DockZone zone)
     }
     _selectedZone = zone;
     return true;
+}
+
+bool KeyboardDockingController::_changeTarget(const int delta)
+{
+    if (!_selectedTarget || _targets.size() < 2 || delta == 0)
+    {
+        return false;
+    }
+    const auto count = static_cast<int>(_targets.size());
+    const auto current = static_cast<int>(*_selectedTarget);
+    const auto next = static_cast<size_t>((current + delta + count) % count);
+    _activateTarget(next, _selectedZone.value_or(DockZone::Center));
+    return true;
+}
+
+void KeyboardDockingController::_activateTarget(
+    const size_t index,
+    const DockZone preferredZone)
+{
+    _selectedTarget = index;
+    _targetName = _targets[index].name;
+    _availableZones = _targets[index].availableZones;
+    _selectedZone.reset();
+    if (!_select(preferredZone))
+    {
+        _selectedZone = _availableZones.front();
+    }
 }

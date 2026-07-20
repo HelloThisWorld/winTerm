@@ -22,6 +22,7 @@ void DockingSettingsModel::Normalize() noexcept
     cornerWidthRatio = std::clamp(cornerWidthRatio, 0.2, 0.45);
     defaultSplitRatio = std::clamp(defaultSplitRatio, 0.2, 0.8);
     layoutHistorySize = std::clamp<size_t>(layoutHistorySize, 1, 100);
+    paneControls.Normalize();
 }
 
 std::vector<std::string> DockingSettingsModel::Validate() const
@@ -42,6 +43,12 @@ std::vector<std::string> DockingSettingsModel::Validate() const
     if (enableCornerDocking && !enableEmptyLayoutSlots)
     {
         errors.emplace_back("Corner docking requires empty layout slots.");
+    }
+    const auto paneControlErrors = paneControls.Validate();
+    errors.insert(errors.end(), paneControlErrors.begin(), paneControlErrors.end());
+    if (!paneControls.HasKeyboardAlternative(true, enableKeyboardDockingMode))
+    {
+        errors.emplace_back("Hidden pane headers require a keyboard or Command Palette alternative.");
     }
     return errors;
 }

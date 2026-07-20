@@ -127,6 +127,14 @@ LayoutTransactionResult LayoutTransactionCoordinator::Execute(LayoutTransactionR
         {
             Fail("The Workspace coordinator could not accept the layout change.");
         }
+        if (request.callbacks.recordHistory)
+        {
+            if (!request.callbacks.recordHistory(request.snapshot, request.plan))
+            {
+                Fail("The layout history could not record the committed change.");
+            }
+            result.state = LayoutTransactionState::HistoryRecorded;
+        }
 
         _invoke(request.callbacks.restoreFocus);
         _invoke(request.callbacks.closeOverlay);

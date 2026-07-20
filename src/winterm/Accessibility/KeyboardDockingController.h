@@ -26,8 +26,17 @@ namespace winTerm::Accessibility
         Right,
         Up,
         Down,
+        Tab,
+        ShiftTab,
         Enter,
         Escape,
+    };
+
+    struct KeyboardDockingTarget
+    {
+        std::string id;
+        std::string name;
+        std::vector<Docking::DockZone> availableZones;
     };
 
     struct DockingCommandDescriptor
@@ -46,11 +55,17 @@ namespace winTerm::Accessibility
             std::string targetName,
             std::vector<Docking::DockZone> availableZones,
             Docking::DockZone initialZone = Docking::DockZone::Center);
+        bool StartMoveMode(
+            std::string sourceName,
+            std::vector<KeyboardDockingTarget> targets,
+            size_t initialTarget = 0,
+            Docking::DockZone initialZone = Docking::DockZone::Center);
         bool Handle(DockingNavigationKey key);
         void Reset() noexcept;
 
         KeyboardDockingState State() const noexcept;
         std::optional<Docking::DockZone> SelectedZone() const noexcept;
+        std::optional<size_t> SelectedTarget() const noexcept;
         std::string Announcement() const;
 
         static std::string_view AccessibleZoneName(Docking::DockZone zone) noexcept;
@@ -59,10 +74,14 @@ namespace winTerm::Accessibility
     private:
         bool _move(int columnDelta, int rowDelta);
         bool _select(Docking::DockZone zone);
+        bool _changeTarget(int delta);
+        void _activateTarget(size_t index, Docking::DockZone preferredZone);
 
         KeyboardDockingState _state{ KeyboardDockingState::Inactive };
         std::string _sourceName;
         std::string _targetName;
+        std::vector<KeyboardDockingTarget> _targets;
+        std::optional<size_t> _selectedTarget;
         std::vector<Docking::DockZone> _availableZones;
         std::optional<Docking::DockZone> _selectedZone;
     };

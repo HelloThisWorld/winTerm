@@ -31,10 +31,35 @@ try
         'drag-tab-within-window',
         'drag-tab-to-another-window',
         'drag-tab-to-edge',
+        'split-pane-top',
+        'split-pane-bottom',
+        'split-pane-left',
+        'split-pane-right',
+        'split-focused-nested-pane',
+        'split-with-selected-profile',
+        'pane-header-automatic-visibility',
+        'pane-header-overflow-menu',
+        'pane-handle-context-menu',
+        'pane-handle-drag-top',
+        'pane-handle-drag-bottom',
+        'pane-handle-drag-left',
+        'pane-handle-drag-right',
+        'pane-handle-drag-corner',
+        'pane-handle-drag-tab-strip',
+        'pane-handle-drag-new-window',
         'drag-pane-to-empty-slot',
+        'terminal-content-drag-does-not-move-pane',
+        'move-pane-to-new-tab',
+        'move-pane-to-new-window',
+        'close-pane-preserves-confirmation',
         'cancel-with-escape',
+        'cancel-on-pointer-capture-loss',
         'keyboard-docking',
-        'undo-redo'
+        'undo-redo',
+        'workspace-restore',
+        'mixed-dpi-pane-drag',
+        'narrator-pane-controls',
+        'high-contrast-pane-controls'
     )
     foreach ($scenario in $expected)
     {
@@ -76,7 +101,7 @@ try
         return
     }
 
-    throw 'The v0.5 XAML docking adapter is feature-disabled; runtime UI automation cannot run yet.'
+    throw 'The v0.7 runtime adapter has not passed the local UI automation gate yet.'
 }
 catch
 {

@@ -77,7 +77,7 @@ function Test-Manifest
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -eq 'HelloThisWorld.winTerm') -Message "$Path uses package identity HelloThisWorld.winTerm"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -notmatch '^Microsoft\.') -Message "$Path does not use a Microsoft package name"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Publisher -ceq $ExpectedPublisher) -Message "$Path uses the expected non-Microsoft publisher"
-    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '1.0.2.0') -Message "$Path uses package version 1.0.2.0"
+    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '0.7.0.1') -Message "$Path uses package version 0.7.0.1"
     Test-Requirement -Condition ($null -ne $properties -and $properties.DisplayName -eq 'winTerm') -Message "$Path package display name is winTerm"
     Test-Requirement -Condition ($null -ne $application -and $application.Id -eq 'winTerm') -Message "$Path application ID is winTerm"
     Test-Requirement -Condition ($null -ne $visualElements -and $visualElements.DisplayName -eq 'winTerm') -Message "$Path application display name is winTerm"
@@ -129,15 +129,15 @@ function Test-BuildOutput
 
     $launcher = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'winterm.exe' | Select-Object -First 1
     $forbiddenLauncher = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'wt.exe' | Select-Object -First 1
-    $host = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'WindowsTerminal.exe' | Select-Object -First 1
+    $hostExecutable = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'WindowsTerminal.exe' | Select-Object -First 1
 
     Test-Requirement -Condition ($null -ne $launcher) -Message 'Build output contains winterm.exe'
     Test-Requirement -Condition ($null -eq $forbiddenLauncher) -Message 'Build output does not contain wt.exe'
-    Test-Requirement -Condition ($null -ne $host) -Message 'Build output contains the internal terminal host executable'
-    if ($null -ne $host)
+    Test-Requirement -Condition ($null -ne $hostExecutable) -Message 'Build output contains the internal terminal host executable'
+    if ($null -ne $hostExecutable)
     {
-        Test-Requirement -Condition ($host.VersionInfo.FileDescription -eq 'winTerm Terminal Host') -Message 'Terminal host file description is winTerm Terminal Host'
-        Test-Requirement -Condition ($host.VersionInfo.ProductName -eq 'winTerm') -Message 'Terminal host product name is winTerm'
+        Test-Requirement -Condition ($hostExecutable.VersionInfo.FileDescription -eq 'winTerm Terminal Host') -Message 'Terminal host file description is winTerm Terminal Host'
+        Test-Requirement -Condition ($hostExecutable.VersionInfo.ProductName -eq 'winTerm') -Message 'Terminal host product name is winTerm'
     }
 }
 

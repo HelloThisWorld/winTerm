@@ -1,6 +1,6 @@
 @{
     RootModule = 'winTerm.Shell.psm1'
-    ModuleVersion = '1.0.2'
+    ModuleVersion = '0.7.0'
     GUID = 'f65cd8f4-5d25-4a2a-a0d4-58df1ab3dc5a'
     Author = 'winTerm contributors'
     CompanyName = 'winTerm'
@@ -12,6 +12,7 @@
     AliasesToExport = @()
     PrivateData = @{
         PSData = @{
+            Prerelease = 'beta.1'
             Tags = @('winTerm', 'terminal', 'shell-integration')
             ProjectUri = 'https://github.com/HelloThisWorld/winTerm'
             LicenseUri = 'https://github.com/HelloThisWorld/winTerm/blob/main/LICENSE'

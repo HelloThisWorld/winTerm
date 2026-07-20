@@ -22,6 +22,7 @@ namespace winTerm::Docking
         OwnershipReserved,
         ModelCommitted,
         VisualCommitted,
+        HistoryRecorded,
         Completed,
         RollingBack,
         RolledBack,
@@ -51,6 +52,7 @@ namespace winTerm::Docking
         std::function<bool(const DockingPlan&)> prepareTarget;
         std::function<bool(const DockingPlan&)> commitModel;
         std::function<bool(const DockingPlan&)> commitVisualTree;
+        std::function<bool(const LayoutTransactionSnapshot&, const DockingPlan&)> recordHistory;
         std::function<bool(const LayoutTransactionSnapshot&)> rollback;
         std::function<bool(const LayoutTransactionSnapshot&)> recoverSessions;
         std::function<bool()> markWorkspaceDirty;

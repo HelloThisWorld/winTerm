@@ -114,15 +114,20 @@ namespace SettingsModelUnitTests
             dirty = true;
             return true;
         };
+        request.callbacks.recordHistory = [&](const auto&, const auto&) {
+            order.emplace_back("history");
+            return true;
+        };
         request.callbacks.invalidateDragToken = [&] { tokenInvalidated = true; };
 
         const auto result = coordinator.Execute(std::move(request));
         VERIFY_ARE_EQUAL(static_cast<int>(DockingStatus::Committed), static_cast<int>(result.docking.status));
-        VERIFY_ARE_EQUAL(size_t{ 4 }, order.size());
+        VERIFY_ARE_EQUAL(size_t{ 5 }, order.size());
         VERIFY_ARE_EQUAL(std::string{ "prepare" }, order[0]);
         VERIFY_ARE_EQUAL(std::string{ "model" }, order[1]);
         VERIFY_ARE_EQUAL(std::string{ "visual" }, order[2]);
         VERIFY_ARE_EQUAL(std::string{ "dirty" }, order[3]);
+        VERIFY_ARE_EQUAL(std::string{ "history" }, order[4]);
         VERIFY_IS_TRUE(dirty);
         VERIFY_IS_TRUE(tokenInvalidated);
         VERIFY_IS_TRUE(ownership.Owner("session-1") == std::optional{ Owner("window-2", "tab-2", "source-pane") });
