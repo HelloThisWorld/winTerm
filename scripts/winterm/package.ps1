@@ -22,10 +22,13 @@ function Assert-WinTermManifest
 {
     param(
         [Parameter(Mandatory)]
-    [string]$Path,
+        [string]$Path,
 
         [Parameter(Mandatory)]
-        [string]$Publisher
+        [string]$Publisher,
+
+        [Parameter(Mandatory)]
+        [string]$Version
     )
 
     [xml]$manifest = Get-Content -LiteralPath $Path -Raw
@@ -48,9 +51,9 @@ function Assert-WinTermManifest
     {
         throw "Package '$Path' must claim winterm.exe and must not claim wt.exe."
     }
-    if ($identity.Version -ne '1.0.2.0')
+    if ($identity.Version -ne $Version)
     {
-        throw "Package '$Path' must use the winTerm 1.0.2.0 package version."
+        throw "Package '$Path' must use the winTerm $Version package version."
     }
 }
 
@@ -135,11 +138,19 @@ function Assert-AppearancePayload
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $sourceManifest = Join-Path $repositoryRoot 'src\cascadia\CascadiaPackage\Package-winTerm.appxmanifest'
 $packageRoot = Join-Path $repositoryRoot 'src\cascadia\CascadiaPackage\AppPackages'
+$versionPath = Join-Path $repositoryRoot 'src\winterm\Branding\version.json'
 $temporaryDirectory = $null
 
 try
 {
-    Assert-WinTermManifest -Path $sourceManifest -Publisher $ExpectedPublisher
+    $versionMetadata = Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json
+    $expectedVersion = [string]$versionMetadata.packageVersion
+    if ([string]::IsNullOrWhiteSpace($expectedVersion))
+    {
+        throw "Version metadata '$versionPath' does not define packageVersion."
+    }
+
+    Assert-WinTermManifest -Path $sourceManifest -Publisher $ExpectedPublisher -Version $expectedVersion
 
     if (-not $SkipBuild)
     {
@@ -179,7 +190,7 @@ try
         throw "makeappx.exe failed to unpack '$($artifact.FullName)' with exit code $LASTEXITCODE."
     }
 
-    Assert-WinTermManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml') -Publisher $ExpectedPublisher
+    Assert-WinTermManifest -Path (Join-Path $temporaryDirectory 'AppxManifest.xml') -Publisher $ExpectedPublisher -Version $expectedVersion
     Assert-AppearancePayload -Path $temporaryDirectory -RepositoryRoot $repositoryRoot
     & (Join-Path $PSScriptRoot 'package-shell-assets.ps1') -PackageRoot $temporaryDirectory
     if (-not $?)
