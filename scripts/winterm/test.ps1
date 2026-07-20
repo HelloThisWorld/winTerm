@@ -101,7 +101,9 @@ function Test-ShellExperienceFoundations
     }
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
-    if ($manifest.ModuleVersion -ne '1.0.2' -or $manifest.PowerShellVersion -ne '5.1')
+    if ($manifest.ModuleVersion -ne '0.7.0' -or
+        $manifest.PrivateData.PSData.Prerelease -ne 'beta.1' -or
+        $manifest.PowerShellVersion -ne '5.1')
     {
         throw 'The winTerm PowerShell module manifest does not declare the supported version boundary.'
     }
@@ -239,6 +241,12 @@ try
     Test-ProfileFoundations -RepositoryRoot $repositoryRoot
     Test-ShellExperienceFoundations -RepositoryRoot $repositoryRoot
     Test-WorkspaceFoundations
+
+    & (Join-Path $PSScriptRoot 'test-pane-controls.ps1') -Configuration $Configuration -Platform $Platform -SourceOnly
+    if (-not $?)
+    {
+        throw 'Directed split and pane control source validation failed.'
+    }
 
     & (Join-Path $PSScriptRoot 'test-diagnostics.ps1')
     if (-not $?)

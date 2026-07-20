@@ -149,13 +149,13 @@ namespace SettingsModelUnitTests
             { DockZone::Center, DockZone::Left, DockZone::Right },
             DockZone::Center));
         VERIFY_IS_TRUE(controller.Handle(DockingNavigationKey::Right));
-        VERIFY_IS_TRUE(controller.Announcement().find("right side of Titan Mind window") != std::string::npos);
+        VERIFY_IS_TRUE(controller.Announcement().find("right of Titan Mind window") != std::string::npos);
         VERIFY_IS_TRUE(controller.Handle(DockingNavigationKey::Escape));
         VERIFY_ARE_EQUAL(
             static_cast<int>(KeyboardDockingState::Cancelled),
             static_cast<int>(controller.State()));
         VERIFY_IS_TRUE(controller.Announcement().find("original layout is unchanged") != std::string::npos);
-        VERIFY_ARE_EQUAL(size_t{ 19 }, KeyboardDockingController::Commands().size());
+        VERIFY_ARE_EQUAL(size_t{ 26 }, KeyboardDockingController::Commands().size());
     }
 
     void WinTermDockingPresentationTests::SettingsKeepRuntimeDockingBehindReadinessGate()
