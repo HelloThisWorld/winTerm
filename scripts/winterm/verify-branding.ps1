@@ -129,15 +129,15 @@ function Test-BuildOutput
 
     $launcher = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'winterm.exe' | Select-Object -First 1
     $forbiddenLauncher = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'wt.exe' | Select-Object -First 1
-    $host = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'WindowsTerminal.exe' | Select-Object -First 1
+    $hostExecutable = Get-ChildItem -LiteralPath $inspectionRoot -Recurse -File -Filter 'WindowsTerminal.exe' | Select-Object -First 1
 
     Test-Requirement -Condition ($null -ne $launcher) -Message 'Build output contains winterm.exe'
     Test-Requirement -Condition ($null -eq $forbiddenLauncher) -Message 'Build output does not contain wt.exe'
-    Test-Requirement -Condition ($null -ne $host) -Message 'Build output contains the internal terminal host executable'
-    if ($null -ne $host)
+    Test-Requirement -Condition ($null -ne $hostExecutable) -Message 'Build output contains the internal terminal host executable'
+    if ($null -ne $hostExecutable)
     {
-        Test-Requirement -Condition ($host.VersionInfo.FileDescription -eq 'winTerm Terminal Host') -Message 'Terminal host file description is winTerm Terminal Host'
-        Test-Requirement -Condition ($host.VersionInfo.ProductName -eq 'winTerm') -Message 'Terminal host product name is winTerm'
+        Test-Requirement -Condition ($hostExecutable.VersionInfo.FileDescription -eq 'winTerm Terminal Host') -Message 'Terminal host file description is winTerm Terminal Host'
+        Test-Requirement -Condition ($hostExecutable.VersionInfo.ProductName -eq 'winTerm') -Message 'Terminal host product name is winTerm'
     }
 }
 

@@ -94,6 +94,12 @@ try
     Assert-Condition ($releaseHeader.Contains('ShellProtocolVersion{ 1 }')) 'About metadata contains Shell Protocol version 1'
     Assert-Condition ($releaseHeader.Contains('ThemeSchemaVersion{ 1 }')) 'About metadata contains Theme Schema version 1'
 
+    $hostResource = Get-Text 'src\cascadia\WindowsTerminal\WindowsTerminal.rc'
+    $packageVersionTuple = $version.packageVersion.Replace('.', ',')
+    Assert-Condition ($hostResource.Contains("FILEVERSION $packageVersionTuple")) 'Terminal host file version matches release metadata'
+    Assert-Condition ($hostResource.Contains("PRODUCTVERSION $packageVersionTuple")) 'Terminal host numeric product version matches release metadata'
+    Assert-Condition ($hostResource.Contains("`"ProductVersion`", `"$($version.applicationVersion)\0`"")) 'Terminal host display product version matches release metadata'
+
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('WorkspaceSchemaVersion{ 2 }')) 'Workspace model remains at Schema version 2'
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('DockingModelVersion{ 1 }')) 'Workspace model remains at Docking version 1'
     Assert-Condition ((Get-Text 'src\winterm\Shell\Protocol\ShellIntegrationProtocol.h').Contains('ShellProtocolVersion{ 1 }')) 'Shell protocol remains at version 1'
