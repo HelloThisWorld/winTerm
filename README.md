@@ -1,8 +1,8 @@
 # winTerm
 
-[Download winTerm v1.0.2](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.2)
+[Download winTerm v0.7.0-beta.1](https://github.com/HelloThisWorld/winTerm/releases/tag/v0.7.0-beta.1)
 
-[![Version](https://img.shields.io/badge/version-1.0.2-blue)](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.2)
+[![Preview version](https://img.shields.io/badge/preview-v0.7.0--beta.1-blue)](https://github.com/HelloThisWorld/winTerm/releases/tag/v0.7.0-beta.1)
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
 [![Stable release](https://img.shields.io/badge/stable%20release-v1.0.2-success)](https://github.com/HelloThisWorld/winTerm/releases/latest)
@@ -10,6 +10,12 @@
 winTerm is an independent open-source terminal application based on Microsoft Windows Terminal.
 
 winTerm is not affiliated with or endorsed by Microsoft. It does not use Microsoft, Windows, or Windows Terminal logos.
+
+## Latest preview release
+
+Download `v0.7.0-beta.1` from its [GitHub Release](https://github.com/HelloThisWorld/winTerm/releases/tag/v0.7.0-beta.1). It contains the Directed Split and Pane Controls foundations and remains a Beta while the runtime and manual acceptance items in [the v0.7 acceptance report](docs/v0.7-acceptance.md) are open.
+
+The preview is self-signed. Download the `.msix`, matching `.cer`, `INSTALL.txt`, and `SHA256SUMS.txt` from the same Release, verify the hashes, and follow the included certificate installation steps. Its Windows/MSIX package version is `1.0.3.0`, allowing it to upgrade an existing `1.0.2.0` installation.
 
 ## Latest stable release
 
@@ -83,6 +89,7 @@ The exact gate status is recorded in:
 - [security review](docs/security-review-v1.0.md);
 - [accessibility audit](docs/accessibility-audit-v1.0.md);
 - [performance validation](docs/performance-v1.0.md);
+- [0.7.0 Beta preview notes](docs/releases/0.7.0-beta.1.md);
 - [release notes](docs/releases/1.0.2.md).
 
 GitHub Actions builds from the exact immutable `v1.0.2` Tag, creates a temporary non-exportable self-signed key, verifies the package identity and embedded signature, uploads only allowlisted assets, re-downloads them for verification, and then publishes the Release. It never replaces an existing Release asset.

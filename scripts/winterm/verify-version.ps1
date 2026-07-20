@@ -50,7 +50,7 @@ try
     $version = Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json
 
     Assert-Condition ($version.applicationVersion -eq '0.7.0-beta.1') 'Application version is 0.7.0-beta.1'
-    Assert-Condition ($version.packageVersion -eq '0.7.0.1') 'Package version is 0.7.0.1'
+    Assert-Condition ($version.packageVersion -eq '1.0.3.0') 'Package version is 1.0.3.0'
     Assert-Condition ($version.moduleVersion -eq '0.7.0') 'PowerShell module version is 0.7.0'
     Assert-Condition ($version.modulePrerelease -eq 'beta.1') 'PowerShell module prerelease is beta.1'
     Assert-Condition ($version.channel -eq 'beta') 'Release channel is beta'

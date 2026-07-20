@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0-beta.1 - Unreleased
+## 0.7.0-beta.1 - 2026-07-21
 
 ### Added
 
@@ -12,15 +12,15 @@
 
 ### Changed
 
-- Development metadata now identifies `0.7.0-beta.1`; the numeric MSIX version is `0.7.0.1`.
+- Product metadata identifies `0.7.0-beta.1`; the monotonic Windows/MSIX package version is `1.0.3.0` so the Beta can upgrade an existing `1.0.2.0` installation.
 - Same-tab pane dragging now uses the existing `LayoutTransformer` to remove, normalize, and reinsert the pane relative to the selected target.
 - Pane movement previews are derived from the proposed layout and must validate before a drop can be requested.
 
 ### Release status
 
-- The existing Stable workflow remains isolated from this Beta tag.
-- No `v0.7.0-beta.1` tag or Beta Release is created until the v0.7 acceptance report is complete.
-- No new Stable Release is produced from this development branch.
+- `v0.7.0-beta.1` is published as a self-signed preview Release.
+- The existing `v1.0.2` Stable workflow and Release remain isolated from this Beta tag.
+- The remaining runtime and manual acceptance gaps are documented in `docs/v0.7-acceptance.md`; this Beta is not a Stable acceptance claim.
 
 ## 1.0.2 - Stable
 
