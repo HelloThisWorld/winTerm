@@ -52,12 +52,12 @@ release asset or user installation requirement.
 
 ```powershell
 .\scripts\winterm\build-installer.ps1 `
-  -Version 0.7.0-beta.3 `
+  -Version 0.7.0-beta.4 `
   -Platform x64 `
   -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 
 .\scripts\winterm\build-portable.ps1 `
-  -Version 0.7.0-beta.3 `
+  -Version 0.7.0-beta.4 `
   -Platform x64 `
   -SkipBuild
 ```
@@ -65,8 +65,8 @@ release asset or user installation requirement.
 Outputs:
 
 ```text
-artifacts/release/winTerm-0.7.0-beta.3-setup-x64.exe
-artifacts/release/winTerm-0.7.0-beta.3-portable-x64.zip
+artifacts/release/winTerm-0.7.0-beta.4-setup-x64.exe
+artifacts/release/winTerm-0.7.0-beta.4-portable-x64.zip
 ```
 
 Without `-SigningCertificateThumbprint`, the installer is intentionally
@@ -81,8 +81,8 @@ Static validation:
 
 ```powershell
 .\scripts\winterm\test-installer.ps1 `
-  -InstallerPath .\artifacts\release\winTerm-0.7.0-beta.3-setup-x64.exe `
-  -Version 0.7.0-beta.3
+  -InstallerPath .\artifacts\release\winTerm-0.7.0-beta.4-setup-x64.exe `
+  -Version 0.7.0-beta.4
 ```
 
 Current-user install, custom path, launch, repair/upgrade, uninstall, reinstall,
@@ -90,8 +90,8 @@ registration, user-data preservation, and Windows Terminal isolation:
 
 ```powershell
 .\scripts\winterm\test-installer.ps1 `
-  -InstallerPath .\artifacts\release\winTerm-0.7.0-beta.3-setup-x64.exe `
-  -Version 0.7.0-beta.3 `
+  -InstallerPath .\artifacts\release\winTerm-0.7.0-beta.4-setup-x64.exe `
+  -Version 0.7.0-beta.4 `
   -RunSilentRoundTrip
 ```
 

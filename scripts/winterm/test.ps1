@@ -102,7 +102,7 @@ function Test-ShellExperienceFoundations
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
     if ($manifest.ModuleVersion -ne '0.7.0' -or
-        $manifest.PrivateData.PSData.Prerelease -ne 'beta.3' -or
+        $manifest.PrivateData.PSData.Prerelease -ne 'beta.4' -or
         $manifest.PowerShellVersion -ne '5.1')
     {
         throw 'The winTerm PowerShell module manifest does not declare the supported version boundary.'

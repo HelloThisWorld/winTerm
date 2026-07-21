@@ -30,11 +30,29 @@ $dataMarkerPaths = [System.Collections.Generic.List[string]]::new()
 
 function Get-WindowsTerminalState
 {
-    $packages = @(
-        Get-AppxPackage -Name 'Microsoft.WindowsTerminal*' -ErrorAction SilentlyContinue |
-            Sort-Object -Property PackageFullName |
-            Select-Object Name, PackageFullName, InstallLocation
-    )
+    $packagesAvailable = $true
+    try
+    {
+        $packages = @(
+            Get-AppxPackage -Name 'Microsoft.WindowsTerminal*' -ErrorAction Stop |
+                Sort-Object -Property PackageFullName |
+                Select-Object Name, PackageFullName, InstallLocation
+        )
+    }
+    catch [System.PlatformNotSupportedException]
+    {
+        $packagesAvailable = $false
+        $packages = @()
+    }
+    catch
+    {
+        if ($_.Exception.Message -notmatch 'Operation is not supported on this platform')
+        {
+            throw
+        }
+        $packagesAvailable = $false
+        $packages = @()
+    }
     $command = Get-Command wt.exe -ErrorAction SilentlyContinue | Select-Object -First 1
     $commandPath = if ($null -ne $command) { [string]$command.Source } else { '' }
     $commandHash = ''
@@ -52,6 +70,7 @@ function Get-WindowsTerminalState
     }
 
     return [ordered]@{
+        packagesAvailable = $packagesAvailable
         packages = @($packages)
         commandPath = $commandPath
         commandHash = $commandHash
