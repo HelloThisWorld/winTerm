@@ -45,6 +45,7 @@ function Test-TrackedLegacyBrand
 
     if ($grepExitCode -eq 1)
     {
+        $global:LASTEXITCODE = 0
         Write-Host "No $legacyBrand references found." -ForegroundColor Green
         return
     }
@@ -125,7 +126,7 @@ function Test-Manifest
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -eq 'HelloThisWorld.winTerm') -Message "$Path uses package identity HelloThisWorld.winTerm"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -notmatch '^Microsoft\.') -Message "$Path does not use a Microsoft package name"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Publisher -ceq $ExpectedPublisher) -Message "$Path uses the expected non-Microsoft publisher"
-    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '1.0.4.0') -Message "$Path uses package version 1.0.4.0"
+    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '1.0.5.0') -Message "$Path uses package version 1.0.5.0"
     Test-Requirement -Condition ($null -ne $properties -and $properties.DisplayName -eq 'winTerm') -Message "$Path package display name is winTerm"
     Test-Requirement -Condition ($null -ne $application -and $application.Id -eq 'winTerm') -Message "$Path application ID is winTerm"
     Test-Requirement -Condition ($null -ne $visualElements -and $visualElements.DisplayName -eq 'winTerm') -Message "$Path application display name is winTerm"

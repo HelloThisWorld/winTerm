@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.0-beta.3 - 2026-07-21
+
+### Added
+
+- Traditional unpackaged Inno Setup and Portable ZIP distributions.
+- Exact release-asset allowlisting, SHA-256 checksums, release metadata, and SPDX and CycloneDX SBOMs.
+- Installer and Portable launch, isolation, upgrade, data-preservation, and uninstall validation.
+
+### Changed
+
+- Unified winTerm-owned publisher metadata under `helloThisWorld`.
+- Made the Setup EXE the recommended download and removed MSIX from the primary release asset set.
+- Corrected GitHub Actions preflight exit-code handling after an expected missing-Release lookup and an empty legacy-brand scan.
+- Advanced the monotonic Windows package-build version to `1.0.5.0`.
+
+### Release status
+
+- This Beta is an unsigned Windows 11 x64 preview.
+- Windows may show Unknown Publisher or SmartScreen warnings; users should verify `SHA256SUMS.txt`.
+- ARM64 and cross-process live pane transfer remain unsupported.
+
 ## 0.7.0-beta.2 - 2026-07-21
 
 ### Added
@@ -16,9 +37,7 @@
 
 ### Release status
 
-- This Beta is an unsigned Windows 11 x64 preview.
-- Windows may show Unknown Publisher or SmartScreen warnings; users should verify `SHA256SUMS.txt`.
-- ARM64 and cross-process live pane transfer remain unsupported.
+- The immutable tag exists, but no GitHub Release was published because the release preflight correctly stopped before building or uploading assets.
 
 ## 0.7.0-beta.1 - 2026-07-21
 

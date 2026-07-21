@@ -41,10 +41,17 @@ jobs:
           if (-not [string]::IsNullOrWhiteSpace((git status --porcelain))) {
             throw 'The release checkout is not clean.'
           }
-          gh release view $expectedTag --repo '${{ github.repository }}' *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $releaseLookup = @(
+            & gh api --method GET "repos/${{ github.repository }}/releases/tags/$expectedTag" 2>&1
+          )
+          $releaseLookupExitCode = $LASTEXITCODE
+          if ($releaseLookupExitCode -eq 0) {
             throw "Release $expectedTag already exists. This workflow never replaces a Release or its assets."
           }
+          if ($releaseLookupExitCode -ne 1 -or ($releaseLookup -join "`n") -notmatch 'HTTP 404') {
+            throw "Unable to verify that Release $expectedTag is absent: $($releaseLookup -join [Environment]::NewLine)"
+          }
+          $global:LASTEXITCODE = 0
           .\scripts\winterm\verify-version.ps1 -RequireTag
           .\scripts\winterm\verify-branding.ps1 -ExpectedPublisher 'CN=helloThisWorld'
 
