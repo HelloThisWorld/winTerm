@@ -49,12 +49,12 @@ try
     $versionPath = Join-Path $repositoryRoot 'src\winterm\Branding\version.json'
     $version = Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json
 
-    Assert-Condition ($version.applicationVersion -eq '0.7.0-beta.4') 'Application version is 0.7.0-beta.4'
-    Assert-Condition ($version.packageVersion -eq '1.0.6.0') 'Package version is 1.0.6.0'
+    Assert-Condition ($version.applicationVersion -eq '0.7.0-beta.5') 'Application version is 0.7.0-beta.5'
+    Assert-Condition ($version.packageVersion -eq '1.0.7.0') 'Package version is 1.0.7.0'
     Assert-Condition ($version.moduleVersion -eq '0.7.0') 'PowerShell module version is 0.7.0'
-    Assert-Condition ($version.modulePrerelease -eq 'beta.4') 'PowerShell module prerelease is beta.4'
+    Assert-Condition ($version.modulePrerelease -eq 'beta.5') 'PowerShell module prerelease is beta.5'
     Assert-Condition ($version.channel -eq 'beta') 'Release channel is beta'
-    Assert-Condition ($version.tag -eq 'v0.7.0-beta.4') 'Beta tag is v0.7.0-beta.4'
+    Assert-Condition ($version.tag -eq 'v0.7.0-beta.5') 'Beta tag is v0.7.0-beta.5'
     Assert-Condition ($version.workspaceSchemaVersion -eq 2) 'Workspace Schema version remains 2'
     Assert-Condition ($version.dockingModelVersion -eq 1) 'Docking Model version remains 1'
     Assert-Condition ($version.shellProtocolVersion -eq 1) 'Shell Protocol version remains 1'
@@ -78,7 +78,7 @@ try
     $moduleManifest = Import-PowerShellDataFile -LiteralPath (Join-Path $repositoryRoot 'shell\powershell\winTerm.Shell\winTerm.Shell.psd1')
     Assert-Condition ($moduleManifest.ModuleVersion.ToString() -eq $version.moduleVersion) 'PowerShell manifest version matches release metadata'
     Assert-Condition ($moduleManifest.PrivateData.PSData.Prerelease -eq $version.modulePrerelease) 'PowerShell manifest prerelease matches release metadata'
-    Assert-Condition ((Get-Text 'shell\powershell\winTerm.Shell\winTerm.Shell.psm1').Contains("`$script:WinTermModuleVersion = '0.7.0-beta.4'")) 'PowerShell module runtime version matches release metadata'
+    Assert-Condition ((Get-Text 'shell\powershell\winTerm.Shell\winTerm.Shell.psm1').Contains("`$script:WinTermModuleVersion = '0.7.0-beta.5'")) 'PowerShell module runtime version matches release metadata'
 
     $shellVersion = Get-Text 'shell\shared\version.json' | ConvertFrom-Json
     Assert-Condition ($shellVersion.applicationVersion -eq $version.applicationVersion) 'Shell asset application version matches release metadata'
@@ -86,7 +86,7 @@ try
     Assert-Condition ($shellVersion.protocolVersion -eq $version.shellProtocolVersion) 'Shell asset protocol version matches release metadata'
 
     $releaseHeader = Get-Text 'src\winterm\Branding\ReleaseMetadata.h'
-    Assert-Condition ($releaseHeader.Contains('ApplicationVersion{ L"0.7.0-beta.4" }')) 'About metadata application version is 0.7.0-beta.4'
+    Assert-Condition ($releaseHeader.Contains('ApplicationVersion{ L"0.7.0-beta.5" }')) 'About metadata application version is 0.7.0-beta.5'
     Assert-Condition ($releaseHeader.Contains('ReleaseChannel{ L"Beta" }')) 'About metadata channel is Beta'
     Assert-Condition ($releaseHeader.Contains($version.microsoftTerminalUpstreamRevision)) 'About metadata contains the Microsoft Terminal upstream revision'
     Assert-Condition ($releaseHeader.Contains('WorkspaceSchemaVersion{ 2 }')) 'About metadata contains Workspace Schema version 2'
@@ -104,19 +104,19 @@ try
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('DockingModelVersion{ 1 }')) 'Workspace model remains at Docking version 1'
     Assert-Condition ((Get-Text 'src\winterm\Shell\Protocol\ShellIntegrationProtocol.h').Contains('ShellProtocolVersion{ 1 }')) 'Shell protocol remains at version 1'
     Assert-Condition ((Get-Text 'src\winterm\Appearance\Themes\ThemeDescriptor.h').Contains('CurrentThemeSchemaVersion{ 1 }')) 'Theme Schema remains at version 1'
-    Assert-Condition ((Get-Text 'src\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp').Contains('"0.7.0-beta.4"')) 'Workspace application-version fallback is 0.7.0-beta.4'
+    Assert-Condition ((Get-Text 'src\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp').Contains('"0.7.0-beta.5"')) 'Workspace application-version fallback is 0.7.0-beta.5'
 
     $releaseWorkflow = Get-Text '.github\workflows\release.yml'
     Assert-Condition ($releaseWorkflow.Contains("- 'v*'")) 'Release workflow accepts version tags through a generic guarded trigger'
     Assert-Condition ($releaseWorkflow.Contains("`$expectedTag = `"v`$(`$metadata.applicationVersion)`"")) 'Release workflow derives the expected tag from version.json'
     Assert-Condition ($releaseWorkflow.Contains("`$metadata.tag -cne `$expectedTag")) 'Release workflow rejects a version metadata tag mismatch'
 
-    Assert-Condition ((Get-Text 'CHANGELOG.md').Contains('## 0.7.0-beta.4')) 'Changelog contains 0.7.0-beta.4'
+    Assert-Condition ((Get-Text 'CHANGELOG.md').Contains('## 0.7.0-beta.5')) 'Changelog contains 0.7.0-beta.5'
 
     if ($RequireTag)
     {
         $tag = (& git describe --tags --exact-match 2>$null).Trim()
-        Assert-Condition ($LASTEXITCODE -eq 0 -and $tag -eq $version.tag) 'Checked-out commit is exactly tagged v0.7.0-beta.4'
+        Assert-Condition ($LASTEXITCODE -eq 0 -and $tag -eq $version.tag) 'Checked-out commit is exactly tagged v0.7.0-beta.5'
     }
 
     Write-Host 'winTerm version consistency verification passed.' -ForegroundColor Green

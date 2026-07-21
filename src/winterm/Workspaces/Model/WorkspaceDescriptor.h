@@ -219,7 +219,7 @@ namespace winTerm::Workspaces
         std::string createdAt;
         std::string updatedAt;
         WorkspaceSource source{ WorkspaceSource::User };
-        std::string applicationVersion{ "0.7.0-beta.4" };
+        std::string applicationVersion{ "0.7.0-beta.5" };
         uint32_t protocolVersion{ 1 };
         uint32_t dockingModelVersion{ DockingModelVersion };
         WorkspaceStartupBehavior startupBehavior;

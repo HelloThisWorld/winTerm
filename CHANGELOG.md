@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0-beta.4 - 2026-07-21
+## 0.7.0-beta.5 - 2026-07-21
 
 ### Added
 
@@ -14,13 +14,25 @@
 - Made the Setup EXE the recommended download and removed MSIX from the primary release asset set.
 - Corrected GitHub Actions preflight exit-code handling after an expected missing-Release lookup and an empty legacy-brand scan.
 - Made Windows Terminal isolation checks portable to Windows Server runners where the Appx module is unavailable.
-- Advanced the monotonic Windows package-build version to `1.0.6.0`.
+- Kept Windows 11 x64 as the supported target while allowing the Windows Server 2022 GitHub runner to execute installer acceptance tests; Windows 10 remains rejected.
+- Advanced the monotonic Windows package-build version to `1.0.7.0`.
 
 ### Release status
 
 - This Beta is an unsigned Windows 11 x64 preview.
 - Windows may show Unknown Publisher or SmartScreen warnings; users should verify `SHA256SUMS.txt`.
 - ARM64 and cross-process live pane transfer remain unsupported.
+
+## 0.7.0-beta.4 - 2026-07-21
+
+### Changed
+
+- Made Windows Terminal isolation checks portable to Windows Server runners where the Appx module is unavailable.
+- Advanced the monotonic Windows package-build version to `1.0.6.0`.
+
+### Release status
+
+- The immutable tag exists, but no GitHub Release was published because the Windows 11-only installer correctly rejected the Windows Server 2022 runner before the acceptance test; the workflow stopped before creating a Draft Release.
 
 ## 0.7.0-beta.3 - 2026-07-21
 

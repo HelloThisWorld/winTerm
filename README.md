@@ -17,7 +17,7 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `0.7.0-beta.4`. Existing GitHub tags and Release
+The current source version is `0.7.0-beta.5`. Existing GitHub tags and Release
 assets are immutable; a release is published only from a new exact tag after
 all build, test, installation, re-download, and checksum gates pass. See the
 [Releases page](https://github.com/HelloThisWorld/winTerm/releases) for assets
@@ -29,7 +29,7 @@ Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
 See [installation guidance](docs/user/installation.md) and the current
-[release notes](docs/releases/0.7.0-beta.4.md).
+[release notes](docs/releases/0.7.0-beta.5.md).
 
 ## Core features
 
@@ -73,8 +73,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 0.7.0-beta.4 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 0.7.0-beta.4 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 0.7.0-beta.5 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 0.7.0-beta.5 -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build

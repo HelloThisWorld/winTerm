@@ -44,7 +44,10 @@ ArchitecturesInstallIn64BitMode=arm64
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 #endif
-MinVersion=10.0.22000
+; Windows 11 x64 remains the supported user target. Windows Server 2022 build
+; 20348 is admitted so GitHub's hosted Windows runner can execute the exact
+; installer acceptance tests. Windows 10 builds remain below this boundary.
+MinVersion=10.0.20348
 CloseApplications=yes
 RestartApplications=no
 UsePreviousAppDir=yes

@@ -126,7 +126,7 @@ function Test-Manifest
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -eq 'HelloThisWorld.winTerm') -Message "$Path uses package identity HelloThisWorld.winTerm"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Name -notmatch '^Microsoft\.') -Message "$Path does not use a Microsoft package name"
     Test-Requirement -Condition ($null -ne $identity -and $identity.Publisher -ceq $ExpectedPublisher) -Message "$Path uses the expected non-Microsoft publisher"
-    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '1.0.6.0') -Message "$Path uses package version 1.0.6.0"
+    Test-Requirement -Condition ($null -ne $identity -and $identity.Version -eq '1.0.7.0') -Message "$Path uses package version 1.0.7.0"
     Test-Requirement -Condition ($null -ne $properties -and $properties.DisplayName -eq 'winTerm') -Message "$Path package display name is winTerm"
     Test-Requirement -Condition ($null -ne $application -and $application.Id -eq 'winTerm') -Message "$Path application ID is winTerm"
     Test-Requirement -Condition ($null -ne $visualElements -and $visualElements.DisplayName -eq 'winTerm') -Message "$Path application display name is winTerm"
@@ -244,6 +244,7 @@ try
     Test-Requirement -Condition ($aboutDialog.Contains('AppearanceAssets\\licenses\\open-source-licenses.html')) -Message 'winTerm About dialog opens its bundled offline license index'
     Test-Requirement -Condition ($releaseMetadata.Contains('Publisher{ L"helloThisWorld" }') -and $aboutDialog.Contains('Publisher: ')) -Message 'About metadata exposes publisher helloThisWorld'
     Test-Requirement -Condition ($installerDefinition.Contains('AppPublisher=helloThisWorld') -and $installerDefinition.Contains('VersionInfoCompany=helloThisWorld') -and $installerDefinition.Contains('VersionInfoProductName=winTerm')) -Message 'Inno Setup uses protected winTerm publisher and product metadata'
+    Test-Requirement -Condition ($installerDefinition.Contains('MinVersion=10.0.20348')) -Message 'Inno Setup admits the Windows Server 2022 acceptance runner while rejecting Windows 10'
     Test-Requirement -Condition ($wingetGenerator.Contains('Publisher: helloThisWorld') -and $wingetGenerator.Contains('PackageIdentifier: HelloThisWorld.winTerm') -and $wingetGenerator.Contains('InstallerType: inno')) -Message 'WinGet generation uses protected publisher, product ID, and Inno type'
     Test-Requirement -Condition ($releaseGenerator.Contains("publisher = 'helloThisWorld'") -and $releaseGenerator.Contains("productId = 'HelloThisWorld.winTerm'")) -Message 'Release SBOM and metadata generation use protected winTerm identity'
     Test-Requirement -Condition ($updateGenerator.Contains("publisher = 'helloThisWorld'") -and $updateGenerator.Contains("productId = 'HelloThisWorld.winTerm'")) -Message 'Update metadata generation uses protected winTerm identity'

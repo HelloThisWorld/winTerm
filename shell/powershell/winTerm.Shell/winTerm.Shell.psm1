@@ -3,7 +3,7 @@
 
 Set-StrictMode -Version Latest
 
-$script:WinTermModuleVersion = '0.7.0-beta.4'
+$script:WinTermModuleVersion = '0.7.0-beta.5'
 $script:WinTermProtocolVersion = 1
 $script:WinTermIntegrationEnabled = $false
 $script:WinTermPromptWrapped = $false
