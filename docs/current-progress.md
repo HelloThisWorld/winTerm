@@ -8,7 +8,7 @@ Last updated: 2026-07-21
 - Implementation commit: `eed15979ecbc223f474d6812744a2eb345efe0a3`
 - Starting commit: `312b3da728c61fbf3afdc31ee9c0cc5e8de75883`
 - Microsoft Terminal upstream revision: `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `0.7.0-beta.1`
+- Application version: `0.7.0-beta.2`
 - Supported release target: Windows 11 x64
 - Uncommitted implementation changes: none
 
@@ -64,14 +64,12 @@ Skipped or pending external evidence:
 
 - Installer: x64 candidate built and verified; explicitly unsigned.
 - Portable: x64 candidate built, extracted, launched, and isolated successfully.
-- Release: not created or published. The existing `v0.7.0-beta.1` tag and GitHub
-  Release are immutable and must not be overwritten.
-- Current phase: phases 18-20 are intentionally pending required external gates
-  and a new, unused version.
+- Release: `v0.7.0-beta.2` is the selected unused release version.
+- Current phase: build, tag, GitHub workflow verification, and retirement of old
+  GitHub Release entries.
 
 ## Next exact action
 
-Run the AllUsers and clean-VM acceptance matrix on an elevated Windows 11 x64
-runner. If every required gate passes, choose a new version, build from that exact
-commit, create a new Draft Release, re-download and verify the allowlisted assets,
-and only then publish and validate the WinGet manifest.
+Build and test `v0.7.0-beta.2`, push its exact annotated tag, allow the guarded
+GitHub workflow to create and verify the new Release, and only after that Release
+is public remove the older GitHub Release entries.

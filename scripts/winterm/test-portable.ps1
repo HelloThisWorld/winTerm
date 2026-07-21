@@ -63,6 +63,45 @@ function Get-PortableIsolationState
     } | ConvertTo-Json -Compress
 }
 
+function Stop-PortableProcesses
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Root
+    )
+
+    $rootPrefix = [IO.Path]::GetFullPath($Root).TrimEnd('\\') + '\\'
+    $processNames = @('winTerm', 'winterm', 'winterm-shim', 'WindowsTerminal', 'OpenConsole')
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    do
+    {
+        $foundProcess = $false
+        foreach ($processName in $processNames)
+        {
+            foreach ($process in @(Get-Process -Name $processName -ErrorAction SilentlyContinue))
+            {
+                try
+                {
+                    if ([string]$process.Path -and $process.Path.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase))
+                    {
+                        $foundProcess = $true
+                        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                    }
+                }
+                catch
+                {
+                    # A process may exit between enumeration and path inspection.
+                }
+            }
+        }
+        if ($foundProcess)
+        {
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    while ($foundProcess -and [DateTime]::UtcNow -lt $deadline)
+}
+
 try
 {
     $resolvedPortable = (Resolve-Path -LiteralPath $PortablePath).Path
@@ -145,6 +184,7 @@ finally
         {
             throw "Refusing to remove Portable test directory outside the temporary root: $resolvedExtractRoot"
         }
+        Stop-PortableProcesses -Root $resolvedExtractRoot
         Remove-Item -LiteralPath $resolvedExtractRoot -Recurse -Force
     }
 }
