@@ -1,28 +1,22 @@
-name: winTerm self-signed stable release
+name: winTerm unpackaged release
 
 on:
   push:
     tags:
-      - 'v1.0.2'
+      - 'v*'
 
 permissions:
   contents: read
 
 concurrency:
-  group: winterm-v1.0.2-stable-release
+  group: winterm-release-${{ github.ref }}
   cancel-in-progress: false
-
-env:
-  WINTERM_VERSION: 1.0.2
-  WINTERM_TAG: v1.0.2
-  WINTERM_PUBLISHER: CN=winTerm Development
-  WINTERM_UPSTREAM_REVISION: 1cea42d433253d95c4487a3037db48197b5e72f4
 
 jobs:
   validate:
     name: Validate exact release source
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out the tagged source without persisted credentials
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -30,22 +24,31 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify tag, commit, and clean checkout
+      - name: Verify tag, version, commit, release absence, and clean checkout
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if ('${{ github.ref }}' -ne 'refs/tags/v1.0.2') {
-            throw 'Stable release runs must check out refs/tags/v1.0.2.'
+          $metadata = Get-Content -LiteralPath 'src\winterm\Branding\version.json' -Raw | ConvertFrom-Json
+          $expectedTag = "v$($metadata.applicationVersion)"
+          if ('${{ github.ref_name }}' -cne $expectedTag -or $metadata.tag -cne $expectedTag) {
+            throw "Tag '${{ github.ref_name }}' does not match version.json '$expectedTag'."
           }
-          $tagCommit = (git rev-list -n 1 v1.0.2).Trim()
-          if ($tagCommit -ne '${{ github.sha }}') {
-            throw 'v1.0.2 does not point to the checked-out release commit.'
+          $tagCommit = (git rev-list -n 1 $expectedTag).Trim()
+          if ($tagCommit -cne '${{ github.sha }}') {
+            throw "$expectedTag does not point to the checked-out release commit."
           }
           if (-not [string]::IsNullOrWhiteSpace((git status --porcelain))) {
             throw 'The release checkout is not clean.'
           }
+          gh release view $expectedTag --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $expectedTag already exists. This workflow never replaces a Release or its assets."
+          }
           .\scripts\winterm\verify-version.ps1 -RequireTag
+          .\scripts\winterm\verify-branding.ps1 -ExpectedPublisher 'CN=helloThisWorld'
 
-      - name: Run static, security, privacy, and release-workflow gates
+      - name: Run static, security, privacy, and workflow gates
         shell: pwsh
         run: .\scripts\winterm\test.ps1 -Suite Smoke -Configuration Release -Platform x64
 
@@ -69,12 +72,12 @@ jobs:
         run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 
   release:
-    name: Build, self-sign, attest, and publish
+    name: Build, test, attest, and publish EXE and Portable ZIP
     needs:
       - validate
       - test-x64
     runs-on: windows-2022
-    timeout-minutes: 300
+    timeout-minutes: 360
     permissions:
       contents: write
       id-token: write
@@ -86,10 +89,77 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Record the UTC build timestamp
+      - name: Resolve immutable release metadata
         shell: pwsh
         run: |
+          $metadata = Get-Content -LiteralPath 'src\winterm\Branding\version.json' -Raw | ConvertFrom-Json
+          "WINTERM_VERSION=$($metadata.applicationVersion)" >> $env:GITHUB_ENV
+          "WINTERM_TAG=$($metadata.tag)" >> $env:GITHUB_ENV
+          "WINTERM_CHANNEL=$($metadata.channel)" >> $env:GITHUB_ENV
+          "WINTERM_UPSTREAM_REVISION=$($metadata.microsoftTerminalUpstreamRevision)" >> $env:GITHUB_ENV
           "WINTERM_BUILD_TIMESTAMP=$([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))" >> $env:GITHUB_ENV
+
+      - name: Install the pinned official Inno Setup compiler
+        shell: pwsh
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          $installRoot = Join-Path $env:RUNNER_TEMP 'Inno-Setup-6.7.3'
+          Invoke-WebRequest `
+            -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' `
+            -OutFile $download
+          $hash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash
+          if ($hash -cne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') {
+            throw "Pinned Inno Setup download hash mismatch: $hash"
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $download
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys B\.V\.') {
+            throw 'The pinned Inno Setup download does not have the expected trusted signature.'
+          }
+          $install = Start-Process -FilePath $download -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"$installRoot`"") `
+            -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "Pinned Inno Setup installation failed with exit code $($install.ExitCode)."
+          }
+          $compiler = Join-Path $installRoot 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+            throw 'The pinned Inno Setup compiler was not installed.'
+          }
+          "WINTERM_INNO_COMPILER=$compiler" >> $env:GITHUB_ENV
+
+      - name: Configure optional trusted Authenticode signing
+        shell: pwsh
+        env:
+          WINTERM_PFX_BASE64: ${{ secrets.WINTERM_SIGNING_PFX_BASE64 }}
+          WINTERM_PFX_PASSWORD: ${{ secrets.WINTERM_SIGNING_PFX_PASSWORD }}
+        run: |
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:WINTERM_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:WINTERM_PFX_PASSWORD)
+          if ($hasCertificate -xor $hasPassword) {
+            throw 'Both Authenticode certificate and password secrets must be configured together.'
+          }
+          if (-not $hasCertificate) {
+            'WINTERM_SIGNING_STATUS=unsigned' >> $env:GITHUB_ENV
+            'No trusted Authenticode certificate is configured; the Release will be explicitly marked unsigned.' >> $env:GITHUB_STEP_SUMMARY
+            return
+          }
+
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'winterm-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINTERM_PFX_BASE64))
+            $password = ConvertTo-SecureString $env:WINTERM_PFX_PASSWORD -AsPlainText -Force
+            $certificate = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $password -Exportable:$false
+            if ($null -eq $certificate -or -not $certificate.HasPrivateKey) {
+              throw 'The trusted Authenticode certificate could not be imported with its private key.'
+            }
+            "WINTERM_SIGNING_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
+            'WINTERM_SIGNING_STATUS=trusted-signed' >> $env:GITHUB_ENV
+          }
+          finally {
+            if (Test-Path -LiteralPath $pfxPath) {
+              Remove-Item -LiteralPath $pfxPath -Force
+            }
+          }
 
       - name: Embed traceable build metadata
         shell: pwsh
@@ -99,165 +169,207 @@ jobs:
             -BuildTimestamp $env:WINTERM_BUILD_TIMESTAMP `
             -WorkflowRunId '${{ github.run_id }}'
 
-      - name: Build and inspect the unsigned x64 MSIX
+      - name: Build and verify the unpackaged self-contained stage
+        shell: pwsh
+        run: .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64 -Force
+
+      - name: Build the Setup EXE and Portable ZIP
         shell: pwsh
         run: |
-          .\scripts\winterm\package.ps1 `
-            -Platform x64 `
-            -ExpectedPublisher $env:WINTERM_PUBLISHER
-          $packages = @(Get-ChildItem -LiteralPath 'src\cascadia\CascadiaPackage\AppPackages' -Recurse -File -Filter '*.msix' |
-            Where-Object { $_.FullName -match '(?i)x64' })
-          if ($packages.Count -ne 1) {
-            throw "Expected one x64 MSIX, found $($packages.Count)."
+          $installerArguments = @{
+            Version = $env:WINTERM_VERSION
+            Platform = 'x64'
+            StageDirectory = 'artifacts\stage\winTerm-x64'
+            OutputDirectory = 'artifacts\build-output'
+            InnoCompiler = $env:WINTERM_INNO_COMPILER
+            SkipBuild = $true
           }
-          "WINTERM_UNSIGNED_X64_PACKAGE=$($packages[0].FullName)" >> $env:GITHUB_ENV
+          if ($env:WINTERM_SIGNING_STATUS -eq 'trusted-signed') {
+            $installerArguments.SigningCertificateThumbprint = $env:WINTERM_SIGNING_THUMBPRINT
+            $installerArguments.TimestampUrl = 'https://timestamp.digicert.com'
+          }
+          .\scripts\winterm\build-installer.ps1 @installerArguments
+          .\scripts\winterm\build-portable.ps1 `
+            -Version $env:WINTERM_VERSION `
+            -Platform x64 `
+            -StageDirectory 'artifacts\stage\winTerm-x64' `
+            -OutputDirectory 'artifacts\build-output' `
+            -SkipBuild
 
-      - name: Create and verify the self-signed installer
+      - name: Test local installer in current-user and all-users scopes
         shell: pwsh
         run: |
-          $output = Join-Path $env:RUNNER_TEMP 'winterm-self-signed-release'
-          .\scripts\winterm\build-local-development.ps1 `
-            -PackagePath $env:WINTERM_UNSIGNED_X64_PACKAGE `
-            -OutputDirectory $output `
-            -ReleaseAsset
-          "WINTERM_X64_PACKAGE=$(Join-Path $output 'winTerm-1.0.2-x64.msix')" >> $env:GITHUB_ENV
-          "WINTERM_PUBLIC_CERTIFICATE=$(Join-Path $output 'winTerm-1.0.2.cer')" >> $env:GITHUB_ENV
-          "WINTERM_INSTALL_INSTRUCTIONS=$(Join-Path $output 'INSTALL.txt')" >> $env:GITHUB_ENV
+          $installer = "artifacts\build-output\winTerm-$env:WINTERM_VERSION-setup-x64.exe"
+          .\scripts\winterm\test-installer.ps1 `
+            -InstallerPath $installer `
+            -Platform x64 `
+            -Version $env:WINTERM_VERSION `
+            -RunSilentRoundTrip `
+            -RunAllUsersRoundTrip `
+            -RunDefaultPathRoundTrips
+          .\scripts\winterm\test-portable.ps1 `
+            -PortablePath "artifacts\build-output\winTerm-$env:WINTERM_VERSION-portable-x64.zip" `
+            -Platform x64 `
+            -Version $env:WINTERM_VERSION `
+            -RunLaunch
 
-      - name: Generate allowlisted release assets, SBOMs, symbols, and checksums
+      - name: Generate and verify the exact release asset allowlist
         shell: pwsh
         run: |
           .\scripts\winterm\generate-release-artifacts.ps1 `
-            -Version '1.0.2' `
-            -X64PackagePath $env:WINTERM_X64_PACKAGE `
-            -CertificatePath $env:WINTERM_PUBLIC_CERTIFICATE `
-            -InstallationInstructionsPath $env:WINTERM_INSTALL_INSTRUCTIONS `
-            -SymbolsDirectory 'bin\x64\Release' `
+            -Version $env:WINTERM_VERSION `
+            -InstallerPath "artifacts\build-output\winTerm-$env:WINTERM_VERSION-setup-x64.exe" `
+            -PortablePath "artifacts\build-output\winTerm-$env:WINTERM_VERSION-portable-x64.zip" `
             -OutputDirectory 'artifacts\release' `
             -CommitSha '${{ github.sha }}' `
             -UpstreamRevision $env:WINTERM_UPSTREAM_REVISION `
             -BuildTimestamp $env:WINTERM_BUILD_TIMESTAMP `
             -WorkflowRunId '${{ github.run_id }}' `
-            -SigningStatus self-signed
-
-      - name: Verify generated release assets
-        shell: pwsh
-        run: |
-          .\scripts\winterm\verify-release-assets.ps1 `
-            -Directory 'artifacts\release' `
-            -Architecture x64 `
-            -RequireSelfSigned `
-            -ExpectedPublisher $env:WINTERM_PUBLISHER
+            -SigningStatus $env:WINTERM_SIGNING_STATUS
+          $verifyArguments = @{
+            Directory = 'artifacts\release'
+            Version = $env:WINTERM_VERSION
+            Platform = 'x64'
+          }
+          if ($env:WINTERM_SIGNING_STATUS -eq 'trusted-signed') {
+            $verifyArguments.RequireSigned = $true
+          }
+          .\scripts\winterm\verify-release-assets.ps1 @verifyArguments
 
       - name: Generate GitHub artifact attestations
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
-          subject-path: artifacts/release/*
+          subject-path: |
+            artifacts/release/winTerm-${{ env.WINTERM_VERSION }}-setup-x64.exe
+            artifacts/release/winTerm-${{ env.WINTERM_VERSION }}-portable-x64.zip
+            artifacts/release/SHA256SUMS.txt
+            artifacts/release/THIRD_PARTY_NOTICES.md
+            artifacts/release/SBOM.spdx.json
+            artifacts/release/SBOM.cyclonedx.json
+            artifacts/release/release-metadata.json
+            artifacts/release/winTerm-${{ env.WINTERM_VERSION }}-release-notes.md
           create-storage-record: false
 
-      - name: Create the immutable-candidate Draft Release
+      - name: Create a non-clobbering Draft Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.0.2 --repo '${{ github.repository }}' *> $null
+          gh release view $env:WINTERM_TAG --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
-            throw 'A v1.0.2 Release already exists. This workflow never replaces or clobbers Release assets.'
+            throw "Release $env:WINTERM_TAG already exists."
           }
-
-          $notesPath = Join-Path $env:RUNNER_TEMP 'winTerm-1.0.2-release-notes.md'
-          Copy-Item -LiteralPath 'docs\releases\1.0.2.md' -Destination $notesPath
-          Add-Content -LiteralPath $notesPath -Value @'
-
-          > **Self-signed installer:** download `winTerm-1.0.2-x64.msix`, `winTerm-1.0.2.cer`, `INSTALL.txt`, and `SHA256SUMS.txt`. Windows does not trust this certificate by default. Verify the hashes and repository URL before importing the certificate into Trusted People.
-          '@
-
           $assets = @(
-            'artifacts\release\winTerm-1.0.2-x64.msix',
-            'artifacts\release\winTerm-1.0.2.cer',
-            'artifacts\release\INSTALL.txt',
+            "artifacts\release\winTerm-$env:WINTERM_VERSION-setup-x64.exe",
+            "artifacts\release\winTerm-$env:WINTERM_VERSION-portable-x64.zip",
             'artifacts\release\SHA256SUMS.txt',
             'artifacts\release\THIRD_PARTY_NOTICES.md',
             'artifacts\release\SBOM.spdx.json',
             'artifacts\release\SBOM.cyclonedx.json',
             'artifacts\release\release-metadata.json',
-            'artifacts\release\winTerm-1.0.2-symbols.zip',
-            'artifacts\release\winTerm-1.0.2-release-notes.md'
+            "artifacts\release\winTerm-$env:WINTERM_VERSION-release-notes.md"
           )
-          gh release create v1.0.2 @assets `
-            --repo '${{ github.repository }}' `
-            --verify-tag `
-            --title 'winTerm 1.0.2' `
-            --notes-file $notesPath `
-            --draft
+          $arguments = @(
+            'release', 'create', $env:WINTERM_TAG
+          ) + $assets + @(
+            '--repo', '${{ github.repository }}',
+            '--verify-tag',
+            '--title', "winTerm $env:WINTERM_VERSION",
+            '--notes-file', "artifacts\release\winTerm-$env:WINTERM_VERSION-release-notes.md",
+            '--draft'
+          )
+          if ($env:WINTERM_CHANNEL -ne 'stable') {
+            $arguments += '--prerelease'
+          }
+          & gh @arguments
           if ($LASTEXITCODE -ne 0) {
             throw 'GitHub Draft Release creation failed.'
           }
 
-      - name: Re-download and verify every Draft Release asset
+      - name: Re-download and test every Draft Release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $verificationDirectory = Join-Path $env:RUNNER_TEMP 'winterm-draft-download'
-          New-Item -ItemType Directory -Path $verificationDirectory | Out-Null
-          gh release download v1.0.2 --repo '${{ github.repository }}' --dir $verificationDirectory
+          $download = Join-Path $env:RUNNER_TEMP 'winterm-draft-download'
+          New-Item -ItemType Directory -Path $download | Out-Null
+          gh release download $env:WINTERM_TAG --repo '${{ github.repository }}' --dir $download
           if ($LASTEXITCODE -ne 0) {
             throw 'Draft Release asset download failed.'
           }
-          .\scripts\winterm\verify-checksums.ps1 -Directory $verificationDirectory
           .\scripts\winterm\verify-release-assets.ps1 `
-            -Directory $verificationDirectory `
-            -Architecture x64 `
-            -RequireSelfSigned `
-            -ExpectedPublisher $env:WINTERM_PUBLISHER
-          gh attestation verify (Join-Path $verificationDirectory 'winTerm-1.0.2-x64.msix') --repo '${{ github.repository }}'
+            -Directory $download `
+            -Version $env:WINTERM_VERSION `
+            -Platform x64 `
+            -RequireSigned:($env:WINTERM_SIGNING_STATUS -eq 'trusted-signed')
+          .\scripts\winterm\test-installer.ps1 `
+            -InstallerPath (Join-Path $download "winTerm-$env:WINTERM_VERSION-setup-x64.exe") `
+            -Platform x64 `
+            -Version $env:WINTERM_VERSION `
+            -RunSilentRoundTrip `
+            -RunAllUsersRoundTrip `
+            -RunDefaultPathRoundTrips
+          .\scripts\winterm\test-portable.ps1 `
+            -PortablePath (Join-Path $download "winTerm-$env:WINTERM_VERSION-portable-x64.zip") `
+            -Platform x64 `
+            -Version $env:WINTERM_VERSION `
+            -RunLaunch
+          gh attestation verify (Join-Path $download "winTerm-$env:WINTERM_VERSION-setup-x64.exe") --repo '${{ github.repository }}'
           if ($LASTEXITCODE -ne 0) {
-            throw 'Artifact attestation verification failed.'
+            throw 'Draft installer attestation verification failed.'
           }
-          $release = gh release view v1.0.2 --repo '${{ github.repository }}' --json tagName,name,isDraft,isPrerelease,url | ConvertFrom-Json
-          if ($release.tagName -ne 'v1.0.2' -or $release.name -ne 'winTerm 1.0.2' -or -not $release.isDraft -or $release.isPrerelease) {
+          $release = gh release view $env:WINTERM_TAG --repo '${{ github.repository }}' --json tagName,name,isDraft,url | ConvertFrom-Json
+          if ($release.tagName -cne $env:WINTERM_TAG -or $release.name -cne "winTerm $env:WINTERM_VERSION" -or -not $release.isDraft) {
             throw 'Draft Release state verification failed.'
           }
 
-      - name: Publish as the Latest stable Release
+      - name: Publish only after every Draft gate passes
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release edit v1.0.2 `
-            --repo '${{ github.repository }}' `
-            --draft=false `
-            --prerelease=false `
-            --latest
+          $arguments = @('release', 'edit', $env:WINTERM_TAG, '--repo', '${{ github.repository }}', '--draft=false')
+          if ($env:WINTERM_CHANNEL -eq 'stable') {
+            $arguments += @('--prerelease=false', '--latest')
+          }
+          else {
+            $arguments += @('--prerelease', '--latest=false')
+          }
+          & gh @arguments
           if ($LASTEXITCODE -ne 0) {
             throw 'GitHub Release publication failed.'
           }
-          $release = gh release view v1.0.2 --repo '${{ github.repository }}' --json tagName,name,isDraft,isPrerelease,assets,url | ConvertFrom-Json
-          if ($release.isDraft -or $release.isPrerelease -or $release.tagName -ne 'v1.0.2') {
-            throw 'Published Release state verification failed.'
-          }
-          "Published Release URL: $($release.url)" >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Re-download and verify the public assets
+      - name: Re-download and test the public Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $publicDirectory = Join-Path $env:RUNNER_TEMP 'winterm-public-download'
-          New-Item -ItemType Directory -Path $publicDirectory | Out-Null
-          gh release download v1.0.2 --repo '${{ github.repository }}' --dir $publicDirectory
+          $download = Join-Path $env:RUNNER_TEMP 'winterm-public-download'
+          New-Item -ItemType Directory -Path $download | Out-Null
+          gh release download $env:WINTERM_TAG --repo '${{ github.repository }}' --dir $download
           if ($LASTEXITCODE -ne 0) {
             throw 'Public Release asset download failed.'
           }
-          .\scripts\winterm\verify-checksums.ps1 -Directory $publicDirectory
           .\scripts\winterm\verify-release-assets.ps1 `
-            -Directory $publicDirectory `
-            -Architecture x64 `
-            -RequireSelfSigned `
-            -ExpectedPublisher $env:WINTERM_PUBLISHER
-          gh attestation verify (Join-Path $publicDirectory 'winTerm-1.0.2-x64.msix') --repo '${{ github.repository }}'
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Public artifact attestation verification failed.'
+            -Directory $download `
+            -Version $env:WINTERM_VERSION `
+            -Platform x64 `
+            -RequireSigned:($env:WINTERM_SIGNING_STATUS -eq 'trusted-signed')
+          .\scripts\winterm\test-installer.ps1 `
+            -InstallerPath (Join-Path $download "winTerm-$env:WINTERM_VERSION-setup-x64.exe") `
+            -Platform x64 `
+            -Version $env:WINTERM_VERSION `
+            -RunSilentRoundTrip `
+            -RunAllUsersRoundTrip `
+            -RunDefaultPathRoundTrips
+          .\scripts\winterm\test-portable.ps1 `
+            -PortablePath (Join-Path $download "winTerm-$env:WINTERM_VERSION-portable-x64.zip") `
+            -Platform x64 `
+            -Version $env:WINTERM_VERSION `
+            -RunLaunch
+          $release = gh release view $env:WINTERM_TAG --repo '${{ github.repository }}' --json tagName,isDraft,isPrerelease,url | ConvertFrom-Json
+          if ($release.isDraft -or $release.tagName -cne $env:WINTERM_TAG) {
+            throw 'Published Release state verification failed.'
           }
-          'The public self-signed installer, certificate, installation instructions, hashes, and provenance were re-downloaded and verified.' >> $env:GITHUB_STEP_SUMMARY
+          "Published and verified Release: $($release.url)" >> $env:GITHUB_STEP_SUMMARY

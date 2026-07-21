@@ -57,6 +57,7 @@ namespace winrt::TerminalApp::implementation
         constexpr std::wstring_view architecture{ L"unknown" };
 #endif
         const auto details = wil::str_printf<std::wstring>(
+            L"Publisher: %.*s\n"
             L"Channel: %.*s\n"
             L"Architecture: %.*s\n"
             L"Commit SHA: %.*s\n"
@@ -66,6 +67,8 @@ namespace winrt::TerminalApp::implementation
             L"Docking Model version: %u\n"
             L"Shell Protocol version: %u\n"
             L"Theme Schema version: %u",
+            static_cast<int>(winTerm::Branding::Publisher.size()),
+            winTerm::Branding::Publisher.data(),
             static_cast<int>(winTerm::Branding::ReleaseChannel.size()),
             winTerm::Branding::ReleaseChannel.data(),
             static_cast<int>(architecture.size()),

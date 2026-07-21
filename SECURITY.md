@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The latest public winTerm Stable release receives security support. winTerm 1.0.2 is the current supported Stable release. Its installer is self-signed; verify the GitHub Release URL, SHA-256 hashes, attached public certificate, and GitHub provenance before importing certificate trust or installing it.
+The latest public winTerm Stable release receives security support. Verify the GitHub Release URL, `SHA256SUMS.txt`, and GitHub provenance before installation. When Release notes mark an installer unsigned, Windows may show Unknown Publisher or a SmartScreen warning; no certificate import is required or recommended.
 
 ## Reporting a vulnerability
 

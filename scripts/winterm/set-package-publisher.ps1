@@ -16,9 +16,9 @@ $manifestPath = Join-Path $repositoryRoot 'src\cascadia\CascadiaPackage\Package-
 
 try
 {
-    if ($Publisher -match '(?i)Microsoft' -or $Publisher -eq 'CN=winTerm Development')
+    if ($Publisher -match '(?i)Microsoft' -or $Publisher -cne 'CN=helloThisWorld')
     {
-        throw 'A stable package publisher must be a production winTerm identity and must not use Microsoft or the development placeholder.'
+        throw 'The optional winTerm package publisher must be exactly CN=helloThisWorld and must not use a Microsoft identity.'
     }
 
     [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw

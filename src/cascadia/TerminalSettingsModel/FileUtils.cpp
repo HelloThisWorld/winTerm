@@ -14,8 +14,13 @@ static constexpr std::wstring_view UnpackagedSettingsFolderName{ L"winTerm\\" };
 static constexpr std::wstring_view UnpackagedSettingsFolderName{ L"Microsoft\\Windows Terminal\\" };
 #endif
 static constexpr std::wstring_view ReleaseSettingsFolder{ L"Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\" };
+#if defined(WT_BRANDING_WINTERM)
+static constexpr std::wstring_view PortableModeMarkerFile{ L"portable.marker" };
+static constexpr std::wstring_view PortableModeSettingsFolder{ L"data" };
+#else
 static constexpr std::wstring_view PortableModeMarkerFile{ L".portable" };
 static constexpr std::wstring_view PortableModeSettingsFolder{ L"settings" };
+#endif
 
 namespace winrt::Microsoft::Terminal::Settings::Model
 {

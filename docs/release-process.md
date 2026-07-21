@@ -1,74 +1,69 @@
-# winTerm Stable release process
+# winTerm release process
 
 ## 1. Select exact source
 
-Start from reviewed `main`, create a release branch, and record:
-
-- repository and branch;
-- commit SHA and v0.6 baseline;
-- Microsoft Terminal upstream revision;
-- clean working tree and untracked files;
-- CI, package, signing, architecture, and blocker status.
-
-Run:
+Start from reviewed `main`. Record the clean commit, application version,
+Microsoft Terminal upstream revision, open blockers, and existing tags and
+Releases. Never replace an existing tag or Release asset.
 
 ```powershell
 .\scripts\winterm\verify-version.ps1
+.\scripts\winterm\verify-branding.ps1 -ExpectedPublisher 'CN=helloThisWorld'
 .\scripts\winterm\test.ps1 -Suite Smoke -Configuration Release -Platform x64
 ```
 
-Do not tag, publish, force-push, or overwrite user work at this stage.
-
-## 2. Run compiled and manual gates
-
-Build and test x64 with PowerShell 7, Visual Studio, and Windows SDK 10.0.22621.0:
+## 2. Complete build and runtime gates
 
 ```powershell
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
-.\scripts\winterm\package.ps1 -Platform x64
+.\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version <version> -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version <version> -Platform x64 -SkipBuild
 ```
 
-Then validate the self-signed package on a clean Windows 11 x64 machine: verify hashes, import the attached CER into Trusted People, install, launch, exercise PowerShell, CMD, tabs, panes, and Workspace save/restore, restart, uninstall, reinstall, run `winterm.exe`, and confirm Windows Terminal retains `wt.exe`.
+Run current-user and elevated all-users installer round trips. On a clean
+Windows 11 x64 machine, verify PowerShell, CMD, WSL discovery, themes, fonts,
+ANSI true color, Emoji, workspaces, directed splits, pane controls, session
+preservation, Portable launch, and portable data mode. Confirm Microsoft
+Windows Terminal and `wt.exe` are unchanged.
 
-Complete Narrator, keyboard, contrast, scaling, privacy, diagnostics, performance, and soak evidence. ARM64 is published only after separate native evidence.
+## 3. Signing
 
-## 3. Self-sign without a public CA
+If a trusted Authenticode certificate is configured, Release CI imports it into
+the ephemeral current-user store, signs the Setup EXE, applies a trusted
+timestamp, and verifies the signature. The PFX is deleted immediately and is
+never an artifact.
 
-The Release workflow:
+Without a trusted certificate, the workflow produces an explicitly unsigned
+release. Release notes must state that Windows can show Unknown Publisher or a
+SmartScreen warning and direct users to `SHA256SUMS.txt`. A shared test
+certificate must never be presented as production signing.
 
-- creates a one-year RSA 3072-bit code-signing certificate for `CN=winTerm Development`;
-- marks the private key non-exportable;
-- signs the exact-tag MSIX without a public timestamp;
-- exports only the public CER;
-- verifies the embedded PKCS#7 signature against that CER;
-- removes the private key after signing.
+## 4. Tag and Draft Release
 
-The public certificate is uploaded beside the installer. Never commit or upload a private key, PFX, password, token, or signing-service credential.
+After every pre-tag gate passes, create a new version tag matching
+`src/winterm/Branding/version.json` and push only that tag. The generic release
+workflow rejects mismatched tags, dirty source, and any tag that already has a
+GitHub Release.
 
-## 4. Merge, tag, and prepare Draft
+It builds the unpackaged stage, Setup EXE, and Portable ZIP; runs both installer
+scopes; generates SBOMs and hashes; creates an allowlisted Draft Release; then
+re-downloads and tests every Draft asset. It never uses `--clobber`.
 
-After every pre-tag gate is reviewed:
+## 5. Publish and verify
 
-1. merge the release PR to `main`;
-2. record the exact merge commit;
-3. create annotated tag `v1.0.2` on that commit;
-4. push only the tag;
-5. let `.github/workflows/release.yml` build from the clean tag checkout.
+Only after all Draft gates pass does the workflow publish the Release. It then
+downloads the public assets into a fresh directory and repeats layout, hash,
+signature-state, current-user/all-users installation, upgrade, uninstall,
+reinstall, and Windows Terminal isolation checks.
 
-The workflow creates a Draft, uploads only the allowlisted installer, public CER, installation instructions, checksums, notices, SBOMs, symbols, metadata, and notes, then generates Attestations. It re-downloads every asset and verifies hashes, package identity, architecture, alias, Publisher, self-signed signature, public certificate, and Attestation. It never uses `--clobber`.
+If any public verification fails, record an incident and prepare a new version;
+never silently replace an already published asset.
 
-## 5. Publish deliberately
+## 6. WinGet
 
-After the Draft assets pass re-download verification, the same exact-tag workflow sets Draft false, Prerelease false, and Latest. It then downloads the public assets into a new directory and repeats package, certificate, signature, checksum, and Attestation verification.
-
-The installer is self-signed and not publicly trusted. Users must verify the repository URL and hashes before importing the attached CER into Trusted People. If the public package fails verification or installation, never replace the `v1.0.2` asset; record the incident and prepare a new version and Tag.
-
-## 6. Post-release metadata
-
-Only after the public URL and asset hash exist:
-
-- generate the stable update manifest with `generate-stable-update-manifest.ps1`;
-- run the WinGet workflow and `winget validate`;
-- update the README to link `/releases/latest`;
-- record Release ID, URL, workflow run, assets, hashes, signatures, installation results, and remaining issues.
+Only a public Release can trigger final WinGet manifest generation. The workflow
+downloads the real Setup EXE, computes its SHA-256, creates `InstallerType:
+inno` manifests for user and machine scope, runs the pinned `winget validate`,
+and uploads the validated manifests for separate manual submission.

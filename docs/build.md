@@ -1,149 +1,107 @@
-# Build and test winTerm
+# Build, package, and test winTerm
 
-## Supported development target
+## Supported target and tools
 
-The winTerm 1.0 release target is Windows 11 x64. The wrappers accept `ARM64`, but ARM64 remains Disabled until a native build, install, and launch validation passes.
+The supported release target is Windows 11 x64. ARM64 remains disabled until a
+native build, install, launch, and release-asset validation succeeds.
 
-## Required tools
+Use PowerShell 7, Git, and Visual Studio 2022 with the components in `.vsconfig`.
+The upstream toolchain requires MSBuild, Visual C++ desktop and UWP support,
+MSIX packaging tools, and Windows SDK 10.0.22621.0. Inno Setup 6.7.3 is required
+only to compile the traditional Setup EXE. Release CI downloads that exact
+official version and verifies its SHA-256 and trusted signature.
 
-Install Visual Studio 2022 Community, Professional, Enterprise, or Build Tools with the components declared in the repository `.vsconfig`. Important components include:
+The source baseline is Microsoft Terminal `release-1.25` commit
+`1cea42d433253d95c4487a3037db48197b5e72f4`.
 
-- MSBuild and Visual C++ x64/x86 tools
-- Desktop development with C++
-- Universal Windows Platform development and C++ support
-- MSIX Packaging tools
-- Windows App SDK support
-- Windows SDK 10.0.22621.0
-- ARM64 C++ and UWP components only when attempting ARM64
+## Compile and test
 
-Also install PowerShell 7 or later and Git. The upstream build module requires PowerShell 7; Windows PowerShell 5.1 can run only the winTerm source-level smoke suite.
-
-The repository contains its expected NuGet client at `dep/nuget/nuget.exe`. Package restore is delegated to the upstream build environment; do not vendor restored `packages` output.
-
-The current baseline has no `.gitmodules` file. If a later upstream integration adds one, run:
-
-```powershell
-git submodule update --init --recursive
-```
-
-## Repository setup
-
-The expected remotes are:
-
-```text
-origin    the winTerm repository
-upstream  https://github.com/microsoft/terminal.git
-```
-
-The source baseline is `release-1.25` commit `1cea42d433253d95c4487a3037db48197b5e72f4`.
-
-## x64 builds
-
-Use PowerShell 7 from the repository root:
+Run from the repository root in PowerShell 7:
 
 ```powershell
 .\scripts\winterm\build.ps1 -Configuration Debug -Platform x64
-.\scripts\winterm\build.ps1 -Configuration Release -Platform x64
-```
-
-The wrapper checks PowerShell, Visual Studio discovery, Windows SDK 10.0.22621.0, NuGet, the solution, and the package project. It then initializes the official upstream environment and invokes its build function with `WindowsTerminalBranding=WinTerm`.
-
-Build output remains in upstream `bin` and intermediate directories. MSIX output is under `src/cascadia/CascadiaPackage/AppPackages`; these generated paths are ignored by Git.
-
-## Tests
-
-```powershell
+.\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Smoke
-.\scripts\winterm\test.ps1 -Suite Relevant -Configuration Debug -Platform x64
-.\scripts\winterm\test.ps1 -Suite Full -Configuration Release -Platform x64
+.\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 ```
 
-- `Smoke` parses winTerm PowerShell scripts and verifies source identity, manifest, assets, settings isolation, and profile foundations. It does not require compiled binaries.
-- `Relevant` runs Smoke plus the upstream `unitSettingsModel`, `terminalApp`, and `unitControl` groups against an existing build.
-- `Full` requests all upstream tests and is intentionally opt-in.
-- Pass `-Build` to Relevant or Full to build before running compiled tests.
+`Smoke` validates scripts, branding, release boundaries, manifests, assets,
+settings isolation, and feature source boundaries. `Relevant` also runs the
+upstream Settings Model, TerminalApp, and Control test groups. `Full` requests
+all upstream tests and is opt-in.
 
-## Package
+## Build the self-contained stage
 
 ```powershell
-.\scripts\winterm\package.ps1 -Platform x64
+.\scripts\winterm\build-unpackaged.ps1 `
+  -Configuration Release `
+  -Platform x64
 ```
 
-The wrapper builds Release with MSIX generation and signing disabled, locates the package, unpacks it with `makeappx.exe`, revalidates the embedded manifest, and reports path, architecture, signature status, and installation guidance. See [Release process](release-process.md) before signing or installing.
+The output is `artifacts/stage/winTerm-x64`. It includes executables, runtime
+DLLs, the merged unpackaged resource index, shell integrations, themes, fonts,
+icons, licenses, notices, and `version.json`. It contains no package identity,
+certificate, private key, test binary, debug symbol, build cache, or local
+absolute path.
 
-## Self-signed local development package
+Microsoft Terminal's supported unpackaged generator consumes an unsigned MSIX
+and the pinned Microsoft.UI.Xaml package as build intermediates. Neither is a
+release asset or user installation requirement.
 
-Use the following command when a public CA or production signing service is
-not available and the package will be used only for local or controlled
-internal testing:
+## Build Setup and Portable distributions
 
 ```powershell
-.\scripts\winterm\build-local-development.ps1 -IncludeTests
+.\scripts\winterm\build-installer.ps1 `
+  -Version 0.7.0-beta.1 `
+  -Platform x64 `
+  -InnoCompiler 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+
+.\scripts\winterm\build-portable.ps1 `
+  -Version 0.7.0-beta.1 `
+  -Platform x64 `
+  -SkipBuild
 ```
 
-The wrapper:
-
-1. verifies the 1.0.2 version and runs the source-level Smoke suite;
-2. builds the x64 Release MSIX with signing disabled;
-3. validates the generated package;
-4. runs the Relevant compiled tests when `-IncludeTests` is present;
-5. creates a one-year, non-exportable, self-signed development key for
-   `CN=winTerm Development`;
-6. signs the MSIX without a timestamp and exports only the public `.cer`;
-7. validates the package identity, version, architecture, `winterm.exe`
-   alias, absence of `wt.exe`, and the cryptographic PKCS#7 signature;
-8. removes the private key and writes installation instructions and
-   `SHA256SUMS.txt`.
-
-The default output directory is ignored by Git:
+Outputs:
 
 ```text
-artifacts/local/winTerm-1.0.2-development-x64/
-    INSTALL.txt
-    SHA256SUMS.txt
-    winTerm-1.0.2-development.cer
-    winTerm-1.0.2-development-x64.msix
+artifacts/release/winTerm-0.7.0-beta.1-setup-x64.exe
+artifacts/release/winTerm-0.7.0-beta.1-portable-x64.zip
 ```
 
-The wrapper refuses to overwrite an existing output directory. Use a new
-directory when preserving an earlier build:
+Without `-SigningCertificateThumbprint`, the installer is intentionally
+unsigned and the script prints an explicit warning. With a trusted code-signing
+certificate in the current user's certificate store, pass its thumbprint and a
+trusted `-TimestampUrl`; the script signs and verifies the Setup EXE. Never
+commit or package a PFX, private key, password, or development certificate.
+
+## Installer tests
+
+Static validation:
 
 ```powershell
-.\scripts\winterm\build-local-development.ps1 `
-  -OutputDirectory artifacts/local/winTerm-development-test-2
+.\scripts\winterm\test-installer.ps1 `
+  -InstallerPath .\artifacts\release\winTerm-0.7.0-beta.1-setup-x64.exe `
+  -Version 0.7.0-beta.1
 ```
 
-An existing unsigned MSIX can be validated and signed without compiling it
-again:
+Current-user install, custom path, launch, repair/upgrade, uninstall, reinstall,
+registration, user-data preservation, and Windows Terminal isolation:
 
 ```powershell
-.\scripts\winterm\build-local-development.ps1 `
-  -PackagePath .\path\to\CascadiaPackage_1.0.2.0_x64.msix `
-  -OutputDirectory artifacts/local/winTerm-development-from-existing-package
+.\scripts\winterm\test-installer.ps1 `
+  -InstallerPath .\artifacts\release\winTerm-0.7.0-beta.1-setup-x64.exe `
+  -Version 0.7.0-beta.1 `
+  -RunSilentRoundTrip
 ```
 
-Do not pass a previously signed package. The wrapper refuses to replace or
-append a signature.
+Add `-RunAllUsersRoundTrip` from an elevated PowerShell process to run the same
+all-users gate. Tests use unique temporary install paths and remove only those
+verified paths. They never remove existing `%LOCALAPPDATA%\winTerm` data.
 
-To install the result:
+## Release assets
 
-1. verify the files against `SHA256SUMS.txt`;
-2. open `winTerm-1.0.2-development.cer`;
-3. choose **Install Certificate**, **Local Machine**, and **Trusted People**,
-   and approve the administrator prompt;
-4. open `winTerm-1.0.2-development-x64.msix` and select **Install**.
-
-Equivalent elevated PowerShell commands are included in `INSTALL.txt`.
-Remove the development certificate after testing. Public v1.0.2 uses the same
-self-signing trust model but generates a distinct certificate from the exact
-release Tag; trust only the CER downloaded from that GitHub Release.
-
-## CI runner
-
-The validation and full-build workflows use GitHub-hosted Windows runners. The Stable workflow accepts only an exact `v1.0.2` Tag checkout. It creates a temporary non-exportable self-signed key, publishes only the public CER, deletes the private key after signing, and verifies the released MSIX against that CER.
-
-## Known build issues in the implementation environment
-
-On 2026-07-18, the available implementation machine did not contain PowerShell 7, Visual Studio or `vswhere.exe`, MSBuild, MakeAppx, SignTool, Winget, or Windows SDK 10.0.22621.0. Consequently, no v1.0 compiler, unit-test binary, application launch, package, signature, or installer result is claimed from that machine.
-
-Install the declared prerequisites, reopen a PowerShell 7 prompt, and rerun Smoke, both x64 builds, Relevant tests, and packaging. Do not treat a source-only Smoke pass as a successful application build.
+`generate-release-artifacts.ps1` copies only the Setup EXE, Portable ZIP,
+third-party notices, versioned notes, release metadata, SPDX SBOM, and CycloneDX
+SBOM, then generates `SHA256SUMS.txt`. `verify-release-assets.ps1` enforces the
+exact allowlist and revalidates every hash and payload.

@@ -1,16 +1,20 @@
 # WinGet manifest preparation
 
-The Stable package identifier is `HelloThisWorld.winTerm`.
+The package identifier is `HelloThisWorld.winTerm`, the publisher is
+`helloThisWorld`, and the installer type is `inno`.
 
-No 1.0.2 manifest is committed before the public GitHub Release exists. The installer URL and SHA-256 must come from the actually published `winTerm-1.0.2-x64.msix`; placeholders and Actions artifact URLs are forbidden.
+Final manifests are generated only after a GitHub Release is public. The
+workflow downloads the real `winTerm-<version>-setup-x64.exe`, computes its
+actual SHA-256, and constructs the exact public URL. Placeholders, Draft assets,
+Actions artifact URLs, and precomputed fake hashes are rejected.
 
-After publication, `.github/workflows/winget.yml`:
+The generated multi-file manifest provides current-user and all-users scopes,
+the `winterm` command, minimum Windows 11 version, Inno upgrade behavior, and
+Installed Apps correlation. CI pins Windows Package Manager 1.29.280 and runs:
 
-1. confirms `v1.0.2` is public and not a Prerelease;
-2. downloads the x64 installer from the Release;
-3. computes its real SHA-256;
-4. generates installer, default-locale, and version manifests;
-5. runs `winget validate`;
-6. uploads the validated set as a workflow artifact for manual review.
+```powershell
+winget validate --manifest <generated-version-directory> --disable-interactivity
+```
 
-This does not claim that an official `microsoft/winget-pkgs` pull request exists or has been approved. Record a real PR URL only after a separate reviewed submission succeeds.
+The validated set is uploaded for manual review. This does not claim that a
+`microsoft/winget-pkgs` pull request exists or has been accepted.

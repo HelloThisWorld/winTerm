@@ -107,8 +107,9 @@ try
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp').Contains('"0.7.0-beta.1"')) 'Workspace application-version fallback is 0.7.0-beta.1'
 
     $releaseWorkflow = Get-Text '.github\workflows\release.yml'
-    Assert-Condition (-not $releaseWorkflow.Contains($version.tag)) 'Beta development tag cannot trigger the Stable workflow'
-    Assert-Condition ($releaseWorkflow.Contains('v1.0.2')) 'Existing Stable workflow remains isolated on v1.0.2'
+    Assert-Condition ($releaseWorkflow.Contains("- 'v*'")) 'Release workflow accepts version tags through a generic guarded trigger'
+    Assert-Condition ($releaseWorkflow.Contains("`$expectedTag = `"v`$(`$metadata.applicationVersion)`"")) 'Release workflow derives the expected tag from version.json'
+    Assert-Condition ($releaseWorkflow.Contains("`$metadata.tag -cne `$expectedTag")) 'Release workflow rejects a version metadata tag mismatch'
 
     Assert-Condition ((Get-Text 'CHANGELOG.md').Contains('## 0.7.0-beta.1')) 'Changelog contains 0.7.0-beta.1'
 

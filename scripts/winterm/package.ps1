@@ -12,7 +12,7 @@ param(
 
     [Parameter()]
     [ValidatePattern('^CN=')]
-    [string]$ExpectedPublisher = 'CN=winTerm Development'
+    [string]$ExpectedPublisher = 'CN=helloThisWorld'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -205,7 +205,7 @@ try
 
     if ($signature.Status -ne 'Valid')
     {
-        Write-Warning 'The package is not signed with a trusted certificate. Create a development certificate whose subject matches CN=winTerm Development, keep it out of Git, and rebuild before installation.'
+        Write-Warning 'The optional MSIX intermediate is not signed. If package testing is required, use a disposable development certificate for CN=helloThisWorld and keep its private key out of Git.'
     }
 
     $developerInstaller = Get-ChildItem -LiteralPath $artifact.Directory.FullName -File -Filter 'Add-AppDevPackage.ps1' -ErrorAction SilentlyContinue | Select-Object -First 1

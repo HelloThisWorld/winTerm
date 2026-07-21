@@ -3,6 +3,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <WindowsTerminalBranding Condition="'$(WindowsTerminalBranding)'==''">WinTerm</WindowsTerminalBranding>
+    <VersionInfoCompanyName Condition="'$(WindowsTerminalBranding)'=='WinTerm'">helloThisWorld</VersionInfoCompanyName>
     <VersionInfoProductName Condition="'$(WindowsTerminalBranding)'=='WinTerm'">winTerm</VersionInfoProductName>
     <VersionInfoCopyRight Condition="'$(WindowsTerminalBranding)'=='WinTerm'">Copyright (c) winTerm contributors. Portions copyright Microsoft Corporation.</VersionInfoCopyRight>
   </PropertyGroup>

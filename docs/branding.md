@@ -1,39 +1,47 @@
 # winTerm branding and identity
 
-## Public identity
-
-| Surface | winTerm 1.0 value |
+| Surface | Value |
 | --- | --- |
-| Product and display name | `winTerm` |
-| Package name | `HelloThisWorld.winTerm` |
-| Application ID | `winTerm` |
-| Execution alias | `winterm.exe` |
-| Forbidden alias | `wt.exe` |
-| Development publisher | `CN=winTerm Development` |
-| Stable publisher | `CN=winTerm Development`, matching the public self-signed Release certificate |
-| Package version | `1.0.2.0` |
-| Application version | `1.0.2` |
-| Release channel | `stable` |
-| Package description | `Independent open-source terminal based on Microsoft Windows Terminal` |
+| Application and product name | `winTerm` |
+| Publisher and company | `helloThisWorld` |
+| Product ID / WinGet ID | `HelloThisWorld.winTerm` |
+| Diagnostic product ID | `helloThisWorld.winTerm` |
+| Executable | `winTerm.exe` |
+| Command | `winterm.exe` |
+| Forbidden command ownership | `wt.exe` |
+| User data | `%LOCALAPPDATA%\winTerm` |
+| All-users install | `%ProgramFiles%\winTerm` |
+| Current-user install | `%LOCALAPPDATA%\Programs\winTerm` |
 
-The WinTerm build brand does not change Microsoft Terminal Stable, Preview, Canary, or Dev package identities. Unique winTerm package, application-data, COM handoff, and shell-extension identities prevent package registration from replacing the upstream application.
+The terminal host retains internal upstream filenames, namespaces, API
+contracts, compatibility identifiers, and source paths where required. Those
+are not public winTerm publisher metadata. Microsoft and third-party component
+publisher data must not be rewritten.
 
-The terminal host may retain the internal filename `WindowsTerminal.exe`, and upstream project names, namespaces, API contracts, compatibility identifiers, and source paths remain unchanged. The package maps the launcher output to `winterm.exe`; it neither ships nor registers `wt.exe`.
+Windows filenames are case-insensitive, so the physical `winTerm.exe` also
+satisfies a lowercase `winterm.exe` invocation. The installer registers that
+command with App Paths and never takes ownership of Windows Terminal's `wt.exe`.
 
-## Publisher and signing
+## Signing and installed metadata
 
-`CN=winTerm Development` is the v1.0.2 self-signed publisher. The Release workflow creates a temporary non-exportable key and exports only its public CER. The certificate subject must exactly match the package Publisher. A private key, PFX, password, token, or signing-service credential must never be committed or uploaded as a release asset.
+`helloThisWorld` appears in winTerm executable version information, Inno Setup
+metadata, Installed Apps, About, diagnostics, release metadata, SBOMs, and
+WinGet manifests. This metadata does not make an unsigned executable a
+Windows-verified publisher. Only a trusted Authenticode certificate can do so.
 
-An unsigned package may exist only as an intermediate CI build. The public installer must contain a cryptographically valid signature matching the CER attached to the same Release.
+The release tooling supports trusted signing or an explicit unsigned state. A
+PFX, private key, password, token, development certificate, or signing service
+credential must never be committed or uploaded.
 
-## Application data and coexistence
+## Data and coexistence
 
-Packaged winTerm has its own package-local data. Unpackaged winTerm uses `%LOCALAPPDATA%\winTerm`. It does not import, overwrite, or remove Microsoft Windows Terminal settings. Uninstall and Reset operations may target only winTerm-owned data.
-
-## Public contracts
-
-The `winterm.exe` alias is frozen for winTerm 1.x. No `winterm:` URI protocol is registered because no reviewed activation contract exists. Shared profile-fragment identifiers retained from upstream are compatibility inputs, not winTerm settings roots or a claim of Microsoft endorsement.
+Installed winTerm stores data under `%LOCALAPPDATA%\winTerm`. Portable mode
+uses the adjacent `data` directory while `portable.marker` exists. winTerm does
+not import, overwrite, or remove Microsoft Windows Terminal settings, packages,
+or commands. Uninstall and reset operations target only winTerm-owned files.
 
 ## Artwork
 
-`assets/winterm/icons/winterm.svg` is original placeholder geometry. It contains no Microsoft, Windows, Windows Terminal, or Apple logo. Generated PNG and ICO files are committed so image generation is not a build dependency.
+`assets/winterm/icons/winterm.svg` is original placeholder geometry. It contains
+no Microsoft, Windows, Windows Terminal, or Apple logo. Generated PNG and ICO
+files are committed so image generation is not a build dependency.

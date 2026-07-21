@@ -4,60 +4,91 @@ on:
   pull_request:
     paths:
       - '.github/workflows/winget.yml'
+      - '.github/workflows/release.yml'
       - 'scripts/winterm/generate-winget-manifests.ps1'
       - 'scripts/winterm/test-release-workflow.ps1'
   release:
     types:
       - published
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing public winTerm Release tag
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  validate:
-    name: Generate and validate public-release manifests
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event.release.tag_name == 'v1.0.2'
+  static:
+    name: Validate WinGet workflow boundaries
+    if: github.event_name == 'pull_request'
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Check out source without persisted credentials
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Download the public x64 installer and derive its actual hash
+      - name: Run release workflow boundary tests
+        shell: pwsh
+        run: .\scripts\winterm\test-release-workflow.ps1
+
+  validate:
+    name: Generate and validate manifests from a public Release
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact released source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          persist-credentials: false
+
+      - name: Download the public Setup EXE and derive its actual hash
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $release = gh release view v1.0.2 --repo '${{ github.repository }}' --json tagName,isDraft,isPrerelease,url,assets | ConvertFrom-Json
-          if ($release.tagName -ne 'v1.0.2' -or $release.isDraft -or $release.isPrerelease) {
-            throw 'WinGet manifests may be generated only from the public stable v1.0.2 Release.'
+          $tag = if ('${{ github.event_name }}' -eq 'release') { '${{ github.event.release.tag_name }}' } else { '${{ inputs.tag }}' }
+          $metadata = Get-Content -LiteralPath 'src\winterm\Branding\version.json' -Raw | ConvertFrom-Json
+          $version = [string]$metadata.applicationVersion
+          if ($tag -cne "v$version" -or $metadata.tag -cne $tag) {
+            throw "Release tag '$tag' does not match checked-out version '$version'."
           }
-          $asset = @($release.assets | Where-Object { $_.name -eq 'winTerm-1.0.2-x64.msix' })
+          $release = gh release view $tag --repo '${{ github.repository }}' --json tagName,isDraft,url,assets | ConvertFrom-Json
+          if ($release.tagName -cne $tag -or $release.isDraft) {
+            throw 'WinGet manifests may be generated only from an existing public Release.'
+          }
+          $assetName = "winTerm-$version-setup-x64.exe"
+          $asset = @($release.assets | Where-Object { $_.name -ceq $assetName })
           if ($asset.Count -ne 1) {
-            throw 'The public Release does not contain exactly one x64 installer.'
+            throw "The public Release does not contain exactly one '$assetName' asset."
           }
 
           $downloadDirectory = Join-Path $env:RUNNER_TEMP 'winterm-winget-source'
           New-Item -ItemType Directory -Path $downloadDirectory | Out-Null
-          gh release download v1.0.2 --repo '${{ github.repository }}' --pattern 'winTerm-1.0.2-x64.msix' --dir $downloadDirectory
+          gh release download $tag --repo '${{ github.repository }}' --pattern $assetName --dir $downloadDirectory
           if ($LASTEXITCODE -ne 0) {
             throw 'Public installer download failed.'
           }
-          $packagePath = Join-Path $downloadDirectory 'winTerm-1.0.2-x64.msix'
-          $sha = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash
-          $url = 'https://github.com/${{ github.repository }}/releases/download/v1.0.2/winTerm-1.0.2-x64.msix'
+          $installerPath = Join-Path $downloadDirectory $assetName
+          $sha = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/$assetName"
+          $output = "artifacts\winget\$version"
           .\scripts\winterm\generate-winget-manifests.ps1 `
+            -Version $version `
             -InstallerUrl $url `
             -InstallerSha256 $sha `
-            -OutputDirectory 'packaging\winget\1.0.2'
+            -OutputDirectory $output
+          "WINTERM_VERSION=$version" >> $env:GITHUB_ENV
+          "WINTERM_WINGET_OUTPUT=$output" >> $env:GITHUB_ENV
 
       - name: Install the pinned WinGet manifest validator
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           Install-Module `
             -Name Microsoft.WinGet.Client `
@@ -67,9 +98,7 @@ jobs:
             -Force
           Import-Module Microsoft.WinGet.Client -RequiredVersion '1.29.280' -Force
           Repair-WinGetPackageManager -Version 'v1.29.280' -AllUsers -Force
-
-          $winget = Get-Command winget.exe -ErrorAction Stop
-          & $winget.Source --version
+          winget --version
           if ($LASTEXITCODE -ne 0) {
             throw 'The pinned WinGet manifest validator is not executable.'
           }
@@ -77,7 +106,7 @@ jobs:
       - name: Validate WinGet manifests
         shell: pwsh
         run: |
-          winget validate --manifest 'packaging\winget\1.0.2' --disable-interactivity
+          winget validate --manifest $env:WINTERM_WINGET_OUTPUT --disable-interactivity
           if ($LASTEXITCODE -ne 0) {
             throw 'winget validate failed.'
           }
@@ -85,7 +114,7 @@ jobs:
       - name: Upload the validated manifest set for manual submission
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: HelloThisWorld.winTerm-1.0.2-winget
-          path: packaging/winget/1.0.2
+          name: HelloThisWorld.winTerm-${{ env.WINTERM_VERSION }}-winget
+          path: ${{ env.WINTERM_WINGET_OUTPUT }}
           if-no-files-found: error
           retention-days: 30

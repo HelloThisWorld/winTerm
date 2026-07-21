@@ -18,6 +18,7 @@
     <ClCompile Include="main.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ResourceCompile Include="winterm-shim.rc" />
   </ItemGroup>
 
   <ItemDefinitionGroup>

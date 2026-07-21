@@ -8,7 +8,10 @@ param(
 
     [Parameter()]
     [ValidatePattern('^CN=')]
-    [string]$ExpectedPublisher = 'CN=winTerm Development'
+    [string]$ExpectedPublisher = 'CN=helloThisWorld',
+
+    [Parameter()]
+    [string[]]$LegacyBrandAllowlist = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,6 +19,51 @@ Set-StrictMode -Version Latest
 
 $failures = New-Object System.Collections.Generic.List[string]
 $temporaryDirectory = $null
+
+function Test-TrackedLegacyBrand
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepositoryRoot
+    )
+
+    # Construct the retired name without storing it in a tracked file. The scanner
+    # scans every tracked file, including this script, so a literal would defeat it.
+    $legacyBrand = -join ([char[]](0x4b, 0x61, 0x6e, 0x61, 0x6d, 0x65))
+    $safeRepositoryRoot = $RepositoryRoot.Replace('\', '/')
+    $originalLocation = Get-Location
+    try
+    {
+        Set-Location $RepositoryRoot
+        $matches = @(& git -c "safe.directory=$safeRepositoryRoot" grep -n -i -- $legacyBrand 2>&1)
+        $grepExitCode = $LASTEXITCODE
+    }
+    finally
+    {
+        Set-Location $originalLocation
+    }
+
+    if ($grepExitCode -eq 1)
+    {
+        Write-Host "No $legacyBrand references found." -ForegroundColor Green
+        return
+    }
+    if ($grepExitCode -ne 0)
+    {
+        throw "Tracked-file branding scan failed with exit code $grepExitCode.`n$($matches -join [Environment]::NewLine)"
+    }
+
+    $blocked = @($matches | Where-Object {
+        $path = ([string]$_ -split ':', 2)[0].Replace('/', '\')
+        $LegacyBrandAllowlist -notcontains $path
+    })
+    if ($blocked.Count -gt 0)
+    {
+        throw "Retired branding was found in tracked files:`n$($blocked -join [Environment]::NewLine)"
+    }
+
+    Write-Host "All retired-brand matches are explicitly allowlisted." -ForegroundColor Yellow
+}
 
 function Test-Requirement
 {
@@ -146,6 +194,7 @@ $manifestPath = Join-Path $repositoryRoot 'src\cascadia\CascadiaPackage\Package-
 
 try
 {
+    Test-TrackedLegacyBrand -RepositoryRoot $repositoryRoot
     Test-Manifest -Path $manifestPath
 
     $requiredFiles = @(
@@ -177,6 +226,11 @@ try
     $resourceItems = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\CascadiaResources.build.items') -Raw
     $executablePathHelper = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\WinRTUtils\inc\WtExeUtils.h') -Raw
     $aboutDialog = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\TerminalApp\AboutDialog.cpp') -Raw
+    $releaseMetadata = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Branding\ReleaseMetadata.h') -Raw
+    $installerDefinition = Get-Content -LiteralPath (Join-Path $repositoryRoot 'packaging\inno\winTerm.iss') -Raw
+    $wingetGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1') -Raw
+    $releaseGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-release-artifacts.ps1') -Raw
+    $updateGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-stable-update-manifest.ps1') -Raw
 
     Test-Requirement -Condition ($packageProject.Contains('Package-winTerm.appxmanifest') -and $packageProject.Contains('<OCExecutionAliasName Condition="''$(WindowsTerminalBranding)''==''WinTerm''">winterm</OCExecutionAliasName>')) -Message 'Package project selects the winTerm manifest and launcher alias'
     Test-Requirement -Condition ($brandingTargets.Contains('WT_BRANDING_WINTERM')) -Message 'Dedicated winTerm compile-time branding token exists'
@@ -187,6 +241,11 @@ try
     Test-Requirement -Condition ($resourceItems.Contains('AppearanceAssets\fonts\bundled\%(FileName)%(Extension)') -and $resourceItems.Contains('''$(WindowsTerminalBranding)''==''WinTerm''')) -Message 'winTerm package maps bundled fonts to an app-private appearance path'
     Test-Requirement -Condition ($executablePathHelper -match '(?s)#if defined\(WT_BRANDING_WINTERM\)\s+WinTermExe;' -and $executablePathHelper.Contains('return std::wstring{ WinTermExe };')) -Message 'New-window and jump-list launch paths use winterm.exe for winTerm branding'
     Test-Requirement -Condition ($aboutDialog.Contains('AppearanceAssets\\licenses\\open-source-licenses.html')) -Message 'winTerm About dialog opens its bundled offline license index'
+    Test-Requirement -Condition ($releaseMetadata.Contains('Publisher{ L"helloThisWorld" }') -and $aboutDialog.Contains('Publisher: ')) -Message 'About metadata exposes publisher helloThisWorld'
+    Test-Requirement -Condition ($installerDefinition.Contains('AppPublisher=helloThisWorld') -and $installerDefinition.Contains('VersionInfoCompany=helloThisWorld') -and $installerDefinition.Contains('VersionInfoProductName=winTerm')) -Message 'Inno Setup uses protected winTerm publisher and product metadata'
+    Test-Requirement -Condition ($wingetGenerator.Contains('Publisher: helloThisWorld') -and $wingetGenerator.Contains('PackageIdentifier: HelloThisWorld.winTerm') -and $wingetGenerator.Contains('InstallerType: inno')) -Message 'WinGet generation uses protected publisher, product ID, and Inno type'
+    Test-Requirement -Condition ($releaseGenerator.Contains("publisher = 'helloThisWorld'") -and $releaseGenerator.Contains("productId = 'HelloThisWorld.winTerm'")) -Message 'Release SBOM and metadata generation use protected winTerm identity'
+    Test-Requirement -Condition ($updateGenerator.Contains("publisher = 'helloThisWorld'") -and $updateGenerator.Contains("productId = 'HelloThisWorld.winTerm'")) -Message 'Update metadata generation uses protected winTerm identity'
 
     if (-not [string]::IsNullOrWhiteSpace($PackageOutput))
     {

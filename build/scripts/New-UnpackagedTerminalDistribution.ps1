@@ -127,7 +127,7 @@ $finalTerminalPriFile = Join-Path $terminalAppPath "resources.pri"
     -TerminalRoot $terminalAppPath `
     -XamlRoot $xamlAppPath `
     -OutputPath $finalTerminalPriFile `
-    -Verbose:$Verbose | Out-Host
+    -Verbose:($VerbosePreference -ne 'SilentlyContinue') | Out-Host
 
 ########
 # Packaging

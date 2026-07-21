@@ -4,7 +4,11 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/tag/v1\.0\.1$')]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
+    [string]$Version,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^https://github\.com/HelloThisWorld/winTerm/releases/tag/v.+$')]
     [string]$ReleaseUrl,
 
     [Parameter(Mandatory)]
@@ -13,7 +17,11 @@ param(
 
     [Parameter(Mandatory)]
     [ValidatePattern('^[0-9a-fA-F]{64}$')]
-    [string]$X64Sha256,
+    [string]$SetupX64Sha256,
+
+    [Parameter(Mandatory)]
+    [ValidatePattern('^[0-9a-fA-F]{64}$')]
+    [string]$PortableX64Sha256,
 
     [Parameter(Mandatory)]
     [string]$OutputPath
@@ -24,6 +32,11 @@ Set-StrictMode -Version Latest
 
 try
 {
+    $expectedReleaseUrl = "https://github.com/HelloThisWorld/winTerm/releases/tag/v$Version"
+    if ($ReleaseUrl -cne $expectedReleaseUrl)
+    {
+        throw "Release URL must match the exact public version: $expectedReleaseUrl"
+    }
     $timestamp = [DateTimeOffset]::Parse(
         $PublishedAt,
         [Globalization.CultureInfo]::InvariantCulture,
@@ -47,23 +60,34 @@ try
     }
 
     $manifest = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
+        product = 'winTerm'
+        productId = 'HelloThisWorld.winTerm'
+        publisher = 'helloThisWorld'
         channel = 'stable'
-        version = '1.0.2'
-        tag = 'v1.0.2'
+        version = $Version
+        tag = "v$Version"
         publishedAt = $timestamp
         releaseUrl = $ReleaseUrl
         artifacts = @(
             [ordered]@{
                 architecture = 'x64'
-                type = 'msix'
-                fileName = 'winTerm-1.0.2-x64.msix'
-                sha256 = $X64Sha256.ToLowerInvariant()
+                type = 'inno'
+                fileName = "winTerm-$Version-setup-x64.exe"
+                sha256 = $SetupX64Sha256.ToLowerInvariant()
+            },
+            [ordered]@{
+                architecture = 'x64'
+                type = 'portable-zip'
+                fileName = "winTerm-$Version-portable-x64.zip"
+                sha256 = $PortableX64Sha256.ToLowerInvariant()
             }
         )
     }
-    $json = $manifest | ConvertTo-Json -Depth 8
-    [IO.File]::WriteAllText($output, $json + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText(
+        $output,
+        ($manifest | ConvertTo-Json -Depth 8) + [Environment]::NewLine,
+        [Text.UTF8Encoding]::new($false))
     Write-Host "Generated stable update manifest: $output" -ForegroundColor Green
 }
 catch

@@ -24,6 +24,7 @@
 
 namespace winTerm::Branding
 {
+    inline constexpr std::wstring_view Publisher{ L"helloThisWorld" };
     inline constexpr std::wstring_view ApplicationVersion{ L"0.7.0-beta.1" };
     inline constexpr std::wstring_view ReleaseChannel{ L"Beta" };
     inline constexpr std::wstring_view CommitSha{ WINTERM_BUILD_COMMIT_SHA };

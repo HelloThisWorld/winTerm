@@ -107,7 +107,7 @@ function Assert-WinTermPackageManifest
     {
         throw "Unexpected package identity '$($identity.Name)'."
     }
-    if ($identity.Publisher -cne 'CN=winTerm Development')
+    if ($identity.Publisher -cne 'CN=helloThisWorld')
     {
         throw "Unexpected package publisher '$($identity.Publisher)'."
     }
@@ -330,7 +330,7 @@ try
 
     $certificate = New-SelfSignedCertificate `
         -Type CodeSigningCert `
-        -Subject 'CN=winTerm Development' `
+        -Subject 'CN=helloThisWorld' `
         -FriendlyName $(if ($ReleaseAsset) { 'winTerm Self-Signed Release Signing' } else { 'winTerm Local Development Signing' }) `
         -CertStoreLocation 'Cert:\CurrentUser\My' `
         -KeyAlgorithm RSA `
@@ -425,7 +425,7 @@ __PACKAGE_DESCRIPTION__
 
 Source commit: __COMMIT_SHA__
 Working tree dirty when packaged: __WORKING_TREE_DIRTY__
-Certificate subject: CN=winTerm Development
+Certificate subject: CN=helloThisWorld
 Certificate thumbprint: __CERTIFICATE_THUMBPRINT__
 Certificate expires: __CERTIFICATE_EXPIRATION__
 

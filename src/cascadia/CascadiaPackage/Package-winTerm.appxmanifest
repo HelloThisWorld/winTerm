@@ -17,12 +17,12 @@
 
   <Identity
     Name="HelloThisWorld.winTerm"
-    Publisher="CN=winTerm Development"
+    Publisher="CN=helloThisWorld"
     Version="1.0.3.0" />
 
   <Properties>
     <DisplayName>winTerm</DisplayName>
-    <PublisherDisplayName>winTerm Contributors</PublisherDisplayName>
+    <PublisherDisplayName>helloThisWorld</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
     <virtualization:RegistryWriteVirtualization>

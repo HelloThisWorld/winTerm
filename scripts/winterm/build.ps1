@@ -37,8 +37,26 @@ function Assert-PathExists
     }
 }
 
+function Set-SingleProcessPath
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Value
+    )
+
+    # PowerShell 7 can preserve both PATH and Path from a sandbox host. Its Env:
+    # provider can address the exact uppercase key, whereas the .NET setter uses
+    # a case-insensitive lookup and may leave the duplicate behind.
+    Remove-Item -LiteralPath 'Env:PATH' -ErrorAction SilentlyContinue
+    $env:Path = $Value
+}
+
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $originalLocation = Get-Location
+$originalProcessPath = [Environment]::GetEnvironmentVariable('Path', [EnvironmentVariableTarget]::Process)
+$originalGitConfigCount = $env:GIT_CONFIG_COUNT
+$originalGitConfigKey = $env:GIT_CONFIG_KEY_0
+$originalGitConfigValue = $env:GIT_CONFIG_VALUE_0
 
 try
 {
@@ -66,9 +84,17 @@ try
     Assert-PathExists -Path $visualStudioInstaller -Description 'Visual Studio Installer discovery tool'
     Assert-PathExists -Path $windowsSdk -Description 'Windows SDK 10.0.22621.0'
 
+    # Some sandboxed Windows hosts expose both PATH and Path. MSBuild ToolTask
+    # rejects that duplicate environment block when it starts rc.exe or midl.exe.
+    Set-SingleProcessPath -Value $originalProcessPath
+    $env:GIT_CONFIG_COUNT = '1'
+    $env:GIT_CONFIG_KEY_0 = 'safe.directory'
+    $env:GIT_CONFIG_VALUE_0 = $repositoryRoot.Replace('\', '/')
+
     Set-Location $repositoryRoot
     Import-Module (Join-Path $repositoryRoot 'tools\OpenConsole.psm1') -Force
     Set-MsBuildDevEnvironment
+    Set-SingleProcessPath -Value ([Environment]::GetEnvironmentVariable('Path', [EnvironmentVariableTarget]::Process))
 
     if (-not (Get-Command msbuild.exe -ErrorAction SilentlyContinue))
     {
@@ -81,7 +107,11 @@ try
         '/p:WindowsTerminalBranding=WinTerm',
         '/p:AppxSymbolPackageEnabled=false',
         '/p:AppxBundle=Never',
-        '/m'
+        '/verbosity:minimal',
+        # The packaging dependency graph contains WinMD and shared-PDB edges that
+        # are not safe under project-level parallelism in this upstream revision.
+        # Keep compiler output visible while serializing projects for reliability.
+        '/m:1'
     )
 
     if ($GeneratePackage)
@@ -124,4 +154,8 @@ catch
 finally
 {
     Set-Location $originalLocation
+    Set-SingleProcessPath -Value $originalProcessPath
+    $env:GIT_CONFIG_COUNT = $originalGitConfigCount
+    $env:GIT_CONFIG_KEY_0 = $originalGitConfigKey
+    $env:GIT_CONFIG_VALUE_0 = $originalGitConfigValue
 }

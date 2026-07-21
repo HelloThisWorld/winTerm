@@ -20,4 +20,4 @@ Diagnostic bundles are generated and shared by the user. Review a bundle before 
 
 ## Removing local data
 
-MSIX uninstall removes application binaries according to Windows package behavior. See [uninstall guidance](docs/user/uninstall.md) before deleting remaining winTerm-specific local data. Never delete Windows Terminal data, PowerShell profiles, WSL distributions, shell history, global fonts, or unrelated user folders to remove winTerm.
+The Inno uninstaller removes winTerm application files and registrations while preserving `%LOCALAPPDATA%\winTerm` by default. See [uninstall guidance](docs/user/uninstall.md) before deleting winTerm-specific local data. Never delete Windows Terminal data, PowerShell profiles, WSL distributions, shell history, global fonts, or unrelated user folders to remove winTerm.
