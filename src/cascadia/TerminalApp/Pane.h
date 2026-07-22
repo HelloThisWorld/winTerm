@@ -225,6 +225,18 @@ public:
     til::event<winrt::delegate<std::shared_ptr<Pane>>> LostFocus;
     til::event<winrt::delegate<std::shared_ptr<Pane>>> Detached;
 
+    using paneDragPointerArgs = winrt::delegate<
+        std::shared_ptr<Pane>,
+        winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs>;
+
+    // Pane dragging is deliberately exposed only by the dedicated header grip.
+    // Tab owns target resolution and layout changes so a hover never mutates the
+    // pane tree and a cancelled drag leaves the live session untouched.
+    til::event<paneDragPointerArgs> PaneDragPressed;
+    til::event<paneDragPointerArgs> PaneDragUpdated;
+    til::event<paneDragPointerArgs> PaneDragCompleted;
+    til::event<winrt::delegate<std::shared_ptr<Pane>>> PaneDragCancelled;
+
 private:
     struct PanePoint;
     struct PaneNeighborSearch;
@@ -273,6 +285,8 @@ private:
     bool _zoomed{ false };
     bool _broadcastEnabled{ false };
     bool _paneHeadersVisible{ false };
+    std::optional<uint32_t> _paneDragPointerId;
+    winrt::Windows::Foundation::Point _paneDragStartPoint{};
 
     bool _IsLeaf() const noexcept;
     bool _HasFocusedChild() const noexcept;
@@ -283,6 +297,10 @@ private:
     void _UpdatePaneHeader();
     winrt::hstring _PaneHeaderTitle() const;
     winrt::hstring _PaneHeaderAccessibleTitle() const;
+    void _PaneGripPointerPressed(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _PaneGripPointerMoved(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _PaneGripPointerReleased(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _CancelPaneDrag(bool restoreFocus);
     bool _HasChild(const std::shared_ptr<Pane> child);
     winrt::TerminalApp::TerminalPaneContent _getTerminalContent() const;
 

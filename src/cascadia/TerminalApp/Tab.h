@@ -6,6 +6,9 @@
 #include "ColorPickupFlyout.h"
 #include "Tab.h"
 #include "Tab.g.h"
+#include "../../winterm/Docking/Drag/PaneHandleDragSource.h"
+#include "../../winterm/Docking/Targets/DockTargetResolver.h"
+#include "../../winterm/Docking/Transactions/LayoutTransaction.h"
 
 // fwdecl unittest classes
 namespace TerminalAppLocalTests
@@ -122,6 +125,7 @@ namespace winrt::TerminalApp::implementation
         til::typed_event<TerminalApp::Tab, IInspectable> ActivePaneChanged;
         til::event<winrt::delegate<>> TabRaiseVisualBell;
         til::typed_event<IInspectable, IInspectable> TaskbarProgressChanged;
+        til::event<winrt::delegate<std::shared_ptr<Pane>>> PaneMoveToNewTabRequested;
 
         // The TabViewIndex is the index this Tab object resides in TerminalPage's _tabs vector.
         WINRT_PROPERTY(uint32_t, TabViewIndex, 0);
@@ -200,6 +204,18 @@ namespace winrt::TerminalApp::implementation
         bool _receivedKeyDown{ false };
         bool _iconHidden{ false };
         bool _changingActivePane{ false };
+        bool _paneDragActive{ false };
+
+        std::weak_ptr<Pane> _paneDragSource;
+        std::weak_ptr<Pane> _paneDockTarget;
+        winrt::Windows::UI::Xaml::Controls::Grid _paneDockingOverlay{ nullptr };
+        std::unique_ptr<winTerm::Docking::PaneHandleDragSource> _paneHandleDragSource;
+        winTerm::Docking::DragPayloadRegistry _paneDragPayloadRegistry;
+        winTerm::Docking::DockTargetResolver _paneDockTargetResolver;
+        winTerm::Docking::SessionOwnershipRegistry _paneSessionOwnership;
+        std::optional<winTerm::Docking::DockZone> _paneDockZone;
+        std::optional<winTerm::Docking::DockingPlan> _paneDockPlan;
+        uint64_t _paneDragPressedTimestamp{};
 
         winrt::hstring _runtimeTabText{};
         bool _inRename{ false };
@@ -218,6 +234,34 @@ namespace winrt::TerminalApp::implementation
         void _DetachEventHandlersFromContent(const uint32_t paneId);
         void _AttachEventHandlersToContent(const uint32_t paneId, const winrt::TerminalApp::IPaneContent& content);
         void _AttachEventHandlersToPane(std::shared_ptr<Pane> pane);
+        void _PaneDragPressed(std::shared_ptr<Pane> source, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _PaneDragUpdated(std::shared_ptr<Pane> source, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _PaneDragCompleted(std::shared_ptr<Pane> source, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _PaneDragCancelled(std::shared_ptr<Pane> source);
+        std::shared_ptr<Pane> _ResolvePaneDockTarget(
+            const winrt::Windows::Foundation::Point& point,
+            const std::shared_ptr<Pane>& source) const;
+        winTerm::Docking::LayoutNodePtr _BuildPaneDockLayout(const std::shared_ptr<Pane>& pane) const;
+        winTerm::Docking::DockSource _BuildPaneDockSource(
+            const std::shared_ptr<Pane>& source,
+            const winTerm::Docking::LayoutNodePtr& tabLayout) const;
+        winTerm::Docking::DockTarget _BuildPaneDockTarget(const std::shared_ptr<Pane>& target) const;
+        winTerm::Docking::LayoutRect _PaneDockBounds(const std::shared_ptr<Pane>& pane) const;
+        winTerm::Docking::DockingCapabilities _PaneDockCapabilities() const;
+        void _ShowPaneDockingOverlay(
+            const std::shared_ptr<Pane>& target,
+            const std::vector<winTerm::Docking::DockZonePresentation>& zones,
+            const winTerm::Docking::DockPreviewModel* preview);
+        void _HidePaneDockingOverlay();
+        bool _CommitPaneDockingPlan(
+            const std::shared_ptr<Pane>& source,
+            const std::shared_ptr<Pane>& target,
+            winTerm::Docking::DockZone zone,
+            const winTerm::Docking::DockingPlan& plan);
+        bool _DockPane(
+            const std::shared_ptr<Pane>& source,
+            const std::shared_ptr<Pane>& target,
+            winrt::Microsoft::Terminal::Settings::Model::SplitDirection direction);
 
         void _UpdateActivePane(std::shared_ptr<Pane> pane);
 
