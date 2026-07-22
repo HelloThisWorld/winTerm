@@ -1885,6 +1885,28 @@ void Pane::_AttachLeafVisual()
     _paneHeader.PointerPressed([this](auto&&, auto&&) { _Focus(); });
     _paneHeader.Tapped([this](auto&&, auto&&) { _Focus(); });
     _paneHeader.RightTapped([this](auto&&, auto&&) { _Focus(); });
+    _paneGrip.PointerPressed([this](auto&&, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e) {
+        _PaneGripPointerPressed(e);
+    });
+    _paneGrip.PointerMoved([this](auto&&, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e) {
+        _PaneGripPointerMoved(e);
+    });
+    _paneGrip.PointerReleased([this](auto&&, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e) {
+        _PaneGripPointerReleased(e);
+    });
+    _paneGrip.PointerCanceled([this](auto&&, auto&&) {
+        _CancelPaneDrag(true);
+    });
+    _paneGrip.PointerCaptureLost([this](auto&&, auto&&) {
+        _CancelPaneDrag(true);
+    });
+    _paneGrip.KeyDown([this](auto&&, const winrt::Windows::UI::Xaml::Input::KeyRoutedEventArgs& e) {
+        if (e.Key() == winrt::Windows::System::VirtualKey::Escape && _paneDragPointerId)
+        {
+            _CancelPaneDrag(true);
+            e.Handled(true);
+        }
+    });
     _paneGrip.PointerEntered([](auto&&, auto&&) {
         if (const auto window = Window::Current())
         {
@@ -1907,6 +1929,73 @@ void Pane::_AttachLeafVisual()
     _borderFirst.Child(_leafLayout);
     _root.Children().Append(_borderFirst);
     _UpdatePaneHeader();
+}
+
+void Pane::_PaneGripPointerPressed(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
+{
+    const auto point = e.GetCurrentPoint(_paneGrip);
+    if (_paneDragPointerId || !point.Properties().IsLeftButtonPressed())
+    {
+        return;
+    }
+
+    _Focus();
+    if (!_paneGrip.CapturePointer(e.Pointer()))
+    {
+        return;
+    }
+
+    _paneDragPointerId = e.Pointer().PointerId();
+    _paneDragStartPoint = point.Position();
+    _paneGrip.Focus(FocusState::Pointer);
+    PaneDragPressed.raise(shared_from_this(), e);
+    e.Handled(true);
+}
+
+void Pane::_PaneGripPointerMoved(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
+{
+    if (!_paneDragPointerId || e.Pointer().PointerId() != *_paneDragPointerId)
+    {
+        return;
+    }
+
+    PaneDragUpdated.raise(shared_from_this(), e);
+    e.Handled(true);
+}
+
+void Pane::_PaneGripPointerReleased(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
+{
+    if (!_paneDragPointerId || e.Pointer().PointerId() != *_paneDragPointerId)
+    {
+        return;
+    }
+
+    _paneDragPointerId.reset();
+    _paneGrip.ReleasePointerCapture(e.Pointer());
+
+    PaneDragCompleted.raise(shared_from_this(), e);
+    if (_content)
+    {
+        _content.Focus(FocusState::Programmatic);
+    }
+    e.Handled(true);
+}
+
+void Pane::_CancelPaneDrag(const bool restoreFocus)
+{
+    if (!_paneDragPointerId)
+    {
+        return;
+    }
+
+    _paneDragPointerId.reset();
+    _paneGrip.ReleasePointerCaptures();
+
+    PaneDragCancelled.raise(shared_from_this());
+    if (restoreFocus && _content)
+    {
+        _content.Focus(FocusState::Programmatic);
+    }
 }
 
 void Pane::_UpdatePaneHeader()

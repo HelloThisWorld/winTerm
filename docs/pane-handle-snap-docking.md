@@ -22,10 +22,15 @@ thread-affine view; its retained `ControlInteractivity`/`ControlCore` owns the
 buffer, renderer state, and `ITerminalConnection`. Elevated windows and another
 launched winTerm instance use another process.
 
-The native pane header currently renders and focuses correctly, and its handle
-and overflow button share the terminal's unified context flyout. The remaining
-runtime pointer/overlay adapter is still readiness-gated. Model or source tests
-must not be reported as proof that the live XAML drag interaction passed.
+The native pane header renders and focuses correctly, and its handle and
+overflow button share the terminal's unified context flyout. Its runtime adapter
+captures pointer input only from the grip, feeds the existing
+`PaneHandleDragSource` and `DockTargetResolver`, renders the model-produced Snap
+zones and proposed-layout preview, and commits same-tab edge drops through the
+layout transaction coordinator. Center drop moves the same live pane into a new
+tab. Cross-window and outside-window handle drops remain readiness-gated. Model,
+source, and compiled tests must not be reported as proof that the live XAML drag
+interaction passed.
 
 ## Reused v0.5 components
 

@@ -123,7 +123,12 @@ try
         'SetPaneHeadersVisible',
         'ContextFlyout',
         'Move ',
-        'Open pane menu'
+        'Open pane menu',
+        '_paneGrip.CapturePointer',
+        'PaneDragPressed.raise',
+        'PaneDragUpdated.raise',
+        'PaneDragCompleted.raise',
+        'PaneDragCancelled.raise'
     ))
     {
         if (-not $runtimeHeader.Contains($required))
@@ -145,6 +150,28 @@ try
         if (-not $terminalPage.Contains($required))
         {
             throw "Runtime directed split or Pane menu boundary '$required' is missing."
+        }
+    }
+
+    $runtimeTab = Get-Content -Raw -LiteralPath (Join-Path $root 'src\cascadia\TerminalApp\Tab.cpp')
+    foreach ($required in @(
+        '_ResolvePaneDockTarget',
+        '_ShowPaneDockingOverlay',
+        '_DockPane',
+        'PaneHandleDragSource',
+        'DockTargetResolver',
+        'LayoutTransactionCoordinator',
+        'PaneSnapLayoutOverlay::Build',
+        'PaneMoveToNewTabRequested.raise',
+        'SplitDirection::Up',
+        'SplitDirection::Down',
+        'SplitDirection::Left',
+        'SplitDirection::Right'
+    ))
+    {
+        if (-not $runtimeTab.Contains($required))
+        {
+            throw "Runtime Pane Handle docking boundary '$required' is missing."
         }
     }
 
