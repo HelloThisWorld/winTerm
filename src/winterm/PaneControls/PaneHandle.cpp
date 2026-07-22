@@ -8,8 +8,9 @@
 
 using namespace winTerm::PaneControls;
 
-PaneHandle::PaneHandle(OpenMenuCallback openMenu) :
-    _openMenu{ std::move(openMenu) }
+PaneHandle::PaneHandle(OpenMenuCallback openMenu, FocusCallback focus) :
+    _openMenu{ std::move(openMenu) },
+    _focus{ std::move(focus) }
 {
 }
 
@@ -35,6 +36,14 @@ bool PaneHandle::HandleRightClick(const PanePointerRegion region) const
 
 bool PaneHandle::HandlePrimaryClick(const PanePointerRegion region) const
 {
+    if (region == PanePointerRegion::DragGrip || region == PanePointerRegion::HeaderBody)
+    {
+        if (_focus)
+        {
+            _focus();
+        }
+        return true;
+    }
     if (region != PanePointerRegion::OverflowButton)
     {
         return false;

@@ -304,7 +304,7 @@ DockingPlan LayoutTransformer::BuildProposedLayout(
         plan.target.nodeId &&
         (plan.target.type == DockTargetType::Pane ||
          plan.target.type == DockTargetType::EmptySlot) &&
-        zone != DockZone::Center;
+        (zone != DockZone::Center || plan.target.type == DockTargetType::EmptySlot);
     if (sameTabMove)
     {
         const auto transformed = MoveWithin(
@@ -325,12 +325,30 @@ DockingPlan LayoutTransformer::BuildProposedLayout(
         plan.status = DockingStatus::Ready;
         return plan;
     }
+    if (plan.target.type == DockTargetType::EmptySlot)
+    {
+        const auto transformed = Insert(
+            targetLayout,
+            plan.target.nodeId ? std::optional<std::string_view>{ *plan.target.nodeId } : std::nullopt,
+            sourceLayout,
+            zone,
+            std::move(emptySlotId),
+            settings);
+        if (!transformed.Succeeded())
+        {
+            plan.invalidReason = transformed.error;
+            return plan;
+        }
+        plan.proposedTargetLayout = transformed.root;
+        plan.status = DockingStatus::Ready;
+        return plan;
+    }
     if (plan.target.type == DockTargetType::TabStrip ||
         plan.target.type == DockTargetType::NewWindow ||
         zone == DockZone::Center)
     {
         plan.proposedSourceLayout = LayoutTree::Clone(sourceLayout);
-        plan.proposedTargetLayout = LayoutTree::Clone(targetLayout);
+        plan.proposedTargetLayout = LayoutTree::Clone(sourceLayout);
         plan.status = DockingStatus::Ready;
         return plan;
     }

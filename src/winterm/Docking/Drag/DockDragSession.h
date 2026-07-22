@@ -27,6 +27,7 @@ namespace winTerm::Docking
         Completed,
         Cancelled,
         Failed,
+        RollingBack,
     };
 
     enum class DragCapability

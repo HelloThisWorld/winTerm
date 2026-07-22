@@ -61,7 +61,9 @@ namespace SettingsModelUnitTests
         TEST_METHOD(TargetResolverUsesDocumentedPriority);
         TEST_METHOD(TargetResolverUsesHysteresis);
         TEST_METHOD(OverlayHidesCornersAndDescribesDisabledZones);
+        TEST_METHOD(OverlayDescribesCenterByTargetType);
         TEST_METHOD(PreviewUsesProposedLayoutGeometry);
+        TEST_METHOD(NewTabPreviewUsesStandaloneSourceLayout);
         TEST_METHOD(KeyboardModeAnnouncesSelectionAndCancellation);
         TEST_METHOD(SettingsKeepRuntimeDockingBehindReadinessGate);
     };
@@ -115,6 +117,46 @@ namespace SettingsModelUnitTests
         VERIFY_IS_FALSE(left->enabled);
         VERIFY_IS_FALSE(left->disabledReason.empty());
         VERIFY_ARE_EQUAL(std::string{ "Button" }, left->automationRole);
+        VERIFY_ARE_EQUAL(std::string{ "Dock pane to the left of target. Edge docking is disabled." }, left->automationName);
+    }
+
+    void WinTermDockingPresentationTests::OverlayDescribesCenterByTargetType()
+    {
+        DockingCapabilities capabilities;
+        auto emptySlot = PaneTarget();
+        emptySlot.type = DockTargetType::EmptySlot;
+        emptySlot.nodeId.reset();
+        const auto emptySlotOverlay = DockingOverlayModel::Build(
+            { 0, 0, 400, 240 },
+            PaneSource(),
+            emptySlot,
+            capabilities,
+            true,
+            DockZone::Center);
+        const auto emptySlotCenter = std::find_if(
+            emptySlotOverlay.begin(),
+            emptySlotOverlay.end(),
+            [](const auto& item) { return item.zone == DockZone::Center; });
+        VERIFY_IS_TRUE(emptySlotCenter != emptySlotOverlay.end());
+        VERIFY_ARE_EQUAL(std::string{ "Fill slot" }, emptySlotCenter->label);
+        VERIFY_ARE_EQUAL(std::string{ "Move pane to empty layout slot" }, emptySlotCenter->automationName);
+
+        auto newWindow = emptySlot;
+        newWindow.type = DockTargetType::NewWindow;
+        const auto newWindowOverlay = DockingOverlayModel::Build(
+            { 0, 0, 400, 240 },
+            PaneSource(),
+            newWindow,
+            capabilities,
+            true,
+            DockZone::Center);
+        const auto newWindowCenter = std::find_if(
+            newWindowOverlay.begin(),
+            newWindowOverlay.end(),
+            [](const auto& item) { return item.zone == DockZone::Center; });
+        VERIFY_IS_TRUE(newWindowCenter != newWindowOverlay.end());
+        VERIFY_ARE_EQUAL(std::string{ "New window" }, newWindowCenter->label);
+        VERIFY_ARE_EQUAL(std::string{ "Move pane to a new window" }, newWindowCenter->automationName);
     }
 
     void WinTermDockingPresentationTests::PreviewUsesProposedLayoutGeometry()
@@ -138,6 +180,30 @@ namespace SettingsModelUnitTests
         VERIFY_ARE_EQUAL(
             static_cast<int>(DockPreviewRegionRole::Source),
             static_cast<int>(preview.regions[1].role));
+    }
+
+    void WinTermDockingPresentationTests::NewTabPreviewUsesStandaloneSourceLayout()
+    {
+        auto target = PaneTarget();
+        target.type = DockTargetType::TabStrip;
+        target.nodeId.reset();
+        DockingCapabilities capabilities;
+        capabilities.sourcePaneCount = 1;
+        const auto plan = LayoutTransformer::BuildProposedLayout(
+            PaneSource(),
+            target,
+            DockZone::Center,
+            LayoutNodeDescriptor::Pane("pane-source"),
+            LayoutNodeDescriptor::Pane("pane-target"),
+            {},
+            capabilities,
+            true);
+        const auto preview = DockPreview::Build(plan, { 100, 100, 900, 500 });
+        VERIFY_IS_TRUE(preview.valid);
+        VERIFY_ARE_EQUAL(size_t{ 1 }, preview.regions.size());
+        VERIFY_ARE_EQUAL(std::string{ "pane-source" }, preview.regions.front().nodeId);
+        VERIFY_ARE_EQUAL(900.0, preview.regions.front().bounds.width);
+        VERIFY_ARE_EQUAL(500.0, preview.regions.front().bounds.height);
     }
 
     void WinTermDockingPresentationTests::KeyboardModeAnnouncesSelectionAndCancellation()

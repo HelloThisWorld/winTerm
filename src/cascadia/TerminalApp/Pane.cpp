@@ -1830,7 +1830,11 @@ void Pane::_AttachLeafVisual()
     _paneHeader.ColumnDefinitions().Append(overflowColumn);
 
     Controls::FontIcon gripIcon{};
-    gripIcon.Glyph(L"\u2807");
+    // Keep the visible grip compact while the surrounding Button provides the
+    // larger DPI-aware pointer target. This is original geometric artwork, not
+    // a product or platform logo.
+    gripIcon.Glyph(L"\u25A1");
+    gripIcon.FontSize(14.0);
     _paneGrip.Content(gripIcon);
     _paneGrip.Width(PaneHeaderButtonWidth);
     _paneGrip.Height(PaneHeaderHeight);
@@ -1881,6 +1885,24 @@ void Pane::_AttachLeafVisual()
     _paneHeader.PointerPressed([this](auto&&, auto&&) { _Focus(); });
     _paneHeader.Tapped([this](auto&&, auto&&) { _Focus(); });
     _paneHeader.RightTapped([this](auto&&, auto&&) { _Focus(); });
+    _paneGrip.PointerEntered([](auto&&, auto&&) {
+        if (const auto window = Window::Current())
+        {
+            if (const auto coreWindow = window.CoreWindow())
+            {
+                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::SizeAll, 0 });
+            }
+        }
+    });
+    _paneGrip.PointerExited([](auto&&, auto&&) {
+        if (const auto window = Window::Current())
+        {
+            if (const auto coreWindow = window.CoreWindow())
+            {
+                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::Arrow, 0 });
+            }
+        }
+    });
     _paneOverflow.Click([this](auto&&, auto&&) { _Focus(); });
     _borderFirst.Child(_leafLayout);
     _root.Children().Append(_borderFirst);

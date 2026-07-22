@@ -57,14 +57,20 @@ namespace winTerm::Docking
         bool PointerMoved(
             DragPoint current,
             std::chrono::milliseconds held);
+        bool PointerReleased();
         PaneHandleDragPreview Preview(const PaneHandleDragPreviewRequest& request);
         bool RequestDrop();
         bool BeginCommit();
         bool Complete();
+        bool Fail(std::string reason);
+        bool BeginRollback();
+        bool CompleteRollback(bool restored);
         bool Cancel(DragCancellationReason reason);
         bool Reset();
 
         DockDragState State() const noexcept;
+        DragCancellationReason CancellationReason() const noexcept;
+        std::string_view FailureReason() const noexcept;
         std::string_view Token() const noexcept;
 
     private:

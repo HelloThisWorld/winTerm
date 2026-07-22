@@ -162,6 +162,9 @@ namespace SettingsModelUnitTests
         VERIFY_IS_TRUE(result.ownershipRestored);
         VERIFY_IS_TRUE(result.layoutRestored);
         VERIFY_IS_TRUE(rollbackCalled);
+        VERIFY_ARE_EQUAL(
+            std::string{ "The pane could not be moved. The previous layout was restored." },
+            result.docking.message);
         VERIFY_IS_TRUE(ownership.Owner("session-1") == std::optional{ originalOwner });
         VERIFY_ARE_EQUAL(size_t{ 0 }, ownership.LeaseCount("session-1"));
     }
@@ -177,7 +180,8 @@ namespace SettingsModelUnitTests
         VERIFY_IS_TRUE(state.Transition(DockDragState::DropPending));
         VERIFY_IS_TRUE(state.Transition(DockDragState::Committing));
         VERIFY_IS_TRUE(state.Fail("target failed"));
-        VERIFY_IS_TRUE(state.Cancel(DragCancellationReason::CommitFailed));
+        VERIFY_IS_TRUE(state.Transition(DockDragState::RollingBack));
+        VERIFY_IS_TRUE(state.Transition(DockDragState::Cancelled));
         VERIFY_IS_TRUE(state.Reset());
     }
 

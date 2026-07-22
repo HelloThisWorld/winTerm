@@ -25,15 +25,15 @@ namespace
     };
 
     constexpr std::array ZoneDefinitions{
-        ZoneDefinition{ DockZone::TopLeft, 0, 0, "Top left", "Dock to the top-left corner", "↖" },
-        ZoneDefinition{ DockZone::Top, 1, 0, "Top", "Dock above the active target", "↑" },
-        ZoneDefinition{ DockZone::TopRight, 2, 0, "Top right", "Dock to the top-right corner", "↗" },
-        ZoneDefinition{ DockZone::Left, 0, 1, "Left", "Dock to the left of the active target", "←" },
-        ZoneDefinition{ DockZone::Center, 1, 1, "New tab", "Move as a new tab", "●" },
-        ZoneDefinition{ DockZone::Right, 2, 1, "Right", "Dock to the right of the active target", "→" },
-        ZoneDefinition{ DockZone::BottomLeft, 0, 2, "Bottom left", "Dock to the bottom-left corner", "↙" },
-        ZoneDefinition{ DockZone::Bottom, 1, 2, "Bottom", "Dock below the active target", "↓" },
-        ZoneDefinition{ DockZone::BottomRight, 2, 2, "Bottom right", "Dock to the bottom-right corner", "↘" },
+        ZoneDefinition{ DockZone::TopLeft, 0, 0, "Top left", "Dock pane to the top-left corner of target", "↖" },
+        ZoneDefinition{ DockZone::Top, 1, 0, "Top", "Dock pane above target", "↑" },
+        ZoneDefinition{ DockZone::TopRight, 2, 0, "Top right", "Dock pane to the top-right corner of target", "↗" },
+        ZoneDefinition{ DockZone::Left, 0, 1, "Left", "Dock pane to the left of target", "←" },
+        ZoneDefinition{ DockZone::Center, 1, 1, "New tab", "Move pane to a new tab", "●" },
+        ZoneDefinition{ DockZone::Right, 2, 1, "Right", "Dock pane to the right of target", "→" },
+        ZoneDefinition{ DockZone::BottomLeft, 0, 2, "Bottom left", "Dock pane to the bottom-left corner of target", "↙" },
+        ZoneDefinition{ DockZone::Bottom, 1, 2, "Bottom", "Dock pane below target", "↓" },
+        ZoneDefinition{ DockZone::BottomRight, 2, 2, "Bottom right", "Dock pane to the bottom-right corner of target", "↘" },
     };
 
     bool IsCorner(const DockZone zone) noexcept
@@ -98,6 +98,16 @@ std::vector<DockZonePresentation> DockingOverlayModel::Build(
         };
         presentation.label = settings.showLabels ? std::string{ definition.label } : std::string{};
         presentation.automationName = definition.automationName;
+        if (definition.zone == DockZone::Center && target.type == DockTargetType::EmptySlot)
+        {
+            presentation.label = settings.showLabels ? "Fill slot" : std::string{};
+            presentation.automationName = "Move pane to empty layout slot";
+        }
+        else if (definition.zone == DockZone::Center && target.type == DockTargetType::NewWindow)
+        {
+            presentation.label = settings.showLabels ? "New window" : std::string{};
+            presentation.automationName = "Move pane to a new window";
+        }
         presentation.icon = definition.icon;
         presentation.enabled = enabled;
         presentation.selected = selected && *selected == definition.zone;

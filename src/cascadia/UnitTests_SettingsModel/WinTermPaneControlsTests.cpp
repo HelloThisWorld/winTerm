@@ -57,8 +57,10 @@ namespace SettingsModelUnitTests
         TEST_METHOD(PaneHeaderVisibilityTitleAndStatusAreAccessible);
         TEST_METHOD(PaneMenuUsesOneCapabilityAwareCommandModel);
         TEST_METHOD(PaneHandleDoesNotDragTerminalContent);
+        TEST_METHOD(PaneHandleClickThresholdAndCancellationAreDeterministic);
         TEST_METHOD(MovePanePlansPreserveThePaneNode);
         TEST_METHOD(PaneHandleDragUsesTransformerPreview);
+        TEST_METHOD(PaneHandleCommitFailureRollsBackAndClearsToken);
         TEST_METHOD(KeyboardMoveModeCyclesTargets);
     };
 
@@ -168,13 +170,54 @@ namespace SettingsModelUnitTests
     void WinTermPaneControlsTests::PaneHandleDoesNotDragTerminalContent()
     {
         size_t menuOpenCount{};
-        PaneHandle handle{ [&](const auto) { ++menuOpenCount; } };
+        size_t focusCount{};
+        PaneHandle handle{
+            [&](const auto) { ++menuOpenCount; },
+            [&] { ++focusCount; }
+        };
         VERIFY_IS_TRUE(handle.CanStartDrag(PanePointerRegion::DragGrip, true));
         VERIFY_IS_FALSE(handle.CanStartDrag(PanePointerRegion::TerminalContent, true));
         VERIFY_IS_FALSE(handle.CanStartDrag(PanePointerRegion::Scrollbar, true));
+        VERIFY_IS_TRUE(handle.HandlePrimaryClick(PanePointerRegion::DragGrip));
+        VERIFY_ARE_EQUAL(size_t{ 1 }, focusCount);
         VERIFY_IS_TRUE(handle.HandleRightClick(PanePointerRegion::DragGrip));
         VERIFY_IS_TRUE(handle.HandlePrimaryClick(PanePointerRegion::OverflowButton));
         VERIFY_ARE_EQUAL(size_t{ 2 }, menuOpenCount);
+    }
+
+    void WinTermPaneControlsTests::PaneHandleClickThresholdAndCancellationAreDeterministic()
+    {
+        DragPayloadRegistry registry;
+        PaneHandleDragSource drag{ registry };
+        PaneHandleDragContext context;
+        context.processInstanceId = "process";
+        context.source.type = DockSourceType::Pane;
+        context.source.windowId = "window";
+        context.source.tabId = "tab";
+        context.source.paneId = "pane-source";
+        context.sourcePaneLayout = Pane("pane-source");
+        context.sourceTabLayout = Pane("pane-source");
+        context.pressedPoint = { 100, 100 };
+        context.threshold.horizontalPixels = 4;
+        context.threshold.verticalPixels = 4;
+        context.threshold.dpiScale = 1.5;
+
+        VERIFY_IS_TRUE(drag.PointerPressed(PanePointerRegion::DragGrip, context));
+        VERIFY_ARE_EQUAL(static_cast<int>(DockDragState::PointerPressed), static_cast<int>(drag.State()));
+        VERIFY_IS_FALSE(drag.PointerMoved({ 105, 105 }, std::chrono::milliseconds{ 20 }));
+        VERIFY_ARE_EQUAL(static_cast<int>(DockDragState::DragPending), static_cast<int>(drag.State()));
+        VERIFY_IS_TRUE(drag.Token().empty());
+        VERIFY_IS_TRUE(drag.PointerReleased());
+        VERIFY_ARE_EQUAL(static_cast<int>(DockDragState::Cancelled), static_cast<int>(drag.State()));
+        VERIFY_ARE_EQUAL(static_cast<int>(DragCancellationReason::None), static_cast<int>(drag.CancellationReason()));
+        VERIFY_ARE_EQUAL(size_t{ 0 }, registry.Size());
+
+        VERIFY_IS_TRUE(drag.Reset());
+        VERIFY_IS_TRUE(drag.PointerPressed(PanePointerRegion::DragGrip, context));
+        VERIFY_IS_TRUE(drag.PointerMoved({ 106, 100 }, std::chrono::milliseconds{ 20 }));
+        VERIFY_ARE_EQUAL(static_cast<int>(DockDragState::Dragging), static_cast<int>(drag.State()));
+        VERIFY_IS_TRUE(drag.Cancel(DragCancellationReason::PointerCaptureLost));
+        VERIFY_ARE_EQUAL(size_t{ 0 }, registry.Size());
     }
 
     void WinTermPaneControlsTests::MovePanePlansPreserveThePaneNode()
@@ -241,6 +284,46 @@ namespace SettingsModelUnitTests
         VERIFY_IS_TRUE(drag.BeginCommit());
         VERIFY_IS_TRUE(drag.Complete());
         VERIFY_IS_TRUE(drag.Token().empty());
+    }
+
+    void WinTermPaneControlsTests::PaneHandleCommitFailureRollsBackAndClearsToken()
+    {
+        DragPayloadRegistry registry;
+        PaneHandleDragSource drag{ registry };
+        PaneHandleDragContext context;
+        context.processInstanceId = "process";
+        context.source.type = DockSourceType::Pane;
+        context.source.windowId = "window";
+        context.source.tabId = "tab";
+        context.source.paneId = "pane-source";
+        context.sourcePaneLayout = Pane("pane-source");
+        context.sourceTabLayout = LayoutNodeDescriptor::Split(
+            SplitOrientation::Vertical,
+            0.5,
+            Pane("pane-source"),
+            Pane("pane-target"));
+        VERIFY_IS_TRUE(drag.PointerPressed(PanePointerRegion::DragGrip, context));
+        VERIFY_IS_TRUE(drag.PointerMoved({ 10, 0 }, std::chrono::milliseconds{ 20 }));
+
+        PaneHandleDragPreviewRequest request;
+        request.target.type = DockTargetType::Pane;
+        request.target.windowId = "window";
+        request.target.tabId = "tab";
+        request.target.nodeId = "pane-target";
+        request.zone = DockZone::Right;
+        request.targetLayout = context.sourceTabLayout;
+        request.capabilities.sourcePaneCount = 1;
+        request.targetBounds = { 0, 0, 1000, 600 };
+        VERIFY_IS_TRUE(drag.Preview(request).Succeeded());
+        VERIFY_IS_TRUE(drag.RequestDrop());
+        VERIFY_IS_TRUE(drag.BeginCommit());
+        VERIFY_IS_TRUE(drag.Fail("target closed"));
+        VERIFY_ARE_EQUAL(std::string{ "target closed" }, std::string{ drag.FailureReason() });
+        VERIFY_ARE_EQUAL(size_t{ 0 }, registry.Size());
+        VERIFY_IS_TRUE(drag.BeginRollback());
+        VERIFY_IS_TRUE(drag.CompleteRollback(true));
+        VERIFY_ARE_EQUAL(static_cast<int>(DockDragState::Cancelled), static_cast<int>(drag.State()));
+        VERIFY_IS_TRUE(drag.Reset());
     }
 
     void WinTermPaneControlsTests::KeyboardMoveModeCyclesTargets()

@@ -195,7 +195,7 @@ LayoutTransactionResult LayoutTransactionCoordinator::Execute(LayoutTransactionR
     {
         result.state = LayoutTransactionState::RolledBack;
         result.docking.status = DockingStatus::RolledBack;
-        result.docking.message = "The layout could not be changed. The previous layout was restored.";
+        result.docking.message = "The pane could not be moved. The previous layout was restored.";
     }
     else
     {

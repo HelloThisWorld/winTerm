@@ -234,25 +234,34 @@ bool DockDragStateMachine::CanTransition(
         return next == DockDragState::PointerPressed;
     case DockDragState::PointerPressed:
         return next == DockDragState::DragPending ||
-               next == DockDragState::Cancelled;
+               next == DockDragState::Cancelled ||
+               next == DockDragState::Failed;
     case DockDragState::DragPending:
         return next == DockDragState::Dragging ||
-               next == DockDragState::Cancelled;
+               next == DockDragState::Cancelled ||
+               next == DockDragState::Failed;
     case DockDragState::Dragging:
         return next == DockDragState::TargetAcquired ||
-               next == DockDragState::Cancelled;
+               next == DockDragState::Cancelled ||
+               next == DockDragState::Failed;
     case DockDragState::TargetAcquired:
         return next == DockDragState::Dragging ||
                next == DockDragState::DropPending ||
-               next == DockDragState::Cancelled;
+               next == DockDragState::Cancelled ||
+               next == DockDragState::Failed;
     case DockDragState::DropPending:
         return next == DockDragState::Committing ||
-               next == DockDragState::Cancelled;
+               next == DockDragState::Cancelled ||
+               next == DockDragState::Failed;
     case DockDragState::Committing:
         return next == DockDragState::Completed ||
                next == DockDragState::Failed;
     case DockDragState::Failed:
-        return next == DockDragState::Cancelled;
+        return next == DockDragState::RollingBack ||
+               next == DockDragState::Idle;
+    case DockDragState::RollingBack:
+        return next == DockDragState::Cancelled ||
+               next == DockDragState::Failed;
     case DockDragState::Completed:
     case DockDragState::Cancelled:
         return next == DockDragState::Idle;

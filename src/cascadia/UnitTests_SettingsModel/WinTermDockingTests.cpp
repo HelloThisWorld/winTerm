@@ -67,6 +67,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(CornerDockingCreatesExpectedEmptySlot);
         TEST_METHOD(RemovingPanePromotesSibling);
         TEST_METHOD(EmptySlotReplacementDoesNotAddSplit);
+        TEST_METHOD(CenterDropFillsEmptySlot);
         TEST_METHOD(ValidatorRejectsDuplicatePaneAndSlotIds);
         TEST_METHOD(GeometryUsesTransformedLayout);
         TEST_METHOD(WorkspaceV2RoundTripsEmptySlot);
@@ -128,6 +129,35 @@ namespace SettingsModelUnitTests
         VERIFY_IS_TRUE(result.Succeeded());
         VERIFY_ARE_EQUAL(static_cast<int>(LayoutNodeType::Pane), static_cast<int>(result.root->type));
         VERIFY_ARE_EQUAL(std::string{ "source-pane" }, result.root->paneId);
+    }
+
+    void WinTermDockingTests::CenterDropFillsEmptySlot()
+    {
+        DockSource source;
+        source.type = DockSourceType::Pane;
+        source.windowId = "source-window";
+        source.tabId = "source-tab";
+        source.paneId = "source-pane";
+        DockTarget target;
+        target.type = DockTargetType::EmptySlot;
+        target.windowId = "target-window";
+        target.tabId = "target-tab";
+        target.nodeId = "slot-1";
+        DockingCapabilities capabilities;
+        capabilities.sourcePaneCount = 1;
+
+        const auto plan = LayoutTransformer::BuildProposedLayout(
+            source,
+            target,
+            DockZone::Center,
+            Source(),
+            LayoutNodeDescriptor::EmptySlot("slot-1"),
+            "slot-1",
+            capabilities,
+            true);
+        VERIFY_ARE_EQUAL(static_cast<int>(DockingStatus::Ready), static_cast<int>(plan.status));
+        VERIFY_ARE_EQUAL(static_cast<int>(LayoutNodeType::Pane), static_cast<int>(plan.proposedTargetLayout->type));
+        VERIFY_ARE_EQUAL(std::string{ "source-pane" }, plan.proposedTargetLayout->paneId);
     }
 
     void WinTermDockingTests::ValidatorRejectsDuplicatePaneAndSlotIds()

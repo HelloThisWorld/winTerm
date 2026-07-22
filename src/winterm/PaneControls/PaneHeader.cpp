@@ -10,9 +10,10 @@ using namespace winTerm::PaneControls;
 
 PaneHeader::PaneHeader(
     PaneHeaderSettings settings,
-    PaneHandle::OpenMenuCallback openMenu) :
+    PaneHandle::OpenMenuCallback openMenu,
+    PaneHandle::FocusCallback focus) :
     _settings{ std::move(settings) },
-    _handle{ std::move(openMenu) }
+    _handle{ std::move(openMenu), std::move(focus) }
 {
     _settings.Normalize();
 }

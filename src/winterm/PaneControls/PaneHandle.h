@@ -22,8 +22,9 @@ namespace winTerm::PaneControls
     {
     public:
         using OpenMenuCallback = std::function<void(PaneMenuInvocation)>;
+        using FocusCallback = std::function<void()>;
 
-        explicit PaneHandle(OpenMenuCallback openMenu = {});
+        explicit PaneHandle(OpenMenuCallback openMenu = {}, FocusCallback focus = {});
 
         bool CanStartDrag(PanePointerRegion region, bool draggingEnabled) const noexcept;
         bool HandleRightClick(PanePointerRegion region) const;
@@ -31,5 +32,6 @@ namespace winTerm::PaneControls
 
     private:
         OpenMenuCallback _openMenu;
+        FocusCallback _focus;
     };
 }

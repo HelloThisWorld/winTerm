@@ -35,8 +35,7 @@ bool PaneHandleDragSource::PointerPressed(
     {
         return false;
     }
-    if (!_state.Transition(DockDragState::PointerPressed) ||
-        !_state.Transition(DockDragState::DragPending))
+    if (!_state.Transition(DockDragState::PointerPressed))
     {
         return false;
     }
@@ -48,7 +47,14 @@ bool PaneHandleDragSource::PointerMoved(
     const DragPoint current,
     const std::chrono::milliseconds held)
 {
-    if (!_context || _state.State() != DockDragState::DragPending)
+    if (!_context ||
+        (_state.State() != DockDragState::PointerPressed &&
+         _state.State() != DockDragState::DragPending))
+    {
+        return false;
+    }
+    if (_state.State() == DockDragState::PointerPressed &&
+        !_state.Transition(DockDragState::DragPending))
     {
         return false;
     }
@@ -70,6 +76,16 @@ bool PaneHandleDragSource::PointerMoved(
         return false;
     }
     return _state.Transition(DockDragState::Dragging);
+}
+
+bool PaneHandleDragSource::PointerReleased()
+{
+    if (_state.State() != DockDragState::PointerPressed &&
+        _state.State() != DockDragState::DragPending)
+    {
+        return false;
+    }
+    return Cancel(DragCancellationReason::None);
 }
 
 PaneHandleDragPreview PaneHandleDragSource::Preview(
@@ -144,6 +160,34 @@ bool PaneHandleDragSource::Complete()
     return true;
 }
 
+bool PaneHandleDragSource::Fail(std::string reason)
+{
+    const auto failed = _state.Fail(std::move(reason));
+    if (failed)
+    {
+        _invalidateToken();
+    }
+    return failed;
+}
+
+bool PaneHandleDragSource::BeginRollback()
+{
+    return _state.Transition(DockDragState::RollingBack);
+}
+
+bool PaneHandleDragSource::CompleteRollback(const bool restored)
+{
+    if (_state.State() != DockDragState::RollingBack)
+    {
+        return false;
+    }
+    if (restored)
+    {
+        return _state.Transition(DockDragState::Cancelled);
+    }
+    return _state.Transition(DockDragState::Failed);
+}
+
 bool PaneHandleDragSource::Cancel(const DragCancellationReason reason)
 {
     const auto cancelled = _state.Cancel(reason);
@@ -169,6 +213,16 @@ bool PaneHandleDragSource::Reset()
 DockDragState PaneHandleDragSource::State() const noexcept
 {
     return _state.State();
+}
+
+DragCancellationReason PaneHandleDragSource::CancellationReason() const noexcept
+{
+    return _state.CancellationReason();
+}
+
+std::string_view PaneHandleDragSource::FailureReason() const noexcept
+{
+    return _state.FailureReason();
 }
 
 std::string_view PaneHandleDragSource::Token() const noexcept

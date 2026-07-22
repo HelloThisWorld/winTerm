@@ -1,5 +1,9 @@
 # Pane Handle Dragging
 
+The detailed architecture, ownership boundary, supported transfer matrix,
+rollback contract, and accessibility strategy are recorded in
+[Pane Handle Snap Docking](pane-handle-snap-docking.md).
+
 Pane docking starts only from the explicit drag grip in a pane header. Pointer movement in terminal content, the scrollbar, or an overflow button cannot start a pane drag. This preserves selection, mouse reporting, Vim/tmux interaction, application mouse input, and right-click copy/paste behavior.
 
 ## Drag lifecycle
@@ -8,7 +12,8 @@ The pane-handle source reuses the v0.5 docking components:
 
 1. `DragThreshold` validates mouse or touch movement.
 2. `DragPayloadRegistry` creates an opaque, expiring, single-use token.
-3. `DockDragStateMachine` tracks drag, target, drop, commit, and cancellation.
+3. `DockDragStateMachine` tracks press, threshold, drag, target, drop, commit,
+   failure, rollback, completion, and cancellation.
 4. `LayoutTransformer.BuildProposedLayout()` produces the proposed layout.
 5. `DockPreview` derives preview geometry from that proposed tree.
 6. `LayoutTransactionCoordinator` reserves live session ownership and commits or rolls back.

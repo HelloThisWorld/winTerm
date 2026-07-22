@@ -11,7 +11,10 @@ namespace winTerm::PaneControls
     class PaneHeader
     {
     public:
-        PaneHeader(PaneHeaderSettings settings, PaneHandle::OpenMenuCallback openMenu = {});
+        PaneHeader(
+            PaneHeaderSettings settings,
+            PaneHandle::OpenMenuCallback openMenu = {},
+            PaneHandle::FocusCallback focus = {});
 
         PaneHeaderPresentation Present(const PaneHeaderState& state) const;
         PaneHandle& Handle() noexcept;
