@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0 - 2026-07-22
+
+### Added
+
+- Dedicated pane-handle focus and drag-threshold behavior with explicit failure and rollback states.
+- Snap-style edge, corner, Empty Slot, new-tab, and new-window presentation models with accessible target names.
+- Traditional unpackaged Inno Setup installer and Portable ZIP distributions with checksums, notices, and SPDX and CycloneDX SBOMs.
+- Direct installer and Portable download links at the top of the README.
+
+### Changed
+
+- Promoted the displayed application and PowerShell module version to stable `1.0.0`.
+- Advanced the monotonic Windows package-build version to `1.0.8.0`.
+- Standardized the public GitHub release and tag on `v1.0.0`.
+
+### Known limitations
+
+- The installer is unsigned and Windows may show Unknown Publisher or SmartScreen.
+- Cross-process live pane transfer and ARM64 distribution remain unsupported.
+- Live pane-drag UI, Narrator, High Contrast, and mixed-DPI acceptance scenarios are documented but were not completed by the local model-test run.
+
 ## 0.7.0-beta.5 - 2026-07-21
 
 ### Added
@@ -127,33 +148,6 @@
 
 - The installer is self-signed, is not publicly trusted or timestamped, and requires administrators to import the attached CER into Trusted People.
 - ARM64 and Windows 10 are not supported by this Release.
-
-## 1.0.0 - Release candidate
-
-### Added
-
-- Stable compatibility and schema policies for Workspace 2, Docking 1, Shell Protocol 1, Theme 1, and Update Manifest 1.
-- Version-consistency, privacy, checksum, package, signing, SBOM, Attestation, and downloaded-asset verification.
-- A protected two-stage GitHub Draft and Stable publication workflow.
-- Stable release notes, feature status, security, accessibility, performance, support, and release checklists.
-
-### Changed
-
-- Application, package, executable metadata, Workspace metadata, and PowerShell module versions are 1.0.0.
-- The release channel is `stable`.
-- Runtime Docking, cross-process Pane transfer, Update Check, Git Bash integration, and ARM64 remain Disabled until their gates pass.
-
-### Security
-
-- Release assets are allowlisted and must come from the exact `v1.0.0` commit.
-- Published installers require a production signature, trusted timestamp, package Publisher match, checksum verification, and clean-machine validation evidence.
-- winTerm performs no update request without explicit consent.
-- The Release workflow never uses `--clobber` and never silently replaces assets.
-
-### Known issues
-
-- See [winTerm 1.0.0 release notes](docs/releases/1.0.0.md).
-- Stable publication remains blocked until signing, clean installation, upgrade, uninstall, accessibility, runtime, and performance gates pass.
 
 ## 0.6.0-beta.1 - Unpublished baseline
 

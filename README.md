@@ -2,6 +2,18 @@
 
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
+[![Release](https://img.shields.io/badge/release-v1.0.0-2ea44f)](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.0)
+
+## Download winTerm 1.0.0
+
+[**Download the x64 installer**](https://github.com/HelloThisWorld/winTerm/releases/download/v1.0.0/winTerm-1.0.0-setup-x64.exe)
+
+[Download the portable x64 ZIP](https://github.com/HelloThisWorld/winTerm/releases/download/v1.0.0/winTerm-1.0.0-portable-x64.zip) ·
+[Release notes and checksums](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.0)
+
+The installer is unsigned, so Windows may display Unknown Publisher or a
+SmartScreen warning. Download only from the official release above and verify
+the included `SHA256SUMS.txt` before running it.
 
 winTerm is an independent open-source Windows 11 terminal published by
 `helloThisWorld`. It is based on Microsoft Terminal source code but is not a
@@ -17,11 +29,9 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `0.7.0-beta.5`. Existing GitHub tags and Release
-assets are immutable; a release is published only from a new exact tag after
-all build, test, installation, re-download, and checksum gates pass. See the
-[Releases page](https://github.com/HelloThisWorld/winTerm/releases) for assets
-that actually exist.
+The current source version is `1.0.0`. See the
+[official v1.0.0 Release](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.0.0)
+for the complete asset list and checksums.
 
 If a release is unsigned, its notes say so explicitly. Windows may display an
 Unknown Publisher or SmartScreen warning; verify `SHA256SUMS.txt` from the same
@@ -29,7 +39,7 @@ Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
 See [installation guidance](docs/user/installation.md) and the current
-[release notes](docs/releases/0.7.0-beta.5.md).
+[release notes](docs/releases/1.0.0.md).
 
 ## Core features
 
@@ -73,8 +83,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 0.7.0-beta.5 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 0.7.0-beta.5 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.0.0 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.0.0 -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build
