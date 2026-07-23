@@ -84,6 +84,32 @@ function Write-JsonWithoutBom
         [Text.UTF8Encoding]::new($false))
 }
 
+function Ensure-ReleaseNotesSigningDisclosure
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('trusted-signed', 'unsigned')]
+        [string]$Status
+    )
+
+    $notes = Get-Content -LiteralPath $Path -Raw
+    if ($Status -eq 'unsigned' -and $notes -notmatch '(?i)unsigned|not code-signed')
+    {
+        $disclosure = @(
+            '## Signing'
+            ''
+            'The Setup EXE is not code-signed. Windows may display a SmartScreen warning; verify the downloaded file against `SHA256SUMS.txt` before running it.'
+        ) -join [Environment]::NewLine
+        $updatedNotes = $notes.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine + $disclosure + [Environment]::NewLine
+        [IO.File]::WriteAllText($Path, $updatedNotes, [Text.UTF8Encoding]::new($false))
+    }
+
+    return Get-Item -LiteralPath $Path
+}
+
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $versionMetadata = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Branding\version.json') -Raw | ConvertFrom-Json
 $outputRoot = if ([IO.Path]::IsPathRooted($OutputDirectory))
@@ -140,6 +166,7 @@ try
         $ReleaseNotesPath
     }
     $notesAsset = Copy-ReleaseFile -Source $notesSource -TargetName "winTerm-$Version-release-notes.md"
+    $notesAsset = Ensure-ReleaseNotesSigningDisclosure -Path $notesAsset.FullName -Status $SigningStatus
 
     $releaseInputs = @($installerAsset, $portableAsset, $noticesAsset, $notesAsset)
     $artifactRecords = @($releaseInputs | ForEach-Object {

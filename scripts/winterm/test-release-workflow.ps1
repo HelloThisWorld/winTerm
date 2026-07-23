@@ -15,6 +15,7 @@ try
     $wingetWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winget.yml') -Raw
     $fullBuildWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winterm-full-build.yml') -Raw
     $wingetGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1') -Raw
+    $releaseGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-release-artifacts.ps1') -Raw
 
     foreach ($required in @(
         "- 'v*'",
@@ -68,6 +69,17 @@ try
         -not $workflow.Contains('WINTERM_SIGNING_STATUS=trusted-signed'))
     {
         throw 'Release workflow does not implement optional trusted signing with an explicit unsigned fallback.'
+    }
+    foreach ($required in @(
+        'Ensure-ReleaseNotesSigningDisclosure',
+        'The Setup EXE is not code-signed.',
+        'SHA256SUMS.txt'
+    ))
+    {
+        if (-not $releaseGenerator.Contains($required))
+        {
+            throw "Release artifact generation is missing required signing disclosure boundary '$required'."
+        }
     }
 
     foreach ($workflowToInspect in @($workflow, $wingetWorkflow, $fullBuildWorkflow))
