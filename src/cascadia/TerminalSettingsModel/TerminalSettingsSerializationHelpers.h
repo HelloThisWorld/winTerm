@@ -258,6 +258,23 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::NewTabPosition)
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::PaneResizeSnapPreset)
+{
+    JSON_MAPPINGS(3) = {
+        pair_type{ "balanced", ValueType::Balanced },
+        pair_type{ "commonRatios", ValueType::CommonRatios },
+        pair_type{ "custom", ValueType::Custom },
+    };
+};
+
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::ApplicationUIDensity)
+{
+    JSON_MAPPINGS(2) = {
+        pair_type{ "compact", ValueType::Compact },
+        pair_type{ "comfortable", ValueType::Comfortable },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::FirstWindowPreference)
 {
     JSON_MAPPINGS(4) = {

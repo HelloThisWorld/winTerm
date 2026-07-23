@@ -74,6 +74,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
                 { ShortcutAction::AddMark, USES_RESOURCE(L"AddMarkCommandKey") },
                 { ShortcutAction::AdjustFontSize, USES_RESOURCE(L"AdjustFontSizeCommandKey") },
                 { ShortcutAction::AdjustOpacity, USES_RESOURCE(L"AdjustOpacity") },
+                { ShortcutAction::BalancePanes, USES_RESOURCE(L"BalancePanesCommandKey") },
                 { ShortcutAction::BreakIntoDebugger, USES_RESOURCE(L"BreakIntoDebuggerCommandKey") },
                 { ShortcutAction::ClearAllMarks, USES_RESOURCE(L"ClearAllMarksCommandKey") },
                 { ShortcutAction::ClearBuffer, USES_RESOURCE(L"ClearBuffer") },
@@ -125,6 +126,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
                 { ShortcutAction::RenameWindow, USES_RESOURCE(L"ResetWindowNameCommandKey") },
                 { ShortcutAction::ResetFontSize, USES_RESOURCE(L"ResetFontSizeCommandKey") },
                 { ShortcutAction::RestartConnection, USES_RESOURCE(L"RestartConnectionKey") },
+                { ShortcutAction::RedoPaneResize, USES_RESOURCE(L"RedoPaneResizeCommandKey") },
                 { ShortcutAction::ResizePane, USES_RESOURCE(L"ResizePaneCommandKey") },
                 { ShortcutAction::RestoreLastClosed, USES_RESOURCE(L"RestoreLastClosedCommandKey") },
                 { ShortcutAction::SaveSnippet, USES_RESOURCE(L"SaveSnippetNamePrefix") },
@@ -162,6 +164,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
                 { ShortcutAction::TogglePaneZoom, USES_RESOURCE(L"TogglePaneZoomCommandKey") },
                 { ShortcutAction::ToggleShaderEffects, USES_RESOURCE(L"ToggleShaderEffectsCommandKey") },
                 { ShortcutAction::ToggleSplitOrientation, USES_RESOURCE(L"ToggleSplitOrientationCommandKey") },
+                { ShortcutAction::UndoPaneResize, USES_RESOURCE(L"UndoPaneResizeCommandKey") },
             };
         }();
 

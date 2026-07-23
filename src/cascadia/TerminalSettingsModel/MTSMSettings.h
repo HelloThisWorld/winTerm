@@ -78,7 +78,17 @@ Author(s):
     X(winrt::Windows::Foundation::Collections::IVector<Model::NewTabMenuEntry>, NewTabMenu, "newTabMenu", winrt::single_threaded_vector<Model::NewTabMenuEntry>({ Model::RemainingProfilesEntry{} })) \
     X(bool, AllowHeadless, "compatibility.allowHeadless", false)                                                                                                                                      \
     X(hstring, SearchWebDefaultQueryUrl, "searchWebDefaultQueryUrl", L"https://www.bing.com/search?q=%22%s%22")                                                                                       \
-    X(bool, ShowTabsFullscreen, "showTabsFullscreen", false)
+    X(bool, ShowTabsFullscreen, "showTabsFullscreen", false)                                                                                                                                          \
+    X(bool, PaneResizeSnapping, "winterm.paneResizing.enableSnapping", true)                                                                                                                         \
+    X(Model::PaneResizeSnapPreset, PaneResizeSnapPoints, "winterm.paneResizing.snapPoints", Model::PaneResizeSnapPreset::CommonRatios)                                                             \
+    X(hstring, PaneResizeCustomRatios, "winterm.paneResizing.customRatios", L"")                                                                                                                     \
+    X(double, PaneResizeSnapThreshold, "winterm.paneResizing.snapThreshold", 8.0)                                                                                                                    \
+    X(bool, PaneResizeShowIndicator, "winterm.paneResizing.showIndicator", true)                                                                                                                     \
+    X(bool, PaneResizeAltDisablesSnapping, "winterm.paneResizing.altDisablesSnapping", true)                                                                                                        \
+    X(Model::ApplicationUIDensity, ApplicationUIDensity, "winterm.applicationUI.density", Model::ApplicationUIDensity::Compact)                                                                     \
+    X(bool, ShowPaneHeaders, "winterm.applicationUI.showPaneHeaders", true)                                                                                                                          \
+    X(bool, ShowPaneProfileIcon, "winterm.applicationUI.showPaneProfileIcon", true)                                                                                                                  \
+    X(bool, ShowPaneActiveStatus, "winterm.applicationUI.showPaneActiveStatus", true)
 
 // Also add these settings to:
 // * Profile.idl

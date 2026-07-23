@@ -70,10 +70,9 @@ PaneHeaderPresentation PaneHeaderViewModel::Build(
     {
         result.accessibleName += ". " + result.statusText;
     }
-    result.gripAccessibleName = "Move " + accessibleTitle + " pane";
+    result.iconAccessibleName = accessibleTitle + " pane";
     result.showProfileIcon = settings.showProfileIcon && !state.profileIcon.empty();
     result.showOverflowButton = settings.showOverflowButton;
-    result.dragEnabled = settings.enablePaneHandleDragging;
     return result;
 }
 

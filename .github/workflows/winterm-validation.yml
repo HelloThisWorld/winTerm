@@ -50,21 +50,13 @@ jobs:
           .\scripts\winterm\test-workspace-recovery.ps1
           .\scripts\winterm\test-workspace-import.ps1
 
-      - name: Validate docking model, transactions, ownership, and history
+      - name: Validate directed splitting and pane resize transactions
         shell: powershell
         run: |
-          .\scripts\winterm\test-layout-transformations.ps1
-          .\scripts\winterm\test-docking-transactions.ps1
-          .\scripts\winterm\test-session-transfer.ps1
-          .\scripts\winterm\test-layout-history.ps1
+          .\scripts\winterm\test-pane-controls.ps1 -SourceOnly
+          .\scripts\winterm\test-pane-resizing.ps1 -SourceOnly
 
-      - name: Validate docking overlay, accessibility, diagnostics, and local UI suite
+      - name: Validate layout fixtures and local UI source boundaries
         shell: powershell
         run: |
-          .\scripts\winterm\test-docking-presentation.ps1
-          .\scripts\winterm\test-docking-ui.ps1 -Mode Validate
           .\scripts\winterm\validate-layout.ps1 -TestFixture empty-slot.winterm-workspace.json
-
-      - name: Run non-runtime docking benchmark
-        shell: powershell
-        run: .\scripts\winterm\benchmark-docking.ps1

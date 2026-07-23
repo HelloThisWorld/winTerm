@@ -50,6 +50,19 @@ namespace Microsoft.Terminal.Settings.Model
         AfterCurrentTab,
     };
 
+    enum PaneResizeSnapPreset
+    {
+        Balanced,
+        CommonRatios,
+        Custom,
+    };
+
+    enum ApplicationUIDensity
+    {
+        Compact,
+        Comfortable,
+    };
+
     [default_interface] runtimeclass GlobalAppSettings {
         Guid DefaultProfile;
 
@@ -108,6 +121,16 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, AllowHeadless);
         INHERITABLE_SETTING(String, SearchWebDefaultQueryUrl);
         INHERITABLE_SETTING(IVector<String>, SafeUriSchemes);
+        INHERITABLE_SETTING(Boolean, PaneResizeSnapping);
+        INHERITABLE_SETTING(PaneResizeSnapPreset, PaneResizeSnapPoints);
+        INHERITABLE_SETTING(String, PaneResizeCustomRatios);
+        INHERITABLE_SETTING(Double, PaneResizeSnapThreshold);
+        INHERITABLE_SETTING(Boolean, PaneResizeShowIndicator);
+        INHERITABLE_SETTING(Boolean, PaneResizeAltDisablesSnapping);
+        INHERITABLE_SETTING(ApplicationUIDensity, ApplicationUIDensity);
+        INHERITABLE_SETTING(Boolean, ShowPaneHeaders);
+        INHERITABLE_SETTING(Boolean, ShowPaneProfileIcon);
+        INHERITABLE_SETTING(Boolean, ShowPaneActiveStatus);
 
         Windows.Foundation.Collections.IMapView<String, ColorScheme> ColorSchemes();
         void AddColorScheme(ColorScheme scheme);

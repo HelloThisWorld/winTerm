@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "PaneHandle.h"
+#include "PaneIcon.h"
 #include "PaneHeaderViewModel.h"
 
 namespace winTerm::PaneControls
@@ -13,16 +13,16 @@ namespace winTerm::PaneControls
     public:
         PaneHeader(
             PaneHeaderSettings settings,
-            PaneHandle::OpenMenuCallback openMenu = {},
-            PaneHandle::FocusCallback focus = {});
+            PaneIcon::OpenMenuCallback openMenu = {},
+            PaneIcon::FocusCallback focus = {});
 
         PaneHeaderPresentation Present(const PaneHeaderState& state) const;
-        PaneHandle& Handle() noexcept;
+        PaneIcon& Icon() noexcept;
         const PaneHeaderSettings& Settings() const noexcept;
         void Settings(PaneHeaderSettings settings);
 
     private:
         PaneHeaderSettings _settings;
-        PaneHandle _handle;
+        PaneIcon _icon;
     };
 }

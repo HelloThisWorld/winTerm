@@ -41,12 +41,11 @@ namespace winTerm::PaneControls
         double height{};
         std::string title;
         std::string accessibleName;
-        std::string gripAccessibleName;
+        std::string iconAccessibleName;
         std::string overflowAccessibleName{ "Open pane menu" };
         std::string statusText;
         bool showProfileIcon{ false };
         bool showOverflowButton{ false };
-        bool dragEnabled{ false };
     };
 
     class PaneHeaderViewModel

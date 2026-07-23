@@ -21,21 +21,38 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+function Assert-Contains
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Content,
+
+        [Parameter(Mandatory)]
+        [string]$Value,
+
+        [Parameter(Mandatory)]
+        [string]$Description
+    )
+
+    if (-not $Content.Contains($Value))
+    {
+        throw "$Description is missing '$Value'."
+    }
+}
+
 try
 {
     $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
     $requiredFiles = @(
         'src\winterm\Actions\DirectedSplitAction.cpp',
-        'src\winterm\Actions\MovePaneAction.cpp',
         'src\winterm\PaneControls\PaneHeader.cpp',
-        'src\winterm\PaneControls\PaneHandle.cpp',
+        'src\winterm\PaneControls\PaneIcon.cpp',
         'src\winterm\PaneControls\PaneCommandModel.cpp',
         'src\winterm\PaneControls\PaneHeaderViewModel.cpp',
         'src\winterm\PaneControls\PaneHeaderSettings.cpp',
-        'src\winterm\Docking\Drag\PaneHandleDragSource.cpp',
-        'src\winterm\Docking\Overlay\PaneSnapLayoutOverlay.cpp',
         'src\cascadia\UnitTests_SettingsModel\WinTermPaneControlsTests.cpp',
         'src\cascadia\TerminalApp\Pane.cpp',
+        'src\cascadia\TerminalApp\Tab.cpp',
         'src\cascadia\TerminalApp\TerminalPage.cpp',
         'src\cascadia\TerminalApp\AppActionHandlers.cpp',
         'src\cascadia\TerminalSettingsModel\defaults.json'
@@ -54,156 +71,126 @@ try
         'DockZone::Bottom',
         'DockZone::Left',
         'DockZone::Right',
-        'LayoutTransformer::BuildProposedLayout',
         'focusedPaneId',
         'minimumPaneWidth',
-        'minimumPaneHeight'
-    ))
-    {
-        if (-not $directedSplit.Contains($required))
-        {
-            throw "Directed split boundary '$required' is missing."
-        }
-    }
-
-    $handle = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[3])
-    if (-not ($handle.Contains('PanePointerRegion::DragGrip') -and
-        $handle.Contains('PanePointerRegion::OverflowButton')) -or
-        $handle.Contains('TerminalContent, true'))
-    {
-        throw 'Pane Handle input isolation or overflow menu routing is incomplete.'
-    }
-
-    $menu = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[4])
-    foreach ($required in @(
-        'movePaneToNewTab',
-        'movePaneToNewWindow',
-        'closeFocusedPane',
-        'DirectedSplitAction::CommandId',
-        'disabledReason'
-    ))
-    {
-        if (-not $menu.Contains($required))
-        {
-            throw "Pane menu command '$required' is missing."
-        }
-    }
-    foreach ($required in @(
+        'minimumPaneHeight',
         '"splitPaneTop"',
         '"splitPaneBottom"',
         '"splitPaneLeft"',
         '"splitPaneRight"'
     ))
     {
-        if (-not $directedSplit.Contains($required))
-        {
-            throw "Directed split command '$required' is missing."
-        }
+        Assert-Contains $directedSplit $required 'Directed split boundary'
     }
 
-    $drag = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[7])
+    $paneIcon = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[2])
     foreach ($required in @(
-        'DragThreshold::Exceeded',
-        'LayoutTransformer::BuildProposedLayout',
-        'PaneSnapLayoutOverlay::Build',
-        'DockPreview::Build',
-        'DragCancellationReason'
+        'PanePointerRegion::PaneIcon',
+        'PanePointerRegion::HeaderBody',
+        'PanePointerRegion::OverflowButton',
+        'PaneMenuInvocation::IconRightClick'
     ))
     {
-        if (-not $drag.Contains($required))
-        {
-            throw "Pane Handle drag boundary '$required' is missing."
-        }
+        Assert-Contains $paneIcon $required 'Pane icon behavior'
+    }
+    if ($paneIcon -match '(?i)drag|move pane')
+    {
+        throw 'The pane icon still exposes pane movement semantics.'
     }
 
-    $runtimeHeader = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[10])
+    $menu = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[3])
+    foreach ($required in @(
+        'balancePanes',
+        'closeFocusedPane',
+        'DirectedSplitAction::CommandId'
+    ))
+    {
+        Assert-Contains $menu $required 'Pane command model'
+    }
+    if ($menu -match '(?i)movePane|startPaneMove|dockPane|dragPane')
+    {
+        throw 'The pane command model still contains a pane movement command.'
+    }
+
+    $runtimePane = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[7])
     foreach ($required in @(
         '_AttachLeafVisual',
-        'PaneHeaderHeight',
         'SetPaneHeadersVisible',
-        'ContextFlyout',
-        'Move ',
+        '_paneIcon',
         'Open pane menu',
-        '_paneGrip.CapturePointer',
-        'PaneDragPressed.raise',
-        'PaneDragUpdated.raise',
-        'PaneDragCompleted.raise',
-        'PaneDragCancelled.raise'
+        'Focus this pane'
     ))
     {
-        if (-not $runtimeHeader.Contains($required))
-        {
-            throw "Runtime Pane Header boundary '$required' is missing."
-        }
+        Assert-Contains $runtimePane $required 'Runtime pane header'
+    }
+    if ($runtimePane -match '(?i)PaneDrag|paneGrip|SizeAll|Start Pane Move|Drag to move')
+    {
+        throw 'The runtime pane header still contains drag-reposition behavior.'
     }
 
-    $terminalPage = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[11])
+    $runtimeTab = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[8])
+    if ($runtimeTab -match '(?i)_PaneDrag|PaneHandleDrag|PaneDockingOverlay|_DockPane')
+    {
+        throw 'The runtime tab still contains pane drag docking behavior.'
+    }
+
+    $terminalPage = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[9])
     foreach ($required in @(
         'SplitDirection::Up',
         'SplitDirection::Down',
         'SplitDirection::Left',
         'SplitDirection::Right',
-        'MovePaneToNewTabText',
-        'MovePaneToNewWindowDisabledText'
+        'BalancePanesText',
+        'ShortcutAction::BalancePanes'
     ))
     {
-        if (-not $terminalPage.Contains($required))
-        {
-            throw "Runtime directed split or Pane menu boundary '$required' is missing."
-        }
+        Assert-Contains $terminalPage $required 'Runtime pane menu'
+    }
+    if ($terminalPage -match 'MovePaneToNew(Tab|Window)Text')
+    {
+        throw 'The runtime pane menu still advertises pane movement.'
     }
 
-    $runtimeTab = Get-Content -Raw -LiteralPath (Join-Path $root 'src\cascadia\TerminalApp\Tab.cpp')
+    $actionHandlers = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[10])
     foreach ($required in @(
-        '_ResolvePaneDockTarget',
-        '_ShowPaneDockingOverlay',
-        '_DockPane',
-        'PaneHandleDragSource',
-        'DockTargetResolver',
-        'LayoutTransactionCoordinator',
-        'PaneSnapLayoutOverlay::Build',
-        'PaneMoveToNewTabRequested.raise',
-        'SplitDirection::Up',
-        'SplitDirection::Down',
-        'SplitDirection::Left',
-        'SplitDirection::Right'
+        '_HandleBalancePanes',
+        '_HandleUndoPaneResize',
+        '_HandleRedoPaneResize',
+        '#if defined(WT_BRANDING_WINTERM)'
     ))
     {
-        if (-not $runtimeTab.Contains($required))
-        {
-            throw "Runtime Pane Handle docking boundary '$required' is missing."
-        }
+        Assert-Contains $actionHandlers $required 'Pane action handler'
     }
 
-    $actionHandlers = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[12])
-    $handlerStart = $actionHandlers.IndexOf('void TerminalPage::_HandleSplitPane')
-    $handlerEnd = $actionHandlers.IndexOf('void TerminalPage::_HandleToggleSplitOrientation', $handlerStart)
-    if ($handlerStart -lt 0 -or $handlerEnd -le $handlerStart)
-    {
-        throw 'The runtime Split Pane handler is missing.'
-    }
-    $splitHandler = $actionHandlers.Substring($handlerStart, $handlerEnd - $handlerStart)
-    if ($splitHandler.IndexOf('PreCalculateCanSplit') -lt 0 -or
-        $splitHandler.IndexOf('PreCalculateCanSplit') -gt $splitHandler.IndexOf('_MakePane(realArgs.ContentArgs()'))
-    {
-        throw 'Split capability validation must run before the new shell pane is created.'
-    }
-
-    $defaultCommands = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[13])
+    $defaultCommands = Get-Content -Raw -LiteralPath (Join-Path $root $requiredFiles[11])
     foreach ($required in @(
         '"id": "splitPaneTop"',
         '"id": "splitPaneBottom"',
         '"id": "splitPaneLeft"',
         '"id": "splitPaneRight"',
-        '"id": "movePaneToNewTab"',
-        '"id": "movePaneToNewWindow"',
-        '"id": "closeFocusedPane"',
-        '"id": "openPaneMenu"'
+        '"id": "Terminal.BalancePanes"',
+        '"id": "Terminal.UndoPaneResize"',
+        '"id": "Terminal.RedoPaneResize"'
     ))
     {
-        if (-not $defaultCommands.Contains($required))
+        Assert-Contains $defaultCommands $required 'Command Palette command'
+    }
+    if ($defaultCommands -match '"action"\s*:\s*"movePane"')
+    {
+        throw 'Default commands still expose pane movement.'
+    }
+
+    $removedFiles = @(
+        'src\winterm\Actions\MovePaneAction.cpp',
+        'src\winterm\Docking\Drag\PaneHandleDragSource.cpp',
+        'src\winterm\Docking\Overlay\PaneSnapLayoutOverlay.cpp',
+        'src\winterm\Accessibility\KeyboardDockingController.cpp'
+    )
+    foreach ($relativePath in $removedFiles)
+    {
+        if (Test-Path -LiteralPath (Join-Path $root $relativePath))
         {
-            throw "Command Palette command $required is missing."
+            throw "Removed pane movement component '$relativePath' still exists."
         }
     }
 
@@ -228,7 +215,8 @@ try
     {
         Write-Host 'SKIP: compiled pane control tests are unavailable.' -ForegroundColor Yellow
     }
-    Write-Host 'PASS: directed split and pane control source boundaries.' -ForegroundColor Green
+
+    Write-Host 'PASS: directed split remains available and pane movement UI is absent.' -ForegroundColor Green
 }
 catch
 {

@@ -9,7 +9,7 @@ namespace winTerm::PaneControls
 {
     enum class PaneMenuInvocation
     {
-        HandleRightClick,
+        IconRightClick,
         OverflowButton,
         Keyboard,
     };

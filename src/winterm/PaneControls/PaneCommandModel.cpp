@@ -13,7 +13,7 @@ using namespace winTerm::PaneControls;
 std::vector<PaneCommandDescriptor> PaneCommandModel::Build(const PaneCommandContext& context)
 {
     std::vector<PaneCommandDescriptor> result;
-    result.reserve(12);
+    result.reserve(10);
 
     const std::array directions{
         std::pair{ PaneCommand::SplitTop, DockZone::Top },
@@ -43,32 +43,16 @@ std::vector<PaneCommandDescriptor> PaneCommandModel::Build(const PaneCommandCont
     }
 
     result.emplace_back(PaneCommandDescriptor{
-        PaneCommand::MoveToNewTab,
-        "movePaneToNewTab",
-        "move",
-        "Move to New Tab",
-        "Move pane to a new tab",
-        "newTab",
-        context.paneCount > 1 && !context.transactionProtected,
+        PaneCommand::BalancePanes,
+        "balancePanes",
+        {},
+        "Balance Panes",
+        "Balance sibling panes",
+        "balance",
+        context.owningSplitCanBalance && !context.transactionProtected,
         context.transactionProtected ?
             "The pane is protected by an active layout transaction." :
-            context.paneCount <= 1 ? "This pane is already the only pane in its tab." : std::string{},
-    });
-    result.emplace_back(PaneCommandDescriptor{
-        PaneCommand::MoveToNewWindow,
-        "movePaneToNewWindow",
-        "move",
-        "Move to New Window",
-        "Move pane to a new window",
-        "newWindow",
-        context.livePaneTransferSupported &&
-            context.sameProcessWindowHosting &&
-            !context.transactionProtected,
-        context.transactionProtected ?
-            "The pane is protected by an active layout transaction." :
-            !context.livePaneTransferSupported || !context.sameProcessWindowHosting ?
-                "Live pane transfer is not supported by this window host." :
-                std::string{},
+            !context.owningSplitCanBalance ? "The focused pane has no sibling split to balance." : std::string{},
     });
     result.emplace_back(PaneCommandDescriptor{
         PaneCommand::ClosePane,
@@ -83,7 +67,6 @@ std::vector<PaneCommandDescriptor> PaneCommandModel::Build(const PaneCommandCont
     result.emplace_back(PaneCommandDescriptor{ PaneCommand::FocusPane, "focusPane", "more", "Focus Pane", "Focus pane", "focus" });
     result.emplace_back(PaneCommandDescriptor{ PaneCommand::ZoomPane, "zoomPane", "more", "Zoom Pane", "Zoom pane", "zoom" });
     result.emplace_back(PaneCommandDescriptor{ PaneCommand::PaneSettings, "paneSettings", "more", "Pane Settings", "Open pane settings", "settings" });
-    result.emplace_back(PaneCommandDescriptor{ PaneCommand::StartMoveMode, "startPaneMoveMode", {}, "Move Pane", "Start pane move mode", "move" });
     result.emplace_back(PaneCommandDescriptor{ PaneCommand::OpenPaneMenu, "openPaneMenu", {}, "Open Pane Menu", "Open pane menu", "more" });
     return result;
 }

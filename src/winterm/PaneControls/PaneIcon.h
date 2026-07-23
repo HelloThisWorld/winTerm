@@ -11,22 +11,21 @@ namespace winTerm::PaneControls
 {
     enum class PanePointerRegion
     {
-        DragGrip,
+        PaneIcon,
         HeaderBody,
         OverflowButton,
         TerminalContent,
         Scrollbar,
     };
 
-    class PaneHandle
+    class PaneIcon
     {
     public:
         using OpenMenuCallback = std::function<void(PaneMenuInvocation)>;
         using FocusCallback = std::function<void()>;
 
-        explicit PaneHandle(OpenMenuCallback openMenu = {}, FocusCallback focus = {});
+        explicit PaneIcon(OpenMenuCallback openMenu = {}, FocusCallback focus = {});
 
-        bool CanStartDrag(PanePointerRegion region, bool draggingEnabled) const noexcept;
         bool HandleRightClick(PanePointerRegion region) const;
         bool HandlePrimaryClick(PanePointerRegion region) const;
 

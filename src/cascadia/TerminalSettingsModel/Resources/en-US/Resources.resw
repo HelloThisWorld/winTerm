@@ -126,6 +126,15 @@
   <data name="SplitPaneParentCommandName" xml:space="preserve">
     <value>Split pane...</value>
   </data>
+  <data name="BalancePanesCommandKey" xml:space="preserve">
+    <value>Balance panes</value>
+  </data>
+  <data name="UndoPaneResizeCommandKey" xml:space="preserve">
+    <value>Undo pane resize</value>
+  </data>
+  <data name="RedoPaneResizeCommandKey" xml:space="preserve">
+    <value>Redo pane resize</value>
+  </data>
   <data name="SnippetsPaneCommandName" xml:space="preserve">
     <value>Open snippets pane</value>
     <comment>This will open a pane with a list of the users's saved commands ("snippets") in it</comment>

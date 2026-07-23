@@ -43,15 +43,11 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\validate-workspaces.ps1 -BundledFixtures
 
-      - name: Validate docking source and local UI boundaries
+      - name: Validate directed splitting and pane resizing
         shell: pwsh
         run: |
-          .\scripts\winterm\test-layout-transformations.ps1
-          .\scripts\winterm\test-docking-transactions.ps1
-          .\scripts\winterm\test-session-transfer.ps1
-          .\scripts\winterm\test-layout-history.ps1
-          .\scripts\winterm\test-docking-presentation.ps1
-          .\scripts\winterm\test-docking-ui.ps1 -Mode Validate
+          .\scripts\winterm\test-pane-controls.ps1 -SourceOnly
+          .\scripts\winterm\test-pane-resizing.ps1 -SourceOnly
           .\scripts\winterm\validate-layout.ps1 -TestFixture empty-slot.winterm-workspace.json
 
       - name: Build x64

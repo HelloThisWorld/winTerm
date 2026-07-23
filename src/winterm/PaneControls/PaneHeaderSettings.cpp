@@ -13,7 +13,7 @@ void PaneHeaderSettings::Normalize() noexcept
 {
     if (!std::isfinite(height))
     {
-        height = 26.0;
+        height = Design::DensityTokens::CompactPaneHeaderHeight;
     }
     height = std::clamp(height, 24.0, 30.0);
 }
@@ -43,10 +43,8 @@ bool PaneHeaderSettings::ShouldShow(const size_t paneCount) const noexcept
 }
 
 bool PaneHeaderSettings::HasKeyboardAlternative(
-    const bool commandPaletteAvailable,
-    const bool keyboardDockingAvailable) const noexcept
+    const bool commandPaletteAvailable) const noexcept
 {
     return visibility != PaneHeaderVisibility::Never ||
-           commandPaletteAvailable ||
-           keyboardDockingAvailable;
+           commandPaletteAvailable;
 }

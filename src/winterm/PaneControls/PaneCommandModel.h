@@ -20,13 +20,11 @@ namespace winTerm::PaneControls
         SplitBottom,
         SplitLeft,
         SplitRight,
-        MoveToNewTab,
-        MoveToNewWindow,
+        BalancePanes,
         ClosePane,
         FocusPane,
         ZoomPane,
         PaneSettings,
-        StartMoveMode,
         OpenPaneMenu,
     };
 
@@ -34,8 +32,7 @@ namespace winTerm::PaneControls
     {
         size_t paneCount{ 1 };
         bool transactionProtected{ false };
-        bool livePaneTransferSupported{ true };
-        bool sameProcessWindowHosting{ true };
+        bool owningSplitCanBalance{ false };
         Docking::LayoutRect focusedPaneBounds;
         Docking::LayoutGeometrySettings geometrySettings;
     };
