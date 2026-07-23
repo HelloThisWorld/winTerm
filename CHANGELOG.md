@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.1 - 2026-07-24
+
+### Fixed
+
+- Added an explicit unsigned-installer disclosure to generated Release notes
+  when no trusted Authenticode certificate is configured.
+- Added release-workflow regression coverage for the signing disclosure.
+- Updated the README and versioned documentation to point users to the
+  v1.1.1 Release while retaining the stable `/releases/latest` download link.
+
+### Distribution
+
+- Publishes the native UI refresh and snapping pane-resize feature set prepared
+  for 1.1.0 as the verified x64 Setup EXE and Portable ZIP.
+- Supersedes the unpublished v1.1.0 Release attempt without moving or
+  overwriting its tag.
+- The Setup EXE is not code-signed; verify it with `SHA256SUMS.txt`.
+
 ## 1.1.0 - 2026-07-23
 
 ### Added
