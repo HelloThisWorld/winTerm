@@ -27,6 +27,9 @@
     </Page.Resources>
 
     <StackPanel Style="{StaticResource SettingsStackStyle}">
+        <TextBlock x:Uid="Globals_ApplicationUIHeader"
+                   Style="{StaticResource TextBlockSubHeaderStyle}" />
+
         <!--  Theme  -->
         <local:SettingContainer x:Name="Theme"
                                 x:Uid="Globals_Theme">
@@ -40,6 +43,33 @@
                     </DataTemplate>
                 </ComboBox.ItemTemplate>
             </ComboBox>
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="ApplicationUIDensity"
+                                x:Uid="Globals_ApplicationUIDensity">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.ApplicationUIDensityList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentApplicationUIDensity, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="ShowPaneHeaders"
+                                x:Uid="Globals_ShowPaneHeaders">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowPaneHeaders, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="ShowPaneProfileIcon"
+                                x:Uid="Globals_ShowPaneProfileIcon">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowPaneProfileIcon, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="ShowPaneActiveStatus"
+                                x:Uid="Globals_ShowPaneActiveStatus">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.ShowPaneActiveStatus, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
         </local:SettingContainer>
 
         <!--  Position of new tab  -->

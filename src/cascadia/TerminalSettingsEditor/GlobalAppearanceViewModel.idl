@@ -21,6 +21,9 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentTabWidthMode;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> TabWidthModeList { get; };
 
+        IInspectable CurrentApplicationUIDensity;
+        Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> ApplicationUIDensityList { get; };
+
         Boolean InvertedDisableAnimations;
 
         void ShowTitlebarToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);
@@ -36,5 +39,8 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, MinimizeToNotificationArea);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowAdminShield);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, EnableUnfocusedAcrylic);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowPaneHeaders);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowPaneProfileIcon);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowPaneActiveStatus);
     }
 }

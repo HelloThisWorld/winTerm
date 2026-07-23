@@ -205,7 +205,9 @@ void AppCommandlineArgs::_buildParser()
     _buildSplitPaneParser();
     _buildFocusTabParser();
     _buildMoveFocusParser();
+#if !defined(WT_BRANDING_WINTERM)
     _buildMovePaneParser();
+#endif
     _buildSwapPaneParser();
     _buildFocusPaneParser();
     _buildSaveSnippetParser();
@@ -319,6 +321,7 @@ void AppCommandlineArgs::_buildSplitPaneParser()
 // - <none>
 // Return Value:
 // - <none>
+#if !defined(WT_BRANDING_WINTERM)
 void AppCommandlineArgs::_buildMovePaneParser()
 {
     _movePaneCommand = _app.add_subcommand("move-pane", RS_A(L"CmdMovePaneDesc"));
@@ -349,6 +352,7 @@ void AppCommandlineArgs::_buildMovePaneParser()
     setupSubcommand(_movePaneCommand);
     setupSubcommand(_movePaneShort);
 }
+#endif
 
 // Method Description:
 // - Adds the `focus-tab` subcommand and related options to the commandline parser.
@@ -779,8 +783,10 @@ bool AppCommandlineArgs::_noCommandsProvided()
              *_focusTabShort ||
              *_moveFocusCommand ||
              *_moveFocusShort ||
+#if !defined(WT_BRANDING_WINTERM)
              *_movePaneCommand ||
              *_movePaneShort ||
+#endif
              *_swapPaneCommand ||
              *_focusPaneCommand ||
              *_focusPaneShort ||
@@ -813,7 +819,9 @@ void AppCommandlineArgs::_resetStateToDefault()
     _splitPaneSize = 0.5f;
     _splitDuplicate = false;
 
+#if !defined(WT_BRANDING_WINTERM)
     _movePaneTabIndex = -1;
+#endif
     _focusTabIndex = -1;
     _focusNextTab = false;
     _focusPrevTab = false;

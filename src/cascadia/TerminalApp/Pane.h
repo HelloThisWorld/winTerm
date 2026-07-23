@@ -22,6 +22,7 @@
 
 #include "TaskbarState.h"
 #include "TerminalPaneContent.h"
+#include "../../winterm/PaneResize/PaneResizeModel.h"
 
 // fwdecl unittest classes
 namespace TerminalAppLocalTests
@@ -111,6 +112,8 @@ public:
 
     void UpdateSettings(const winrt::Microsoft::Terminal::Settings::Model::CascadiaSettings& settings);
     bool ResizePane(const winrt::Microsoft::Terminal::Settings::Model::ResizeDirection& direction);
+    bool BalancePane();
+    bool ApplySplitRatio(uint64_t ownerId, float ratio);
     std::shared_ptr<Pane> NavigateDirection(const std::shared_ptr<Pane> sourcePane,
                                             const winrt::Microsoft::Terminal::Settings::Model::FocusDirection& direction,
                                             const std::vector<uint32_t>& mruPanes);
@@ -225,17 +228,12 @@ public:
     til::event<winrt::delegate<std::shared_ptr<Pane>>> LostFocus;
     til::event<winrt::delegate<std::shared_ptr<Pane>>> Detached;
 
-    using paneDragPointerArgs = winrt::delegate<
+    using paneResizeCommittedArgs = winrt::delegate<
         std::shared_ptr<Pane>,
-        winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs>;
-
-    // Pane dragging is deliberately exposed only by the dedicated header grip.
-    // Tab owns target resolution and layout changes so a hover never mutates the
-    // pane tree and a cancelled drag leaves the live session untouched.
-    til::event<paneDragPointerArgs> PaneDragPressed;
-    til::event<paneDragPointerArgs> PaneDragUpdated;
-    til::event<paneDragPointerArgs> PaneDragCompleted;
-    til::event<winrt::delegate<std::shared_ptr<Pane>>> PaneDragCancelled;
+        uint64_t,
+        float,
+        float>;
+    til::event<paneResizeCommittedArgs> PaneResizeCommitted;
 
 private:
     struct PanePoint;
@@ -250,11 +248,17 @@ private:
     winrt::Windows::UI::Xaml::Controls::Grid _leafLayout{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Grid _paneHeader{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Border _contentHost{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::Button _paneGrip{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Button _paneIcon{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Button _paneOverflow{ nullptr };
     winrt::Windows::UI::Xaml::Controls::TextBlock _paneTitle{ nullptr };
     winrt::Windows::UI::Xaml::Controls::TextBlock _paneStatus{ nullptr };
     winrt::Windows::UI::Xaml::Controls::RowDefinition _paneHeaderRow{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _paneIconColumn{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Primitives::Thumb _dividerHitTarget{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _dividerPointerTarget{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _dividerVisual{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _snapIndicator{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::TextBlock _snapIndicatorText{ nullptr };
 
     PaneResources _themeResources;
 
@@ -285,8 +289,14 @@ private:
     bool _zoomed{ false };
     bool _broadcastEnabled{ false };
     bool _paneHeadersVisible{ false };
-    std::optional<uint32_t> _paneDragPointerId;
-    winrt::Windows::Foundation::Point _paneDragStartPoint{};
+    bool _showPaneProfileIcon{ true };
+    bool _showPaneActiveStatus{ true };
+    double _paneHeaderHeight{ 27.0 };
+    winTerm::PaneResize::PaneResizeSettings _paneResizeSettings;
+    uint64_t _layoutNodeId{};
+    std::optional<uint32_t> _resizePointerId;
+    std::unique_ptr<winTerm::PaneResize::PaneResizeTransaction> _resizeTransaction;
+    bool _dividerPointerOver{ false };
 
     bool _IsLeaf() const noexcept;
     bool _HasFocusedChild() const noexcept;
@@ -297,10 +307,14 @@ private:
     void _UpdatePaneHeader();
     winrt::hstring _PaneHeaderTitle() const;
     winrt::hstring _PaneHeaderAccessibleTitle() const;
-    void _PaneGripPointerPressed(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
-    void _PaneGripPointerMoved(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
-    void _PaneGripPointerReleased(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
-    void _CancelPaneDrag(bool restoreFocus);
+    void _CreateDividerVisual();
+    void _UpdateDividerPlacement();
+    void _UpdateDividerState(bool active, bool snapped = false);
+    void _DividerPointerPressed(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _DividerPointerMoved(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _DividerPointerReleased(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _CancelDividerResize();
+    bool _Balance();
     bool _HasChild(const std::shared_ptr<Pane> child);
     winrt::TerminalApp::TerminalPaneContent _getTerminalContent() const;
 

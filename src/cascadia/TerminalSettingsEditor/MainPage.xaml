@@ -160,6 +160,10 @@
                                      x:Uid="Nav_Interaction"
                                      Tag="Interaction_Nav" />
 
+            <muxc:NavigationViewItem x:Name="DockingAndLayoutNavItem"
+                                     x:Uid="Nav_DockingAndLayout"
+                                     Tag="DockingAndLayout_Nav" />
+
             <muxc:NavigationViewItem x:Name="AppearanceNavItem"
                                      x:Uid="Nav_Appearance"
                                      Tag="GlobalAppearance_Nav" />

@@ -6,6 +6,8 @@
 #include "MainPage.g.cpp"
 #include "Launch.h"
 #include "Interaction.h"
+#include "DockingAndLayout.h"
+#include "DockingAndLayoutViewModel.h"
 #include "Compatibility.h"
 #include "Rendering.h"
 #include "RenderingViewModel.h"
@@ -575,6 +577,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             {
                 contentFrame().Navigate(xaml_typename<Editor::Interaction>(), winrt::make<NavigateToPageArgs>(winrt::make<InteractionViewModel>(_settingsClone.GlobalSettings()), *this, elementToFocus));
                 _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Interaction/Content"), BreadcrumbSubPage::None));
+            }
+            else if (*clickedItemTag == dockingAndLayoutTag)
+            {
+                contentFrame().Navigate(xaml_typename<Editor::DockingAndLayout>(), winrt::make<NavigateToPageArgs>(winrt::make<DockingAndLayoutViewModel>(_settingsClone.GlobalSettings()), *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_DockingAndLayout/Content"), BreadcrumbSubPage::None));
             }
             else if (*clickedItemTag == renderingTag)
             {

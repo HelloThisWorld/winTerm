@@ -83,6 +83,9 @@
     <ClInclude Include="Interaction.h">
       <DependentUpon>Interaction.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="DockingAndLayout.h">
+      <DependentUpon>DockingAndLayout.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="Compatibility.h">
       <DependentUpon>Compatibility.xaml</DependentUpon>
     </ClInclude>
@@ -128,6 +131,10 @@
     </ClInclude>
     <ClInclude Include="InteractionViewModel.h">
       <DependentUpon>InteractionViewModel.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClInclude>
+    <ClInclude Include="DockingAndLayoutViewModel.h">
+      <DependentUpon>DockingAndLayoutViewModel.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClInclude>
     <ClInclude Include="GlobalAppearanceViewModel.h">
@@ -213,6 +220,9 @@
     <Page Include="Interaction.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="DockingAndLayout.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Compatibility.xaml">
       <SubType>Designer</SubType>
     </Page>
@@ -294,6 +304,9 @@
     <ClCompile Include="Interaction.cpp">
       <DependentUpon>Interaction.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="DockingAndLayout.cpp">
+      <DependentUpon>DockingAndLayout.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="Compatibility.cpp">
       <DependentUpon>Compatibility.xaml</DependentUpon>
     </ClCompile>
@@ -340,6 +353,10 @@
     </ClCompile>
     <ClCompile Include="InteractionViewModel.cpp">
       <DependentUpon>InteractionViewModel.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
+    <ClCompile Include="DockingAndLayoutViewModel.cpp">
+      <DependentUpon>DockingAndLayoutViewModel.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
     <ClCompile Include="GlobalAppearanceViewModel.cpp">
@@ -442,6 +459,10 @@
       <DependentUpon>Interaction.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Midl>
+    <Midl Include="DockingAndLayout.idl">
+      <DependentUpon>DockingAndLayout.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
     <Midl Include="Compatibility.idl">
       <DependentUpon>Compatibility.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -461,6 +482,7 @@
     <Midl Include="ColorSchemesPageViewModel.idl" />
     <Midl Include="RenderingViewModel.idl" />
     <Midl Include="InteractionViewModel.idl" />
+    <Midl Include="DockingAndLayoutViewModel.idl" />
     <Midl Include="GlobalAppearanceViewModel.idl" />
     <Midl Include="LaunchViewModel.idl" />
     <Midl Include="NewTabMenuViewModel.idl" />

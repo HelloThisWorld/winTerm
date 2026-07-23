@@ -366,7 +366,9 @@ namespace winrt::TerminalApp::implementation
         bool _SelectTab(uint32_t tabIndex);
         bool _MoveFocus(const Microsoft::Terminal::Settings::Model::FocusDirection& direction);
         bool _SwapPane(const Microsoft::Terminal::Settings::Model::FocusDirection& direction);
+#if !defined(WT_BRANDING_WINTERM)
         bool _MovePane(const Microsoft::Terminal::Settings::Model::MovePaneArgs args);
+#endif
         bool _MoveTab(winrt::com_ptr<Tab> tab, const Microsoft::Terminal::Settings::Model::MoveTabArgs args);
 
         std::shared_ptr<ThrottledFunc<>> _adjustProcessPriorityThrottled;

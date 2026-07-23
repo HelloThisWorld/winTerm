@@ -137,24 +137,6 @@ namespace winrt::TerminalApp::implementation
         // PropertyChanged event handler.
         newTabImpl->ActivePaneChanged({ get_weak(), &TerminalPage::_activePaneChanged });
 
-        // A center drop from the pane docking overlay moves the existing live
-        // pane into a standalone tab. The Tab detaches only after a valid drop,
-        // so pointer cancellation never removes terminal content.
-        newTabImpl->PaneMoveToNewTabRequested([weakThis{ get_weak() }](std::shared_ptr<Pane> pane) {
-            if (const auto page = weakThis.get())
-            {
-                page->_CreateNewTabFromPane(std::move(pane));
-                if (auto autoPeer = Automation::Peers::FrameworkElementAutomationPeer::FromElement(*page))
-                {
-                    autoPeer.RaiseNotificationEvent(
-                        Automation::Peers::AutomationNotificationKind::ActionCompleted,
-                        Automation::Peers::AutomationNotificationProcessing::ImportantMostRecent,
-                        RS_(L"TerminalPage_PaneMovedAnnouncement_NewTab"),
-                        L"TerminalPagePaneDragToNewTab");
-                }
-            }
-        });
-
         // The RaiseVisualBell event has been bubbled up to here from the pane,
         // the next part of the chain is bubbling up to app logic, which will
         // forward it to app host.

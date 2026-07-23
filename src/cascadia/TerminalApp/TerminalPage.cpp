@@ -2455,6 +2455,7 @@ namespace winrt::TerminalApp::implementation
         }
     }
 
+#if !defined(WT_BRANDING_WINTERM)
     // Method Description:
     // - Moves the currently active pane on the currently active tab to the
     //   specified tab. If the tab index is greater than the number of
@@ -2558,6 +2559,7 @@ namespace winrt::TerminalApp::implementation
 
         return true;
     }
+#endif
 
     // Detach a tree of panes from this terminal. Helper used for moving panes
     // and tabs to other windows.
@@ -5554,64 +5556,11 @@ namespace winrt::TerminalApp::implementation
         // Only wire up "Close Pane" if there's multiple panes.
         if (_GetFocusedTabImpl()->GetLeafPaneCount() > 1)
         {
-            MUX::Controls::CommandBarFlyout movePaneMenu{};
             makeItem(
-                RS_(L"MovePaneToNewTabText"),
-                L"\xE8A7",
-                ActionAndArgs{
-                    ShortcutAction::MovePane,
-                    MovePaneArgs{ std::numeric_limits<uint32_t>::max(), L"" },
-                },
-                movePaneMenu);
-            const auto moveToNewWindow = makeItem(
-                RS_(L"MovePaneToNewWindowText"),
-                L"\xE737",
-                ActionAndArgs{
-                    ShortcutAction::MovePane,
-                    MovePaneArgs{ 0, L"new" },
-                },
-                movePaneMenu);
-            const auto moveToNewWindowReason = RS_(L"MovePaneToNewWindowDisabledText");
-            moveToNewWindow.IsEnabled(false);
-            WUX::Controls::ToolTipService::SetToolTip(moveToNewWindow, box_value(moveToNewWindowReason));
-            Automation::AutomationProperties::SetHelpText(moveToNewWindow, moveToNewWindowReason);
-            makeMenuItem(RS_(L"MovePaneText"), L"\xE8AB", movePaneMenu, menu);
-
-            MUX::Controls::CommandBarFlyout swapPaneMenu{};
-            const auto rootPane = _GetFocusedTabImpl()->GetRootPane();
-            const auto mruPanes = _GetFocusedTabImpl()->GetMruPanes();
-            auto activePane = _GetFocusedTabImpl()->GetActivePane();
-            rootPane->WalkTree([&](auto p) {
-                if (const auto& c{ p->GetTerminalControl() })
-                {
-                    if (c == control)
-                    {
-                        activePane = p;
-                    }
-                }
-            });
-
-            if (auto neighbor = rootPane->NavigateDirection(activePane, FocusDirection::Down, mruPanes))
-            {
-                makeItem(RS_(L"SwapPaneDownText"), neighbor->GetProfile().Icon().Resolved(), ActionAndArgs{ ShortcutAction::SwapPane, SwapPaneArgs{ FocusDirection::Down } }, swapPaneMenu);
-            }
-
-            if (auto neighbor = rootPane->NavigateDirection(activePane, FocusDirection::Right, mruPanes))
-            {
-                makeItem(RS_(L"SwapPaneRightText"), neighbor->GetProfile().Icon().Resolved(), ActionAndArgs{ ShortcutAction::SwapPane, SwapPaneArgs{ FocusDirection::Right } }, swapPaneMenu);
-            }
-
-            if (auto neighbor = rootPane->NavigateDirection(activePane, FocusDirection::Up, mruPanes))
-            {
-                makeItem(RS_(L"SwapPaneUpText"), neighbor->GetProfile().Icon().Resolved(), ActionAndArgs{ ShortcutAction::SwapPane, SwapPaneArgs{ FocusDirection::Up } }, swapPaneMenu);
-            }
-
-            if (auto neighbor = rootPane->NavigateDirection(activePane, FocusDirection::Left, mruPanes))
-            {
-                makeItem(RS_(L"SwapPaneLeftText"), neighbor->GetProfile().Icon().Resolved(), ActionAndArgs{ ShortcutAction::SwapPane, SwapPaneArgs{ FocusDirection::Left } }, swapPaneMenu);
-            }
-
-            makeMenuItem(RS_(L"SwapPaneText"), L"\xF1CB", swapPaneMenu, menu);
+                RS_(L"BalancePanesText"),
+                L"\xE9D2",
+                ActionAndArgs{ ShortcutAction::BalancePanes, nullptr },
+                menu);
 
             makeItem(RS_(L"TogglePaneZoomText"), L"\xE8A3", ActionAndArgs{ ShortcutAction::TogglePaneZoom, nullptr }, menu);
             makeItem(RS_(L"CloseOtherPanesText"), L"\xE89F", ActionAndArgs{ ShortcutAction::CloseOtherPanes, nullptr }, menu);
