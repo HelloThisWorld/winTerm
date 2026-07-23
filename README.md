@@ -39,7 +39,7 @@ Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
 See [installation guidance](docs/user/installation.md) and the
-[1.1.0 release-candidate notes](docs/releases/1.1.0.md).
+[1.1.0 release notes](docs/releases/1.1.0.md).
 
 ## Core features
 
