@@ -52,6 +52,9 @@
     ON_ALL_ACTIONS(ClearMark)               \
     ON_ALL_ACTIONS(ClearAllMarks)           \
     ON_ALL_ACTIONS(ResizePane)              \
+    ON_ALL_ACTIONS(BalancePanes)            \
+    ON_ALL_ACTIONS(UndoPaneResize)          \
+    ON_ALL_ACTIONS(RedoPaneResize)          \
     ON_ALL_ACTIONS(MoveFocus)               \
     ON_ALL_ACTIONS(MovePane)                \
     ON_ALL_ACTIONS(SwapPane)                \

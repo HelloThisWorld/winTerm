@@ -91,8 +91,10 @@ private:
     CLI::App* _focusTabShort;
     CLI::App* _moveFocusCommand;
     CLI::App* _moveFocusShort;
+#if !defined(WT_BRANDING_WINTERM)
     CLI::App* _movePaneCommand;
     CLI::App* _movePaneShort;
+#endif
     CLI::App* _swapPaneCommand;
     CLI::App* _focusPaneCommand;
     CLI::App* _focusPaneShort;
@@ -121,7 +123,9 @@ private:
     bool _splitDuplicate{ false };
     float _splitPaneSize{ 0.5f };
 
+#if !defined(WT_BRANDING_WINTERM)
     int _movePaneTabIndex{ -1 };
+#endif
     int _focusTabIndex{ -1 };
     bool _focusNextTab{ false };
     bool _focusPrevTab{ false };
@@ -151,7 +155,9 @@ private:
     void _buildSplitPaneParser();
     void _buildFocusTabParser();
     void _buildMoveFocusParser();
+#if !defined(WT_BRANDING_WINTERM)
     void _buildMovePaneParser();
+#endif
     void _buildSwapPaneParser();
     void _buildFocusPaneParser();
     bool _noCommandsProvided();

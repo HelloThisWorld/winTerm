@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../Actions/DirectedSplitAction.h"
+#include "../Design/DensityTokens.h"
 
 #include <cstddef>
 #include <string>
@@ -27,19 +28,19 @@ namespace winTerm::PaneControls
     struct PaneHeaderSettings
     {
         PaneHeaderVisibility visibility{ PaneHeaderVisibility::Automatic };
-        double height{ 26.0 };
+        double height{ Design::DensityTokens::CompactPaneHeaderHeight };
         bool showPaneTitle{ true };
         bool showProfileIcon{ true };
         bool showOverflowButton{ true };
-        bool enablePaneHandleDragging{ true };
-        bool showSnapLayoutOverlay{ true };
-        bool enableCornerZones{ true };
+        bool showActiveStatus{ true };
+        bool enableUiAnimations{ true };
+        Design::InterfaceDensity density{ Design::DensityTokens::Default };
         AfterSplitFocus afterSplit{ AfterSplitFocus::FocusNewPane };
         Actions::SplitProfilePolicy splitProfile{ Actions::SplitProfilePolicy::DefaultProfile };
 
         void Normalize() noexcept;
         std::vector<std::string> Validate() const;
         bool ShouldShow(size_t paneCount) const noexcept;
-        bool HasKeyboardAlternative(bool commandPaletteAvailable, bool keyboardDockingAvailable) const noexcept;
+        bool HasKeyboardAlternative(bool commandPaletteAvailable) const noexcept;
     };
 }

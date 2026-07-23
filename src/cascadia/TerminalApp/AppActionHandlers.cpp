@@ -228,6 +228,14 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_HandleMovePane(const IInspectable& /*sender*/,
                                        const ActionEventArgs& args)
     {
+#if defined(WT_BRANDING_WINTERM)
+        // winTerm 1.1 removes pane repositioning. Keep the inherited action
+        // identifier parse-safe for existing settings, but do not execute it.
+        if (args)
+        {
+            args.Handled(false);
+        }
+#else
         if (args == nullptr)
         {
             args.Handled(false);
@@ -237,6 +245,7 @@ namespace winrt::TerminalApp::implementation
             const auto moved = _MovePane(realArgs);
             args.Handled(moved);
         }
+#endif
     }
 
     // * Helper to try and get a ProfileIndex out of a NewTerminalArgs out of a
@@ -527,6 +536,45 @@ namespace winrt::TerminalApp::implementation
                 const auto resizeSucceeded = _ResizePane(realArgs.ResizeDirection());
                 args.Handled(resizeSucceeded);
             }
+        }
+    }
+
+    void TerminalPage::_HandleBalancePanes(const IInspectable& /*sender*/,
+                                           const ActionEventArgs& args)
+    {
+        if (const auto tab = _GetFocusedTabImpl())
+        {
+            args.Handled(tab->BalancePanes());
+        }
+        else
+        {
+            args.Handled(false);
+        }
+    }
+
+    void TerminalPage::_HandleUndoPaneResize(const IInspectable& /*sender*/,
+                                             const ActionEventArgs& args)
+    {
+        if (const auto tab = _GetFocusedTabImpl())
+        {
+            args.Handled(tab->UndoPaneResize());
+        }
+        else
+        {
+            args.Handled(false);
+        }
+    }
+
+    void TerminalPage::_HandleRedoPaneResize(const IInspectable& /*sender*/,
+                                             const ActionEventArgs& args)
+    {
+        if (const auto tab = _GetFocusedTabImpl())
+        {
+            args.Handled(tab->RedoPaneResize());
+        }
+        else
+        {
+            args.Handled(false);
         }
     }
 

@@ -20,6 +20,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         WINRT_PROPERTY(Windows::Foundation::Collections::IObservableVector<Model::Theme>, ThemeList, nullptr);
         GETSET_BINDABLE_ENUM_SETTING(NewTabPosition, Model::NewTabPosition, _GlobalSettings.NewTabPosition);
         GETSET_BINDABLE_ENUM_SETTING(TabWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, _GlobalSettings.TabWidthMode);
+        GETSET_BINDABLE_ENUM_SETTING(ApplicationUIDensity, Model::ApplicationUIDensity, _GlobalSettings.ApplicationUIDensity);
 
     public:
         winrt::Windows::Foundation::IInspectable CurrentTheme();
@@ -42,6 +43,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, MinimizeToNotificationArea);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowAdminShield);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, EnableUnfocusedAcrylic);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowPaneHeaders);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowPaneProfileIcon);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowPaneActiveStatus);
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

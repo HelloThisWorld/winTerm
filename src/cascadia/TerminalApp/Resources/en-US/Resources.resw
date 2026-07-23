@@ -210,17 +210,8 @@
   <data name="SplitPaneLeftText" xml:space="preserve">
     <value>Left</value>
   </data>
-  <data name="MovePaneText" xml:space="preserve">
-    <value>Move</value>
-  </data>
-  <data name="MovePaneToNewTabText" xml:space="preserve">
-    <value>Move to New Tab</value>
-  </data>
-  <data name="MovePaneToNewWindowText" xml:space="preserve">
-    <value>Move to New Window</value>
-  </data>
-  <data name="MovePaneToNewWindowDisabledText" xml:space="preserve">
-    <value>Live pane transfer to a new window is unavailable until the transactional runtime adapter is verified.</value>
+  <data name="BalancePanesText" xml:space="preserve">
+    <value>Balance Panes</value>
   </data>
   <data name="SplitPaneDuplicateText" xml:space="preserve">
     <value>Duplicate</value>

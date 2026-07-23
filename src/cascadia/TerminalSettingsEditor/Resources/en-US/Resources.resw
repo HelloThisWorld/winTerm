@@ -2786,4 +2786,91 @@
   <data name="ColorScheme_ThemeFileErrorDialog.CloseButtonText" xml:space="preserve">
     <value>Close</value>
   </data>
+  <data name="Nav_DockingAndLayout.Content" xml:space="preserve">
+    <value>Docking and layout</value>
+  </data>
+  <data name="Globals_ApplicationUIHeader.Text" xml:space="preserve">
+    <value>Application UI</value>
+  </data>
+  <data name="Globals_ApplicationUIDensity.Header" xml:space="preserve">
+    <value>Density</value>
+  </data>
+  <data name="Globals_ApplicationUIDensity.HelpText" xml:space="preserve">
+    <value>Choose compact or comfortable spacing for the native application shell.</value>
+  </data>
+  <data name="Globals_ApplicationUIDensityCompact.Content" xml:space="preserve">
+    <value>Compact</value>
+  </data>
+  <data name="Globals_ApplicationUIDensityComfortable.Content" xml:space="preserve">
+    <value>Comfortable</value>
+  </data>
+  <data name="Globals_ShowPaneHeaders.Header" xml:space="preserve">
+    <value>Pane header visibility</value>
+  </data>
+  <data name="Globals_ShowPaneHeaders.HelpText" xml:space="preserve">
+    <value>Show compact pane headers when a tab contains multiple panes.</value>
+  </data>
+  <data name="Globals_ShowPaneProfileIcon.Header" xml:space="preserve">
+    <value>Show pane profile icon</value>
+  </data>
+  <data name="Globals_ShowPaneProfileIcon.HelpText" xml:space="preserve">
+    <value>Show the pane or shell icon at the start of each pane header.</value>
+  </data>
+  <data name="Globals_ShowPaneActiveStatus.Header" xml:space="preserve">
+    <value>Show active status</value>
+  </data>
+  <data name="Globals_ShowPaneActiveStatus.HelpText" xml:space="preserve">
+    <value>Show focused, read-only, and running state in pane headers.</value>
+  </data>
+  <data name="Globals_PaneResizingHeader.Text" xml:space="preserve">
+    <value>Pane resizing</value>
+  </data>
+  <data name="Globals_PaneResizeSnapping.Header" xml:space="preserve">
+    <value>Enable resize snapping</value>
+  </data>
+  <data name="Globals_PaneResizeSnapping.HelpText" xml:space="preserve">
+    <value>Snap dragged pane borders to clean proportions.</value>
+  </data>
+  <data name="Globals_PaneResizeSnapPoints.Header" xml:space="preserve">
+    <value>Snap points</value>
+  </data>
+  <data name="Globals_PaneResizeSnapPoints.HelpText" xml:space="preserve">
+    <value>Balanced uses 50%. Common ratios adds quarters and thirds.</value>
+  </data>
+  <data name="Globals_PaneResizeSnapPointsBalanced.Content" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="Globals_PaneResizeSnapPointsCommonRatios.Content" xml:space="preserve">
+    <value>Common ratios</value>
+  </data>
+  <data name="Globals_PaneResizeSnapPointsCustom.Content" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="Globals_PaneResizeCustomRatios.Header" xml:space="preserve">
+    <value>Custom ratios</value>
+  </data>
+  <data name="Globals_PaneResizeCustomRatios.HelpText" xml:space="preserve">
+    <value>Enter up to 12 comma-separated values between 0.05 and 0.95. Invalid and duplicate values are ignored.</value>
+  </data>
+  <data name="Globals_PaneResizeShowIndicator.Header" xml:space="preserve">
+    <value>Show snap ratio indicator</value>
+  </data>
+  <data name="Globals_PaneResizeShowIndicator.HelpText" xml:space="preserve">
+    <value>Show a compact ratio label while a pane border is snapped.</value>
+  </data>
+  <data name="Globals_PaneResizeAltDisablesSnapping.Header" xml:space="preserve">
+    <value>Alt disables snapping</value>
+  </data>
+  <data name="Globals_PaneResizeAltDisablesSnapping.HelpText" xml:space="preserve">
+    <value>Hold Alt while dragging a pane border for free resizing.</value>
+  </data>
+  <data name="Globals_PaneResizeSnapThreshold.Header" xml:space="preserve">
+    <value>Snap threshold</value>
+  </data>
+  <data name="Globals_PaneResizeSnapThreshold.HelpText" xml:space="preserve">
+    <value>Advanced: logical pixels from a valid ratio at which snapping begins.</value>
+  </data>
+  <data name="Globals_PaneResizeReset.Content" xml:space="preserve">
+    <value>Reset pane resizing to defaults</value>
+  </data>
 </root>

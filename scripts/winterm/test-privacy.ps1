@@ -68,9 +68,6 @@ try
     $workspaceDiagnostics = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Workspaces\Diagnostics\WorkspaceDiagnostics.cpp') -Raw
     Assert-Condition (-not ($workspaceDiagnostics -match '(?i)terminalOutput|clipboard(Content|Text)|command(Line|Text)|workspaceJson')) 'Workspace diagnostics exclude commands, terminal output, clipboard content, and Workspace JSON'
 
-    $dockingDiagnostics = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\winterm\Docking\Diagnostics\DockingDiagnostics.cpp') -Raw
-    Assert-Condition (-not ($dockingDiagnostics -match '(?i)terminalOutput|clipboard(Content|Text)|command(Line|Text)')) 'Docking diagnostics exclude commands, terminal output, and clipboard content'
-
     $loggingCandidates = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'src\winterm') -Recurse -File -Include '*.cpp', '*.h')
     foreach ($file in $loggingCandidates)
     {

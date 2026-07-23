@@ -1,45 +1,20 @@
-# Pane Controls
+# Pane controls
 
-winTerm 0.7 defines a compact pane header for every pane in a split layout. The header is outside the terminal buffer, so its pointer input is never sent to the shell.
+winTerm 1.1 uses a compact informational header for every pane in a visible
+split layout. It is outside the terminal buffer, so pointer input on the header
+is not sent to the shell.
 
-## Visibility
+The header contains a pane/profile icon, ellipsized title, real
+active/read-only/running status, and overflow button. Clicking the icon focuses
+the pane. Right-clicking the icon or header can open the same unified pane menu
+as the overflow button. No header control initiates pane repositioning or uses
+a movement cursor.
 
-Pane header visibility supports:
+Settings → Appearance → Application UI controls compact/comfortable density,
+pane-header visibility, profile icon, active status, and animations. Hiding
+headers does not remove directed split, resize, balance, undo/redo, Command
+Palette, or keyboard access.
 
-- Automatic: hidden for a one-pane tab and shown for every pane when the tab has two or more panes.
-- Always: shown even for a one-pane tab.
-- Never: hidden without removing Command Palette, keyboard move mode, or the pane-menu shortcut.
-
-The supported logical height is 24–30 pixels; the default is 26. Showing or hiding a header changes the space offered to the terminal control, which must trigger the normal row and column recalculation.
-
-## Header content
-
-The compact header contains a drag grip, a pane title, focus/status text exposed to accessibility, and an optional overflow button. It does not contain a large toolbar.
-
-Title precedence is:
-
-1. User-defined pane title.
-2. Shell-reported title.
-3. Profile name.
-4. Shell type.
-
-Absolute paths are reduced to their final component before display. Long titles are ellipsized while the accessible pane name remains meaningful.
-
-Focused, running, failed-command, and read-only states have text or automation state and do not rely on color alone.
-
-## Settings
-
-Pane Controls are part of Docking and Layout settings:
-
-- Show Pane Headers
-- Pane Header Height
-- Show Pane Title
-- Show Profile Icon
-- Show Overflow Button
-- Enable Pane Handle Dragging
-- Show Snap Layout Overlay
-- Enable Corner Zones
-- After Split
-- Split Profile
-
-These are view/profile settings. They do not add fields to the Workspace schema.
+The pane title prefers shell-reported title, profile name, and finally
+`Terminal`. Displayed paths are reduced to their final component, long text is
+ellipsized, and the full accessible label remains **_title_ pane**.

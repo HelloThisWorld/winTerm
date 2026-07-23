@@ -1,5 +1,9 @@
 # winTerm 1.0 accessibility audit
 
+> Historical 1.0 record. Pane repositioning and its overlay/keyboard model were
+> removed in winTerm 1.1. Current requirements and results are tracked in
+> `docs/v1.1-acceptance.md`.
+
 Static checks cover accessible Docking descriptions, keyboard command descriptors, non-color labels, and privacy-safe diagnostics categories. They do not replace assistive-technology testing.
 
 | Required flow or environment | Result | Evidence |

@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.1.0 - 2026-07-23
+
+### Added
+
+- Pane-border drag resizing with a separate 1-pixel visual divider and
+  12-logical-pixel pointer target.
+- Common-ratio snapping at 25%, one third, 50%, two thirds, and 75%, with an
+  8-pixel entry threshold, 14-pixel release threshold, and Alt bypass.
+- One-entry-per-commit pane resize history, exact undo/redo, Escape and capture
+  loss rollback, and **Balance Panes**.
+- Native settings for pane resizing, snap presets and custom ratios, advanced
+  snap threshold, ratio indicator, Alt bypass, Application UI density, pane
+  header visibility, profile icon, and active status.
+- Centralized native design tokens and a website-aligned title bar, tab strip,
+  pane header, divider, and terminal-shell palette.
+
+### Removed
+
+- Pane-header and pane-handle drag repositioning.
+- Pane docking overlays, edge/corner/empty-slot move targets, pane drag
+  sessions, movement leases, movement history, and keyboard move mode.
+- winTerm pane move commands, command-line entry points, settings, menus, and
+  active documentation. Top-level tab reordering remains unchanged.
+
+### Changed
+
+- Pane headers now use a pane icon that focuses the pane and exposes an accurate
+  accessible name; the overflow button remains the primary pane-menu entry.
+- Directed Top, Bottom, Left, and Right splitting remains relative to the
+  focused pane.
+- Workspace schema remains version 2 because final split ratios already
+  serialize through the inherited split startup actions.
+- Application, package, shell module, About, and release metadata now identify
+  `1.1.0` and tag `v1.1.0`.
+
+### Release status
+
+- x64 installer and Portable ZIP remain the primary distributions.
+- Native Release build, manual DPI/accessibility/rendering acceptance, package
+  launch, and upgrade validation are required before publication.
+
 ## 1.0.0 - 2026-07-22
 
 ### Added
@@ -20,6 +61,9 @@
 - The installer is unsigned and Windows may show Unknown Publisher or SmartScreen.
 - Cross-process live pane transfer and ARM64 distribution remain unsupported.
 - Live pane-drag UI, Narrator, High Contrast, and mixed-DPI acceptance scenarios are documented but were not completed by the local model-test run.
+
+> Historical note: pane repositioning described in the 1.0.0 entry was removed
+> in 1.1.0 and is not available in current winTerm builds.
 
 ## 0.7.0-beta.5 - 2026-07-21
 

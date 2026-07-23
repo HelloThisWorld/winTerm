@@ -18,7 +18,6 @@ using namespace winrt::Microsoft::Terminal::TerminalConnection;
 using namespace winrt::Microsoft::Terminal::Settings::Model;
 using namespace winrt::Microsoft::UI::Xaml::Controls;
 using namespace winrt::Windows::System;
-using namespace winTerm::Docking;
 
 namespace winrt
 {
@@ -79,7 +78,7 @@ namespace winrt::TerminalApp::implementation
     // - <none>
     void Tab::_Setup()
     {
-        _rootPane->SetPaneHeadersVisible(_rootPane->GetLeafPaneCount() >= 2);
+        _rootPane->SetPaneHeadersVisible(_showPaneHeaders && _rootPane->GetLeafPaneCount() >= 2);
         _rootClosedToken = _rootPane->Closed([=](auto&& /*s*/, auto&& /*e*/) {
             Closed.raise(nullptr, nullptr);
         });
@@ -359,6 +358,10 @@ namespace winrt::TerminalApp::implementation
     void Tab::UpdateSettings(const CascadiaSettings& settings)
     {
         ASSERT_UI_THREAD();
+
+        _showPaneHeaders = settings.GlobalSettings().ShowPaneHeaders();
+        _rootPane->SetPaneHeadersVisible(
+            _showPaneHeaders && _rootPane->GetLeafPaneCount() >= 2);
 
         // The tabWidthMode may have changed, update the header control accordingly
         _UpdateHeaderControlMaxWidth();
@@ -644,7 +647,7 @@ namespace winrt::TerminalApp::implementation
         // either the first or second child, but this will always return the
         // original pane first.
         auto [original, newPane] = _activePane->Split(splitType, splitSize, pane);
-        _rootPane->SetPaneHeadersVisible(true);
+        _rootPane->SetPaneHeadersVisible(_showPaneHeaders);
 
         // After split, Close Pane Menu Item should be visible
         _closePaneMenuItem.Visibility(WUX::Visibility::Visible);
@@ -691,7 +694,8 @@ namespace winrt::TerminalApp::implementation
         // Attempt to remove the active pane from the tree
         if (const auto pane = _rootPane->DetachPane(_activePane))
         {
-            _rootPane->SetPaneHeadersVisible(_rootPane->GetLeafPaneCount() >= 2);
+            _rootPane->SetPaneHeadersVisible(
+                _showPaneHeaders && _rootPane->GetLeafPaneCount() >= 2);
             // Just make sure that the remaining pane is marked active
             _UpdateActivePane(_rootPane->GetActivePane());
 
@@ -775,7 +779,7 @@ namespace winrt::TerminalApp::implementation
         // Make sure that we have the right pane set as the active pane
         if (const auto focus = pane->GetActivePane())
         {
-            _rootPane->SetPaneHeadersVisible(true);
+            _rootPane->SetPaneHeadersVisible(_showPaneHeaders);
             _UpdateActivePane(focus);
         }
     }
@@ -857,6 +861,44 @@ namespace winrt::TerminalApp::implementation
         // NOTE: This _must_ be called on the root pane, so that it can propagate
         // throughout the entire tree.
         return _rootPane->ResizePane(direction);
+    }
+
+    bool Tab::BalancePanes()
+    {
+        ASSERT_UI_THREAD();
+        return _rootPane && _rootPane->BalancePane();
+    }
+
+    bool Tab::UndoPaneResize()
+    {
+        ASSERT_UI_THREAD();
+        if (!_rootPane)
+        {
+            return false;
+        }
+        if (const auto entry = _paneResizeHistory.Undo())
+        {
+            return _rootPane->ApplySplitRatio(
+                entry->ownerId,
+                gsl::narrow_cast<float>(entry->before));
+        }
+        return false;
+    }
+
+    bool Tab::RedoPaneResize()
+    {
+        ASSERT_UI_THREAD();
+        if (!_rootPane)
+        {
+            return false;
+        }
+        if (const auto entry = _paneResizeHistory.Redo())
+        {
+            return _rootPane->ApplySplitRatio(
+                entry->ownerId,
+                gsl::narrow_cast<float>(entry->after));
+        }
+        return false;
     }
 
     // Method Description:
@@ -1327,7 +1369,7 @@ namespace winrt::TerminalApp::implementation
         }
 
         const auto paneCount = _rootPane->GetLeafPaneCount();
-        _rootPane->SetPaneHeadersVisible(paneCount >= 2);
+        _rootPane->SetPaneHeadersVisible(_showPaneHeaders && paneCount >= 2);
         if (paneCount == 1)
         {
             _closePaneMenuItem.Visibility(WUX::Visibility::Collapsed);
@@ -1414,35 +1456,20 @@ namespace winrt::TerminalApp::implementation
             }
         });
 
-        auto paneDragPressedToken = pane->PaneDragPressed(
-            [weakThis](std::shared_ptr<Pane> source, const WUX::Input::PointerRoutedEventArgs& e) {
+        auto paneResizeCommittedToken = pane->PaneResizeCommitted(
+            [weakThis](std::shared_ptr<Pane> /*owner*/,
+                       const uint64_t ownerId,
+                       const float before,
+                       const float after) {
                 if (auto tab = weakThis.get())
                 {
-                    tab->_PaneDragPressed(std::move(source), e);
+                    tab->_paneResizeHistory.Record({
+                        ownerId,
+                        before,
+                        after,
+                    });
                 }
             });
-        auto paneDragUpdatedToken = pane->PaneDragUpdated(
-            [weakThis](std::shared_ptr<Pane> source, const WUX::Input::PointerRoutedEventArgs& e) {
-                if (auto tab = weakThis.get())
-                {
-                    tab->_PaneDragUpdated(std::move(source), e);
-                }
-            });
-        auto paneDragCompletedToken = pane->PaneDragCompleted(
-            [weakThis](std::shared_ptr<Pane> source, const WUX::Input::PointerRoutedEventArgs& e) {
-                if (auto tab = weakThis.get())
-                {
-                    tab->_PaneDragCompleted(std::move(source), e);
-                }
-            });
-        auto paneDragCancelledToken = pane->PaneDragCancelled(
-            [weakThis](std::shared_ptr<Pane> source) {
-                if (auto tab = weakThis.get())
-                {
-                    tab->_PaneDragCancelled(std::move(source));
-                }
-            });
-
         // Add a Closed event handler to the Pane. If the pane closes out from
         // underneath us, and it's zoomed, we want to be able to make sure to
         // update our state accordingly to un-zoom that pane. See GH#7252.
@@ -1488,10 +1515,7 @@ namespace winrt::TerminalApp::implementation
                                          gotFocusToken,
                                          lostFocusToken,
                                          closedToken,
-                                         paneDragPressedToken,
-                                         paneDragUpdatedToken,
-                                         paneDragCompletedToken,
-                                         paneDragCancelledToken,
+                                         paneResizeCommittedToken,
                                          detachedToken](std::shared_ptr<Pane> /*sender*/) {
             // Make sure we do this at most once
             if (auto pane{ weakPane.lock() })
@@ -1500,16 +1524,9 @@ namespace winrt::TerminalApp::implementation
                 pane->GotFocus(gotFocusToken);
                 pane->LostFocus(lostFocusToken);
                 pane->Closed(closedToken);
-                pane->PaneDragPressed(paneDragPressedToken);
-                pane->PaneDragUpdated(paneDragUpdatedToken);
-                pane->PaneDragCompleted(paneDragCompletedToken);
-                pane->PaneDragCancelled(paneDragCancelledToken);
+                pane->PaneResizeCommitted(paneResizeCommittedToken);
                 if (auto tab{ weakThis.get() })
                 {
-                    if (tab->_paneDragSource.lock() == pane)
-                    {
-                        tab->_PaneDragCancelled(pane);
-                    }
                     tab->_DetachEventHandlersFromContent(pane->Id().value());
 
                     for (auto i = tab->_mruPanes.begin(); i != tab->_mruPanes.end(); ++i)
@@ -1523,730 +1540,6 @@ namespace winrt::TerminalApp::implementation
                 }
             }
         });
-    }
-
-    void Tab::_PaneDragPressed(
-        std::shared_ptr<Pane> source,
-        const WUX::Input::PointerRoutedEventArgs& e)
-    {
-        if (!source || !source->Id() || _paneDragActive || _zoomedPane || GetLeafPaneCount() < 2 || !_rootPane)
-        {
-            return;
-        }
-
-        const auto tabLayout = _BuildPaneDockLayout(_rootPane);
-        const auto sourceLayout = _BuildPaneDockLayout(source);
-        if (!tabLayout || !sourceLayout)
-        {
-            return;
-        }
-
-        const auto rootElement = _rootPane->GetRootElement();
-        const auto point = e.GetCurrentPoint(rootElement);
-        PaneHandleDragContext context;
-        context.processInstanceId = "local-process";
-        context.source = _BuildPaneDockSource(source, tabLayout);
-        context.sourcePaneLayout = sourceLayout;
-        context.sourceTabLayout = tabLayout;
-        context.pressedPoint = { point.Position().X, point.Position().Y };
-        context.threshold.touch = e.Pointer().PointerDeviceType() == Windows::Devices::Input::PointerDeviceType::Touch;
-
-        _paneHandleDragSource = std::make_unique<PaneHandleDragSource>(_paneDragPayloadRegistry);
-        if (!_paneHandleDragSource->PointerPressed(winTerm::PaneControls::PanePointerRegion::DragGrip, std::move(context)))
-        {
-            _paneHandleDragSource.reset();
-            return;
-        }
-
-        _paneDragActive = true;
-        _paneDragSource = source;
-        _paneDragPressedTimestamp = point.Timestamp();
-        _paneDockTargetResolver.Clear();
-        _HidePaneDockingOverlay();
-        if (_activePane != source)
-        {
-            _UpdateActivePane(source);
-        }
-    }
-
-    void Tab::_PaneDragUpdated(
-        std::shared_ptr<Pane> source,
-        const WUX::Input::PointerRoutedEventArgs& e)
-    {
-        if (!_paneDragActive || !source || _paneDragSource.lock() != source || !_rootPane || !_paneHandleDragSource)
-        {
-            return;
-        }
-
-        const auto rootElement = _rootPane->GetRootElement();
-        const auto pointerPoint = e.GetCurrentPoint(rootElement);
-        const auto point = pointerPoint.Position();
-        if (_paneHandleDragSource->State() == DockDragState::PointerPressed ||
-            _paneHandleDragSource->State() == DockDragState::DragPending)
-        {
-            const auto elapsed = pointerPoint.Timestamp() >= _paneDragPressedTimestamp ?
-                                     std::chrono::milliseconds{ (pointerPoint.Timestamp() - _paneDragPressedTimestamp) / 1000 } :
-                                     std::chrono::milliseconds::zero();
-            _paneHandleDragSource->PointerMoved({ point.X, point.Y }, elapsed);
-        }
-        if (_paneHandleDragSource->State() != DockDragState::Dragging &&
-            _paneHandleDragSource->State() != DockDragState::TargetAcquired)
-        {
-            return;
-        }
-
-        const auto hoveredTarget = _ResolvePaneDockTarget(point, source);
-        if (!hoveredTarget)
-        {
-            _paneDockTargetResolver.Clear();
-            _HidePaneDockingOverlay();
-            return;
-        }
-
-        const auto tabLayout = _BuildPaneDockLayout(_rootPane);
-        if (!tabLayout)
-        {
-            _HidePaneDockingOverlay();
-            return;
-        }
-
-        const auto sourceModel = _BuildPaneDockSource(source, tabLayout);
-        const auto hoveredTargetModel = _BuildPaneDockTarget(hoveredTarget);
-        auto capabilities = _PaneDockCapabilities();
-        auto zones = PaneSnapLayoutOverlay::Build(
-            _PaneDockBounds(hoveredTarget),
-            sourceModel,
-            hoveredTargetModel,
-            capabilities,
-            true,
-            std::nullopt,
-            false);
-
-        const auto splitDirection = [](const DockZone zone) {
-            switch (zone)
-            {
-            case DockZone::Left: return SplitDirection::Left;
-            case DockZone::Right: return SplitDirection::Right;
-            case DockZone::Top: return SplitDirection::Up;
-            case DockZone::Bottom: return SplitDirection::Down;
-            default: return SplitDirection::Automatic;
-            }
-        };
-        const auto applySplitAvailability = [&](auto& presentations, const std::shared_ptr<Pane>& pane) {
-            const auto bounds = _PaneDockBounds(pane);
-            for (auto& zone : presentations)
-            {
-                const auto direction = splitDirection(zone.zone);
-                if (direction == SplitDirection::Automatic)
-                {
-                    continue;
-                }
-                const auto canSplit = pane->PreCalculateCanSplit(
-                    pane,
-                    direction,
-                    .5f,
-                    { static_cast<float>(bounds.width), static_cast<float>(bounds.height) });
-                if (!canSplit || !*canSplit)
-                {
-                    zone.enabled = false;
-                    zone.disabledReason = "The target is too small for this split.";
-                    zone.automationName += ". " + zone.disabledReason;
-                }
-            }
-        };
-        applySplitAvailability(zones, hoveredTarget);
-
-        std::vector<DockTargetCandidate> candidates;
-        candidates.reserve(zones.size());
-        for (const auto& zone : zones)
-        {
-            DockTargetCandidate candidate;
-            candidate.key = hoveredTargetModel.nodeId.value_or("pane") + "-" + std::string{ ToString(zone.zone) };
-            candidate.target = hoveredTargetModel;
-            candidate.zone = zone.zone;
-            candidate.bounds = zone.hitBounds;
-            candidate.enabled = zone.enabled;
-            candidate.disabledReason = zone.disabledReason;
-            candidates.emplace_back(std::move(candidate));
-        }
-
-        const auto resolved = _paneDockTargetResolver.Resolve(candidates, { point.X, point.Y });
-        if (!resolved || !resolved->target.nodeId)
-        {
-            if (_paneHandleDragSource->State() == DockDragState::TargetAcquired)
-            {
-                auto invalidCapabilities = capabilities;
-                invalidCapabilities.canMove = false;
-                PaneHandleDragPreviewRequest invalidRequest;
-                invalidRequest.target = hoveredTargetModel;
-                invalidRequest.zone = DockZone::Center;
-                invalidRequest.targetLayout = tabLayout;
-                invalidRequest.capabilities = invalidCapabilities;
-                invalidRequest.targetBounds = { 0, 0, rootElement.ActualWidth(), rootElement.ActualHeight() };
-                _paneHandleDragSource->Preview(invalidRequest);
-            }
-            _ShowPaneDockingOverlay(hoveredTarget, zones, nullptr);
-            _paneDockPlan.reset();
-            return;
-        }
-
-        std::shared_ptr<Pane> target;
-        _rootPane->WalkTree([&](const auto& pane) {
-            if (pane->Id() && std::to_string(*pane->Id()) == *resolved->target.nodeId)
-            {
-                target = pane;
-                return true;
-            }
-            return false;
-        });
-        if (!target || target == source)
-        {
-            _HidePaneDockingOverlay();
-            return;
-        }
-
-        const auto targetModel = _BuildPaneDockTarget(target);
-        PaneHandleDragPreviewRequest request;
-        request.target = targetModel;
-        request.zone = resolved->zone;
-        request.targetLayout = tabLayout;
-        request.capabilities = capabilities;
-        request.sameProcess = true;
-        request.targetBounds = { 0, 0, rootElement.ActualWidth(), rootElement.ActualHeight() };
-        const auto preview = _paneHandleDragSource->Preview(request);
-
-        zones = PaneSnapLayoutOverlay::Build(
-            _PaneDockBounds(target),
-            sourceModel,
-            targetModel,
-            capabilities,
-            true,
-            preview.Succeeded() ? std::optional{ resolved->zone } : std::nullopt,
-            false);
-        applySplitAvailability(zones, target);
-        _ShowPaneDockingOverlay(target, zones, preview.Succeeded() ? &preview.preview : nullptr);
-        if (preview.Succeeded())
-        {
-            _paneDockPlan = preview.plan;
-        }
-        else
-        {
-            _paneDockPlan.reset();
-        }
-    }
-
-    void Tab::_PaneDragCompleted(
-        std::shared_ptr<Pane> source,
-        const WUX::Input::PointerRoutedEventArgs& e)
-    {
-        if (!_paneDragActive || !source || _paneDragSource.lock() != source || !_paneHandleDragSource)
-        {
-            return;
-        }
-
-        _PaneDragUpdated(source, e);
-        const auto target = _paneDockTarget.lock();
-        const auto zone = _paneDockZone;
-        const auto plan = _paneDockPlan;
-
-        if (_paneHandleDragSource->State() == DockDragState::PointerPressed ||
-            _paneHandleDragSource->State() == DockDragState::DragPending)
-        {
-            _paneHandleDragSource->PointerReleased();
-        }
-        else if (!target || !zone || !plan ||
-                 !_paneHandleDragSource->RequestDrop() ||
-                 !_paneHandleDragSource->BeginCommit())
-        {
-            _paneHandleDragSource->Cancel(DragCancellationReason::InvalidDrop);
-        }
-
-        _paneDragActive = false;
-        _paneDragSource.reset();
-        _paneDockTargetResolver.Clear();
-        _HidePaneDockingOverlay();
-
-        if (_paneHandleDragSource->State() != DockDragState::Committing || !target || !zone || !plan)
-        {
-            _paneHandleDragSource->Reset();
-            _paneHandleDragSource.reset();
-            return;
-        }
-
-        if (_CommitPaneDockingPlan(source, target, *zone, *plan))
-        {
-            _paneHandleDragSource->Complete();
-        }
-        else
-        {
-            _paneHandleDragSource->Fail("The runtime pane layout could not commit the docking plan.");
-            _paneHandleDragSource->BeginRollback();
-            _paneHandleDragSource->CompleteRollback(true);
-        }
-        _paneHandleDragSource->Reset();
-        _paneHandleDragSource.reset();
-    }
-
-    void Tab::_PaneDragCancelled(std::shared_ptr<Pane> source)
-    {
-        if (!_paneDragActive || _paneDragSource.lock() != source)
-        {
-            return;
-        }
-
-        _paneDragActive = false;
-        _paneDragSource.reset();
-        _paneDockTargetResolver.Clear();
-        _HidePaneDockingOverlay();
-        if (_paneHandleDragSource)
-        {
-            _paneHandleDragSource->Cancel(DragCancellationReason::PointerCaptureLost);
-            _paneHandleDragSource->Reset();
-            _paneHandleDragSource.reset();
-        }
-    }
-
-    std::shared_ptr<Pane> Tab::_ResolvePaneDockTarget(
-        const Windows::Foundation::Point& point,
-        const std::shared_ptr<Pane>& source) const
-    {
-        if (!_rootPane)
-        {
-            return nullptr;
-        }
-
-        std::shared_ptr<Pane> result;
-        const auto rootElement = _rootPane->GetRootElement();
-        _rootPane->WalkTree([&](const auto& pane) {
-            if (result || pane == source || !pane->_IsLeaf())
-            {
-                return result != nullptr;
-            }
-
-            try
-            {
-                const auto width = pane->_root.ActualWidth();
-                const auto height = pane->_root.ActualHeight();
-                if (width <= 0.0 || height <= 0.0)
-                {
-                    return false;
-                }
-
-                const auto transform = pane->_root.TransformToVisual(rootElement);
-                const auto origin = transform.TransformPoint({ 0.0f, 0.0f });
-                if (point.X < origin.X || point.Y < origin.Y ||
-                    point.X > origin.X + width || point.Y > origin.Y + height)
-                {
-                    return false;
-                }
-
-                result = pane;
-                return true;
-            }
-            catch (...)
-            {
-                // A target can disappear while its terminal is closing. It is
-                // not a valid drop target, and the source pane remains attached.
-                return false;
-            }
-        });
-        return result;
-    }
-
-    LayoutNodePtr Tab::_BuildPaneDockLayout(const std::shared_ptr<Pane>& pane) const
-    {
-        if (!pane)
-        {
-            return nullptr;
-        }
-        if (pane->_IsLeaf())
-        {
-            return pane->Id() ?
-                       winTerm::Workspaces::LayoutNodeDescriptor::Pane(std::to_string(*pane->Id())) :
-                       nullptr;
-        }
-
-        const auto first = _BuildPaneDockLayout(pane->_firstChild);
-        const auto second = _BuildPaneDockLayout(pane->_secondChild);
-        if (!first || !second)
-        {
-            return nullptr;
-        }
-        return winTerm::Workspaces::LayoutNodeDescriptor::Split(
-            pane->_splitState == SplitState::Vertical ?
-                winTerm::Workspaces::SplitOrientation::Vertical :
-                winTerm::Workspaces::SplitOrientation::Horizontal,
-            pane->_desiredSplitPosition,
-            first,
-            second);
-    }
-
-    DockSource Tab::_BuildPaneDockSource(
-        const std::shared_ptr<Pane>& source,
-        const LayoutNodePtr& tabLayout) const
-    {
-        DockSource result;
-        result.type = DockSourceType::Pane;
-        result.windowId = "local-window";
-        result.tabId = "local-tab";
-        result.root = tabLayout;
-        if (source && source->Id())
-        {
-            const auto id = std::to_string(*source->Id());
-            result.paneId = id;
-            result.paneIds = { id };
-            result.activePaneId = id;
-            result.title = winrt::to_string(source->_PaneHeaderTitle());
-        }
-        return result;
-    }
-
-    DockTarget Tab::_BuildPaneDockTarget(const std::shared_ptr<Pane>& target) const
-    {
-        DockTarget result;
-        result.type = DockTargetType::Pane;
-        result.windowId = "local-window";
-        result.tabId = "local-tab";
-        if (target && target->Id())
-        {
-            result.nodeId = std::to_string(*target->Id());
-        }
-        return result;
-    }
-
-    LayoutRect Tab::_PaneDockBounds(const std::shared_ptr<Pane>& pane) const
-    {
-        if (!pane || !_rootPane)
-        {
-            return {};
-        }
-        try
-        {
-            const auto origin = pane->_root.TransformToVisual(_rootPane->GetRootElement()).TransformPoint({ 0.0f, 0.0f });
-            return { origin.X, origin.Y, pane->_root.ActualWidth(), pane->_root.ActualHeight() };
-        }
-        catch (...)
-        {
-            return {};
-        }
-    }
-
-    DockingCapabilities Tab::_PaneDockCapabilities() const
-    {
-        DockingCapabilities result;
-        result.canDockCorners = false;
-        result.canUseEmptySlots = false;
-        result.sourcePaneCount = 1;
-        result.currentPaneCount = _rootPane ? static_cast<size_t>(std::max(0, _rootPane->GetLeafPaneCount() - 1)) : 0;
-        return result;
-    }
-
-    void Tab::_ShowPaneDockingOverlay(
-        const std::shared_ptr<Pane>& target,
-        const std::vector<DockZonePresentation>& zones,
-        const DockPreviewModel* preview)
-    {
-        std::optional<DockZone> selected;
-        for (const auto& zone : zones)
-        {
-            if (zone.selected)
-            {
-                selected = zone.zone;
-                break;
-            }
-        }
-        if (_paneDockTarget.lock() == target && _paneDockZone == selected && _paneDockingOverlay)
-        {
-            return;
-        }
-
-        _HidePaneDockingOverlay();
-        if (!target || !target->_IsLeaf() || !_rootPane || zones.empty())
-        {
-            return;
-        }
-
-        const auto overlay = WUX::Controls::Grid{};
-        overlay.IsHitTestVisible(false);
-        overlay.Background(WUX::Media::SolidColorBrush{ Windows::UI::ColorHelper::FromArgb(72, 5, 12, 18) });
-        WUX::Controls::Canvas::SetZIndex(overlay, 1000);
-        WUX::Controls::Grid::SetRowSpan(overlay, std::max(1, static_cast<int>(_rootPane->_root.RowDefinitions().Size())));
-        WUX::Controls::Grid::SetColumnSpan(overlay, std::max(1, static_cast<int>(_rootPane->_root.ColumnDefinitions().Size())));
-
-        const auto canvas = WUX::Controls::Canvas{};
-        overlay.Children().Append(canvas);
-
-        if (preview && preview->valid)
-        {
-            for (const auto& region : preview->regions)
-            {
-                const auto panePreview = WUX::Controls::Border{};
-                panePreview.Width(region.bounds.width);
-                panePreview.Height(region.bounds.height);
-                panePreview.Margin(WUX::ThicknessHelper::FromUniformLength(2.0));
-                panePreview.BorderThickness(WUX::ThicknessHelper::FromUniformLength(2.0));
-                panePreview.BorderBrush(WUX::Media::SolidColorBrush{ Windows::UI::ColorHelper::FromArgb(200, 115, 220, 205) });
-                panePreview.Background(WUX::Media::SolidColorBrush{
-                    region.role == DockPreviewRegionRole::Source ?
-                        Windows::UI::ColorHelper::FromArgb(110, 18, 126, 108) :
-                        Windows::UI::ColorHelper::FromArgb(68, 38, 58, 72) });
-                WUX::Automation::AutomationProperties::SetName(panePreview, winrt::to_hstring(region.automationName));
-                WUX::Controls::Canvas::SetLeft(panePreview, region.bounds.x);
-                WUX::Controls::Canvas::SetTop(panePreview, region.bounds.y);
-                canvas.Children().Append(panePreview);
-            }
-        }
-
-        for (const auto& zone : zones)
-        {
-            const auto border = WUX::Controls::Border{};
-            border.Width(zone.hitBounds.width);
-            border.Height(zone.hitBounds.height);
-            border.CornerRadius(WUX::CornerRadiusHelper::FromUniformRadius(5.0));
-            border.BorderThickness(WUX::ThicknessHelper::FromUniformLength(zone.selected ? 2.0 : 1.0));
-            border.BorderBrush(WUX::Media::SolidColorBrush{ Windows::UI::ColorHelper::FromArgb(180, 115, 220, 205) });
-            border.Background(WUX::Media::SolidColorBrush{
-                zone.selected ?
-                    Windows::UI::ColorHelper::FromArgb(210, 18, 126, 108) :
-                    Windows::UI::ColorHelper::FromArgb(188, 38, 58, 72) });
-            border.Opacity(zone.enabled ? 1.0 : 0.45);
-
-            const auto panel = WUX::Controls::StackPanel{};
-            panel.HorizontalAlignment(WUX::HorizontalAlignment::Center);
-            panel.VerticalAlignment(WUX::VerticalAlignment::Center);
-            const auto icon = WUX::Controls::TextBlock{};
-            icon.Text(winrt::to_hstring(zone.icon));
-            icon.FontSize(20.0);
-            icon.HorizontalAlignment(WUX::HorizontalAlignment::Center);
-            icon.Foreground(WUX::Media::SolidColorBrush{ Windows::UI::Colors::White() });
-            panel.Children().Append(icon);
-            if (!zone.label.empty())
-            {
-                const auto label = WUX::Controls::TextBlock{};
-                label.Text(winrt::to_hstring(zone.label));
-                label.FontSize(10.0);
-                label.HorizontalAlignment(WUX::HorizontalAlignment::Center);
-                label.Foreground(WUX::Media::SolidColorBrush{ Windows::UI::Colors::White() });
-                panel.Children().Append(label);
-            }
-            border.Child(panel);
-            WUX::Automation::AutomationProperties::SetName(border, winrt::to_hstring(zone.automationName));
-            if (!zone.disabledReason.empty())
-            {
-                WUX::Controls::ToolTipService::SetToolTip(border, box_value(winrt::to_hstring(zone.disabledReason)));
-            }
-            WUX::Controls::Canvas::SetLeft(border, zone.hitBounds.x);
-            WUX::Controls::Canvas::SetTop(border, zone.hitBounds.y);
-            canvas.Children().Append(border);
-        }
-
-        _rootPane->_root.Children().Append(overlay);
-        _paneDockTarget = target;
-        _paneDockingOverlay = overlay;
-        _paneDockZone = selected;
-    }
-
-    void Tab::_HidePaneDockingOverlay()
-    {
-        if (_rootPane && _paneDockingOverlay)
-        {
-            const auto children = _rootPane->_root.Children();
-            for (uint32_t i = 0; i < children.Size(); ++i)
-            {
-                if (children.GetAt(i) == _paneDockingOverlay)
-                {
-                    children.RemoveAt(i);
-                    break;
-                }
-            }
-        }
-        _paneDockingOverlay = nullptr;
-        _paneDockTarget.reset();
-        _paneDockZone.reset();
-        _paneDockPlan.reset();
-    }
-
-    bool Tab::_CommitPaneDockingPlan(
-        const std::shared_ptr<Pane>& source,
-        const std::shared_ptr<Pane>& target,
-        const DockZone zone,
-        const DockingPlan& plan)
-    {
-        if (!source || !source->Id() || !target || !target->Id() || plan.status != DockingStatus::Ready)
-        {
-            return false;
-        }
-
-        if (zone == DockZone::Center)
-        {
-            if (_activePane != source)
-            {
-                _UpdateActivePane(source);
-            }
-            if (auto pane = DetachPane())
-            {
-                PaneMoveToNewTabRequested.raise(std::move(pane));
-                return true;
-            }
-            return false;
-        }
-
-        const auto direction = [&]() {
-            switch (zone)
-            {
-            case DockZone::Left: return SplitDirection::Left;
-            case DockZone::Right: return SplitDirection::Right;
-            case DockZone::Top: return SplitDirection::Up;
-            case DockZone::Bottom: return SplitDirection::Down;
-            default: return SplitDirection::Automatic;
-            }
-        }();
-        if (direction == SplitDirection::Automatic)
-        {
-            return false;
-        }
-
-        const auto sourceId = std::to_string(*source->Id());
-        const SessionOwner owner{ "local-window", "local-tab", sourceId };
-        const auto sessionId = "pane-session-" + sourceId;
-        _paneSessionOwnership.Unregister(sessionId);
-        if (!_paneSessionOwnership.Register(
-                SessionIdentity{ sessionId, "live-terminal", "local-process", true, true },
-                owner))
-        {
-            return false;
-        }
-
-        LayoutTransactionRequest request;
-        request.transactionId = "pane-drag-" + sourceId + "-" + std::to_string(_paneDragPressedTimestamp);
-        request.plan = plan;
-        request.snapshot.sourceLayout = _BuildPaneDockLayout(_rootPane);
-        request.snapshot.targetLayout = request.snapshot.sourceLayout;
-        request.snapshot.focus.activeWindowId = "local-window";
-        request.snapshot.focus.activeTabId = "local-tab";
-        request.snapshot.focus.activePaneId = sourceId;
-        request.sessionIds = { sessionId };
-        request.targetOwners = { owner };
-
-        const auto targetId = *target->Id();
-        bool visualCommitted = false;
-        request.callbacks.sourceAvailable = [this, source] {
-            return _rootPane && _rootPane->_HasChild(source);
-        };
-        request.callbacks.targetAvailable = [this, targetId] {
-            return _rootPane && _rootPane->FindPane(targetId) != nullptr;
-        };
-        request.callbacks.prepareTarget = [this, targetId, direction](const auto&) {
-            const auto currentTarget = _rootPane ? _rootPane->FindPane(targetId) : nullptr;
-            if (!currentTarget)
-            {
-                return false;
-            }
-            const auto canSplit = currentTarget->PreCalculateCanSplit(
-                currentTarget,
-                direction,
-                .5f,
-                { static_cast<float>(currentTarget->_root.ActualWidth()),
-                  static_cast<float>(currentTarget->_root.ActualHeight()) });
-            return canSplit && *canSplit;
-        };
-        request.callbacks.commitModel = [](const auto& proposedPlan) {
-            return proposedPlan.status == DockingStatus::Ready && proposedPlan.proposedTargetLayout != nullptr;
-        };
-        request.callbacks.commitVisualTree = [this, source, target, direction, &visualCommitted](const auto&) {
-            visualCommitted = _DockPane(source, target, direction);
-            return visualCommitted;
-        };
-        request.callbacks.rollback = [this, source](const auto&) {
-            return _rootPane && source->Id() && _rootPane->FindPane(*source->Id()) != nullptr;
-        };
-        request.callbacks.recoverSessions = request.callbacks.rollback;
-        request.callbacks.markWorkspaceDirty = [] { return true; };
-        request.callbacks.restoreFocus = [this] {
-            if (_activePane)
-            {
-                _activePane->_Focus();
-            }
-        };
-
-        LayoutTransactionCoordinator coordinator{ _paneSessionOwnership };
-        const auto result = coordinator.Execute(std::move(request));
-        _paneSessionOwnership.Unregister(sessionId);
-        return result.docking.Succeeded() && visualCommitted;
-    }
-
-    bool Tab::_DockPane(
-        const std::shared_ptr<Pane>& source,
-        const std::shared_ptr<Pane>& target,
-        const SplitDirection direction)
-    {
-        if (!source || !target || source == target ||
-            direction == SplitDirection::Automatic ||
-            !_rootPane || !_rootPane->_HasChild(source))
-        {
-            return false;
-        }
-
-        const auto targetId = target->Id();
-        if (!targetId)
-        {
-            return false;
-        }
-
-        const auto canSplit = target->PreCalculateCanSplit(
-            target,
-            direction,
-            .5f,
-            { static_cast<float>(target->_root.ActualWidth()),
-              static_cast<float>(target->_root.ActualHeight()) });
-        if (!canSplit || !*canSplit)
-        {
-            return false;
-        }
-
-        if (_activePane != source)
-        {
-            _UpdateActivePane(source);
-        }
-
-        auto detached = _rootPane->DetachPane(source);
-        if (!detached)
-        {
-            return false;
-        }
-
-        _rootPane->SetPaneHeadersVisible(_rootPane->GetLeafPaneCount() >= 2);
-        _UpdateActivePane(_rootPane->GetActivePane());
-
-        auto resolvedTarget = _rootPane->FindPane(*targetId);
-        if (!resolvedTarget)
-        {
-            // The target can close between preview and drop. Reattach the source
-            // rather than allowing a failed commit to lose the live pane.
-            AttachPane(std::move(detached));
-            return false;
-        }
-
-        const auto originalTarget = resolvedTarget->AttachPane(detached, direction);
-        const auto movedPane = detached;
-        originalTarget->Id(*targetId);
-        _AttachEventHandlersToPane(originalTarget);
-
-        movedPane->WalkTree([&](const auto& pane) {
-            _AttachEventHandlersToPane(pane);
-            if (pane->_IsLeaf() && pane->Id())
-            {
-                if (const auto content = pane->GetContent())
-                {
-                    _AttachEventHandlersToContent(*pane->Id(), content);
-                }
-            }
-        });
-
-        _rootPane->SetPaneHeadersVisible(true);
-        _closePaneMenuItem.Visibility(WUX::Visibility::Visible);
-        _UpdateActivePane(movedPane->GetActivePane());
-        return true;
     }
 
     void Tab::_AppendMoveMenuItems(winrt::Windows::UI::Xaml::Controls::MenuFlyout flyout)

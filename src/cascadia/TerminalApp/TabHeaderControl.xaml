@@ -11,7 +11,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:mtu="using:Microsoft.Terminal.UI"
              xmlns:mux="using:Microsoft.UI.Xaml.Controls"
-             MinHeight="16"
+             MinHeight="18"
              mc:Ignorable="d">
 
     <StackPanel x:Name="HeaderStackPanel"
@@ -57,6 +57,9 @@
                   Glyph="&#xEC05;"
                   Visibility="{x:Bind TabStatus.IsInputBroadcastActive, Mode=OneWay}" />
         <TextBlock x:Name="HeaderTextBlock"
+                   MaxWidth="180"
+                   Foreground="{ThemeResource WinTermTextBrush}"
+                   TextTrimming="CharacterEllipsis"
                    Text="{x:Bind Title, Mode=OneWay}"
                    Visibility="Visible" />
         <TextBox x:Name="HeaderRenamerTextBox"

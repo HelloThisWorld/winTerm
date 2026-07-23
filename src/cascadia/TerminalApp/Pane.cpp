@@ -4,6 +4,13 @@
 #include "pch.h"
 #include "Pane.h"
 
+#include "../../winterm/Design/DesignTokens.h"
+
+#include <algorithm>
+#include <atomic>
+#include <sstream>
+#include <utility>
+
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Graphics::Display;
 using namespace winrt::Windows::UI;
@@ -14,13 +21,59 @@ using namespace winrt::Microsoft::Terminal::Settings::Model;
 using namespace winrt::Microsoft::Terminal::Control;
 using namespace winrt::Microsoft::Terminal::TerminalConnection;
 using namespace winrt::TerminalApp;
+namespace XamlInput = winrt::Windows::UI::Xaml::Input;
 
-static const int PaneBorderSize = 2;
+static const int PaneBorderSize = 1;
 static const int CombinedPaneBorderSize = 2 * PaneBorderSize;
-static constexpr double PaneHeaderHeight = 26.0;
-static constexpr double PaneHeaderButtonWidth = 32.0;
+static constexpr double PaneHeaderButtonWidth = 28.0;
 static constexpr uint64_t PaneTaskbarStateError = 2;
 static constexpr uint64_t PaneTaskbarStateIndeterminate = 3;
+
+namespace
+{
+    uint64_t NextLayoutNodeId() noexcept
+    {
+        static std::atomic<uint64_t> nextId{ 1 };
+        return nextId.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    Color TokenColor(const uint32_t argb) noexcept
+    {
+        return ColorHelper::FromArgb(
+            static_cast<uint8_t>((argb >> 24) & 0xff),
+            static_cast<uint8_t>((argb >> 16) & 0xff),
+            static_cast<uint8_t>((argb >> 8) & 0xff),
+            static_cast<uint8_t>(argb & 0xff));
+    }
+
+    SolidColorBrush TokenBrush(const uint32_t argb)
+    {
+        return SolidColorBrush{ TokenColor(argb) };
+    }
+
+    std::vector<double> ParseCustomSnapRatios(const winrt::hstring& value)
+    {
+        std::vector<double> ratios;
+        std::wistringstream stream{ std::wstring{ value.c_str() } };
+        for (std::wstring item; std::getline(stream, item, L',');)
+        {
+            try
+            {
+                size_t parsed{};
+                const auto ratio = std::stod(item, &parsed);
+                if (parsed == item.size())
+                {
+                    ratios.emplace_back(ratio);
+                }
+            }
+            catch (const std::exception&)
+            {
+                // Validation removes malformed custom entries without affecting startup.
+            }
+        }
+        return ratios;
+    }
+}
 
 // WARNING: Don't do this! This won't work
 //   Duration duration{ std::chrono::milliseconds{ 200 } };
@@ -62,7 +115,8 @@ Pane::Pane(std::shared_ptr<Pane> first,
     _secondChild{ second },
     _splitState{ splitState },
     _desiredSplitPosition{ splitPosition },
-    _lastActive{ lastFocused }
+    _lastActive{ lastFocused },
+    _layoutNodeId{ NextLayoutNodeId() }
 {
     _CreateRowColDefinitions();
     _borderFirst.Child(_firstChild->GetRootElement());
@@ -74,6 +128,7 @@ Pane::Pane(std::shared_ptr<Pane> first,
 
     _root.Children().Append(_borderFirst);
     _root.Children().Append(_borderSecond);
+    _CreateDividerVisual();
 
     _ApplySplitDefinitions();
 
@@ -252,7 +307,18 @@ bool Pane::_Resize(const ResizeDirection& direction)
         return false;
     }
 
-    auto amount = .05f;
+    auto amount = .02f;
+    if (const auto window = Window::Current())
+    {
+        if (const auto coreWindow = window.CoreWindow())
+        {
+            const auto shiftState = coreWindow.GetKeyState(winrt::Windows::System::VirtualKey::Shift);
+            if (WI_IsFlagSet(shiftState, CoreVirtualKeyStates::Down))
+            {
+                amount = .05f;
+            }
+        }
+    }
     if (direction == ResizeDirection::Right || direction == ResizeDirection::Down)
     {
         amount = -amount;
@@ -267,10 +333,41 @@ bool Pane::_Resize(const ResizeDirection& direction)
     // resizing.
     const auto actualDimension = changeWidth ? actualSize.Width : actualSize.Height;
 
-    _desiredSplitPosition = _ClampSplitPosition(changeWidth, _desiredSplitPosition - amount, actualDimension);
+    const auto originalPosition = _desiredSplitPosition;
+    const auto candidate = _ClampSplitPosition(
+        changeWidth,
+        _desiredSplitPosition - amount,
+        actualDimension);
+
+    const auto firstMinSize = _firstChild->_GetMinSize();
+    const auto secondMinSize = _secondChild->_GetMinSize();
+    const winTerm::PaneResize::ResizeGeometry geometry{
+        actualDimension,
+        changeWidth ? firstMinSize.Width : firstMinSize.Height,
+        changeWidth ? secondMinSize.Width : secondMinSize.Height,
+    };
+    winTerm::PaneResize::PaneResizeTransaction keyboardResize{ _paneResizeSettings };
+    if (keyboardResize.Begin(_layoutNodeId, originalPosition, geometry))
+    {
+        _desiredSplitPosition = gsl::narrow_cast<float>(
+            keyboardResize.Update(candidate * actualDimension, false).ratio);
+        keyboardResize.Commit();
+    }
+    else
+    {
+        _desiredSplitPosition = candidate;
+    }
 
     // Resize our columns to match the new percentages.
     _CreateRowColDefinitions();
+    if (std::abs(_desiredSplitPosition - originalPosition) > std::numeric_limits<float>::epsilon())
+    {
+        PaneResizeCommitted.raise(
+            shared_from_this(),
+            _layoutNodeId,
+            originalPosition,
+            _desiredSplitPosition);
+    }
 
     return true;
 }
@@ -326,6 +423,84 @@ bool Pane::ResizePane(const ResizeDirection& direction)
     }
 
     return false;
+}
+
+bool Pane::_Balance()
+{
+    if (_IsLeaf())
+    {
+        return false;
+    }
+
+    const auto widthOrHeight = _splitState == SplitState::Vertical;
+    const auto totalSize = gsl::narrow_cast<float>(
+        widthOrHeight ? _root.ActualWidth() : _root.ActualHeight());
+    if (totalSize <= 0)
+    {
+        return false;
+    }
+
+    const auto originalPosition = _desiredSplitPosition;
+    const auto balanced = _ClampSplitPosition(widthOrHeight, 0.5f, totalSize);
+    if (std::abs(balanced - 0.5f) > std::numeric_limits<float>::epsilon() ||
+        std::abs(originalPosition - balanced) <= std::numeric_limits<float>::epsilon())
+    {
+        return false;
+    }
+
+    _desiredSplitPosition = balanced;
+    _CreateRowColDefinitions();
+    PaneResizeCommitted.raise(
+        shared_from_this(),
+        _layoutNodeId,
+        originalPosition,
+        _desiredSplitPosition);
+    return true;
+}
+
+bool Pane::BalancePane()
+{
+    if (_IsLeaf())
+    {
+        return false;
+    }
+
+    if (_firstChild->_lastActive || _secondChild->_lastActive)
+    {
+        return _Balance();
+    }
+    if (!_firstChild->_IsLeaf() && _firstChild->_HasFocusedChild())
+    {
+        return _firstChild->BalancePane() || _Balance();
+    }
+    if (!_secondChild->_IsLeaf() && _secondChild->_HasFocusedChild())
+    {
+        return _secondChild->BalancePane() || _Balance();
+    }
+    return false;
+}
+
+bool Pane::ApplySplitRatio(const uint64_t ownerId, const float ratio)
+{
+    if (_IsLeaf())
+    {
+        return false;
+    }
+    if (_layoutNodeId == ownerId)
+    {
+        const auto widthOrHeight = _splitState == SplitState::Vertical;
+        const auto totalSize = gsl::narrow_cast<float>(
+            widthOrHeight ? _root.ActualWidth() : _root.ActualHeight());
+        if (totalSize <= 0)
+        {
+            return false;
+        }
+        _desiredSplitPosition = _ClampSplitPosition(widthOrHeight, ratio, totalSize);
+        _CreateRowColDefinitions();
+        return true;
+    }
+    return _firstChild->ApplySplitRatio(ownerId, ratio) ||
+           _secondChild->ApplySplitRatio(ownerId, ratio);
 }
 
 // Method Description:
@@ -654,6 +829,7 @@ bool Pane::SwapPanes(std::shared_ptr<Pane> first, std::shared_ptr<Pane> second)
             parent->_root.ColumnDefinitions().Clear();
             parent->_root.RowDefinitions().Clear();
             parent->_CreateRowColDefinitions();
+            parent->_CreateDividerVisual();
         };
 
         // If the firstParent and secondParent are the same, then we are just
@@ -1161,7 +1337,7 @@ void Pane::SetPaneHeadersVisible(const bool visible)
         {
             _paneHeader.Visibility(visible ? Visibility::Visible : Visibility::Collapsed);
             _paneHeaderRow.Height(GridLengthHelper::FromValueAndType(
-                visible ? PaneHeaderHeight : 0.0,
+                visible ? _paneHeaderHeight : 0.0,
                 GridUnitType::Pixel));
             _UpdatePaneHeader();
         }
@@ -1251,7 +1427,21 @@ void Pane::UpdateVisuals()
     _borderSecond.BorderBrush(brush);
     if (_paneHeader)
     {
-        _paneHeader.Background(brush);
+        _paneHeader.Background(TokenBrush(winTerm::Design::ColorTokens::PaneHeaderSurface));
+        if (_paneIcon)
+        {
+            _paneIcon.Foreground(TokenBrush(
+                _lastActive ?
+                    winTerm::Design::ColorTokens::AccentMint :
+                    winTerm::Design::ColorTokens::TextMuted));
+        }
+        if (_paneTitle)
+        {
+            _paneTitle.Foreground(TokenBrush(
+                _lastActive ?
+                    winTerm::Design::ColorTokens::TextPrimary :
+                    winTerm::Design::ColorTokens::TextSecondary));
+        }
         _UpdatePaneHeader();
     }
 }
@@ -1319,6 +1509,52 @@ void Pane::_FocusFirstChild()
 
 void Pane::UpdateSettings(const CascadiaSettings& settings)
 {
+    const auto globals = settings.GlobalSettings();
+    _paneResizeSettings.enableSnapping = globals.PaneResizeSnapping();
+    switch (globals.PaneResizeSnapPoints())
+    {
+    case PaneResizeSnapPreset::Balanced:
+        _paneResizeSettings.preset = winTerm::PaneResize::SnapPointPreset::Balanced;
+        break;
+    case PaneResizeSnapPreset::Custom:
+        _paneResizeSettings.preset = winTerm::PaneResize::SnapPointPreset::Custom;
+        break;
+    case PaneResizeSnapPreset::CommonRatios:
+    default:
+        _paneResizeSettings.preset = winTerm::PaneResize::SnapPointPreset::CommonRatios;
+        break;
+    }
+    _paneResizeSettings.customRatios = ParseCustomSnapRatios(globals.PaneResizeCustomRatios());
+    _paneResizeSettings.snapThreshold = globals.PaneResizeSnapThreshold();
+    _paneResizeSettings.snapReleaseThreshold = std::max(
+        winTerm::Design::InteractionTokens::SnapReleaseThreshold,
+        _paneResizeSettings.snapThreshold + 1.0);
+    _paneResizeSettings.showSnapRatioIndicator = globals.PaneResizeShowIndicator();
+    _paneResizeSettings.altDisablesSnapping = globals.PaneResizeAltDisablesSnapping();
+    _paneResizeSettings.Normalize();
+
+    _showPaneProfileIcon = globals.ShowPaneProfileIcon();
+    _showPaneActiveStatus = globals.ShowPaneActiveStatus();
+    _paneHeaderHeight =
+        globals.ApplicationUIDensity() == ApplicationUIDensity::Comfortable ?
+            winTerm::Design::DensityTokens::ComfortablePaneHeaderHeight :
+            winTerm::Design::DensityTokens::CompactPaneHeaderHeight;
+    if (_IsLeaf() && _paneHeaderRow)
+    {
+        _paneHeaderRow.Height(GridLengthHelper::FromValueAndType(
+            _paneHeadersVisible ? _paneHeaderHeight : 0.0,
+            GridUnitType::Pixel));
+        if (_paneIconColumn)
+        {
+            _paneIconColumn.Width(GridLengthHelper::FromValueAndType(
+                _showPaneProfileIcon ? PaneHeaderButtonWidth : 0.0,
+                GridUnitType::Pixel));
+        }
+        _paneIcon.Visibility(_showPaneProfileIcon ? Visibility::Visible : Visibility::Collapsed);
+        _paneStatus.Visibility(_showPaneActiveStatus ? Visibility::Visible : Visibility::Collapsed);
+        _UpdatePaneHeader();
+    }
+
     if (_content)
     {
         _content.UpdateSettings(settings);
@@ -1482,6 +1718,7 @@ void Pane::_CloseChild(const bool closeFirst)
         // what our active control is, we won't technically be a "leaf", and
         // GetTerminalControl will return null.
         _splitState = SplitState::None;
+        _layoutNodeId = 0;
         _AttachLeafVisual();
 
         // re-attach our handler for the control's GotFocus event.
@@ -1521,6 +1758,8 @@ void Pane::_CloseChild(const bool closeFirst)
 
         // Steal all the state from our child
         _splitState = remainingChild->_splitState;
+        _desiredSplitPosition = remainingChild->_desiredSplitPosition;
+        _layoutNodeId = remainingChild->_layoutNodeId;
         _firstChild = remainingChild->_firstChild;
         _secondChild = remainingChild->_secondChild;
 
@@ -1570,6 +1809,7 @@ void Pane::_CloseChild(const bool closeFirst)
 
         _root.Children().Append(_borderFirst);
         _root.Children().Append(_borderSecond);
+        _CreateDividerVisual();
 
         // Propagate the new borders down to the children.
         _borders = remainingBorders;
@@ -1802,67 +2042,72 @@ void Pane::_AttachLeafVisual()
     _leafLayout = Controls::Grid{};
     _paneHeader = Controls::Grid{};
     _contentHost = Controls::Border{};
-    _paneGrip = Controls::Button{};
+    _paneIcon = Controls::Button{};
     _paneOverflow = Controls::Button{};
     _paneTitle = Controls::TextBlock{};
     _paneStatus = Controls::TextBlock{};
     _paneHeaderRow = Controls::RowDefinition{};
 
     _paneHeaderRow.Height(GridLengthHelper::FromValueAndType(
-        _paneHeadersVisible ? PaneHeaderHeight : 0.0,
+        _paneHeadersVisible ? _paneHeaderHeight : 0.0,
         GridUnitType::Pixel));
     auto contentRow = Controls::RowDefinition{};
     contentRow.Height(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
     _leafLayout.RowDefinitions().Append(_paneHeaderRow);
     _leafLayout.RowDefinitions().Append(contentRow);
 
-    auto gripColumn = Controls::ColumnDefinition{};
-    gripColumn.Width(GridLengthHelper::FromValueAndType(PaneHeaderButtonWidth, GridUnitType::Pixel));
+    _paneIconColumn = Controls::ColumnDefinition{};
+    _paneIconColumn.Width(GridLengthHelper::FromValueAndType(
+        _showPaneProfileIcon ? PaneHeaderButtonWidth : 0.0,
+        GridUnitType::Pixel));
     auto titleColumn = Controls::ColumnDefinition{};
     titleColumn.Width(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
     auto statusColumn = Controls::ColumnDefinition{};
     statusColumn.Width(GridLengthHelper::Auto());
     auto overflowColumn = Controls::ColumnDefinition{};
     overflowColumn.Width(GridLengthHelper::FromValueAndType(PaneHeaderButtonWidth, GridUnitType::Pixel));
-    _paneHeader.ColumnDefinitions().Append(gripColumn);
+    _paneHeader.ColumnDefinitions().Append(_paneIconColumn);
     _paneHeader.ColumnDefinitions().Append(titleColumn);
     _paneHeader.ColumnDefinitions().Append(statusColumn);
     _paneHeader.ColumnDefinitions().Append(overflowColumn);
 
-    Controls::FontIcon gripIcon{};
-    // Keep the visible grip compact while the surrounding Button provides the
-    // larger DPI-aware pointer target. This is original geometric artwork, not
-    // a product or platform logo.
-    gripIcon.Glyph(L"\u25A1");
-    gripIcon.FontSize(14.0);
-    _paneGrip.Content(gripIcon);
-    _paneGrip.Width(PaneHeaderButtonWidth);
-    _paneGrip.Height(PaneHeaderHeight);
-    _paneGrip.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
+    Controls::FontIcon paneIcon{};
+    paneIcon.Glyph(L"\xE756");
+    paneIcon.FontFamily(Media::FontFamily{ L"Segoe Fluent Icons, Segoe MDL2 Assets" });
+    paneIcon.FontSize(13.0);
+    _paneIcon.Content(paneIcon);
+    _paneIcon.Width(PaneHeaderButtonWidth);
+    _paneIcon.Height(_paneHeaderHeight);
+    _paneIcon.Visibility(_showPaneProfileIcon ? Visibility::Visible : Visibility::Collapsed);
+    _paneIcon.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
     Automation::AutomationProperties::SetHelpText(
-        _paneGrip,
-        L"Drag to move this pane. Use Start Pane Move Mode for keyboard docking.");
+        _paneIcon,
+        L"Focus this pane. Right-click for pane commands.");
 
     _paneTitle.VerticalAlignment(VerticalAlignment::Center);
+    _paneTitle.FontSize(winTerm::Design::TypographyTokens::PaneTitleSize);
     _paneTitle.TextTrimming(TextTrimming::CharacterEllipsis);
     _paneTitle.Margin(ThicknessHelper::FromLengths(4, 0, 4, 0));
 
     _paneStatus.VerticalAlignment(VerticalAlignment::Center);
+    _paneStatus.FontSize(winTerm::Design::TypographyTokens::PaneStatusSize);
+    _paneStatus.Foreground(TokenBrush(winTerm::Design::ColorTokens::AccentMint));
     _paneStatus.Margin(ThicknessHelper::FromLengths(4, 0, 4, 0));
+    _paneStatus.Visibility(_showPaneActiveStatus ? Visibility::Visible : Visibility::Collapsed);
 
     Controls::FontIcon overflowIcon{};
     overflowIcon.Glyph(L"\xE712");
     _paneOverflow.Content(overflowIcon);
     _paneOverflow.Width(PaneHeaderButtonWidth);
-    _paneOverflow.Height(PaneHeaderHeight);
+    _paneOverflow.Height(_paneHeaderHeight);
     _paneOverflow.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
     Automation::AutomationProperties::SetName(_paneOverflow, L"Open pane menu");
 
-    Controls::Grid::SetColumn(_paneGrip, 0);
+    Controls::Grid::SetColumn(_paneIcon, 0);
     Controls::Grid::SetColumn(_paneTitle, 1);
     Controls::Grid::SetColumn(_paneStatus, 2);
     Controls::Grid::SetColumn(_paneOverflow, 3);
-    _paneHeader.Children().Append(_paneGrip);
+    _paneHeader.Children().Append(_paneIcon);
     _paneHeader.Children().Append(_paneTitle);
     _paneHeader.Children().Append(_paneStatus);
     _paneHeader.Children().Append(_paneOverflow);
@@ -1878,129 +2123,23 @@ void Pane::_AttachLeafVisual()
     {
         const auto paneMenu = terminal.ContextMenu();
         _paneHeader.ContextFlyout(paneMenu);
-        _paneGrip.ContextFlyout(paneMenu);
+        _paneIcon.ContextFlyout(paneMenu);
         _paneOverflow.Flyout(paneMenu);
     }
 
     _paneHeader.PointerPressed([this](auto&&, auto&&) { _Focus(); });
     _paneHeader.Tapped([this](auto&&, auto&&) { _Focus(); });
     _paneHeader.RightTapped([this](auto&&, auto&&) { _Focus(); });
-    _paneGrip.PointerPressed([this](auto&&, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e) {
-        _PaneGripPointerPressed(e);
-    });
-    _paneGrip.PointerMoved([this](auto&&, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e) {
-        _PaneGripPointerMoved(e);
-    });
-    _paneGrip.PointerReleased([this](auto&&, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e) {
-        _PaneGripPointerReleased(e);
-    });
-    _paneGrip.PointerCanceled([this](auto&&, auto&&) {
-        _CancelPaneDrag(true);
-    });
-    _paneGrip.PointerCaptureLost([this](auto&&, auto&&) {
-        _CancelPaneDrag(true);
-    });
-    _paneGrip.KeyDown([this](auto&&, const winrt::Windows::UI::Xaml::Input::KeyRoutedEventArgs& e) {
-        if (e.Key() == winrt::Windows::System::VirtualKey::Escape && _paneDragPointerId)
-        {
-            _CancelPaneDrag(true);
-            e.Handled(true);
-        }
-    });
-    _paneGrip.PointerEntered([](auto&&, auto&&) {
-        if (const auto window = Window::Current())
-        {
-            if (const auto coreWindow = window.CoreWindow())
-            {
-                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::SizeAll, 0 });
-            }
-        }
-    });
-    _paneGrip.PointerExited([](auto&&, auto&&) {
-        if (const auto window = Window::Current())
-        {
-            if (const auto coreWindow = window.CoreWindow())
-            {
-                coreWindow.PointerCursor(CoreCursor{ CoreCursorType::Arrow, 0 });
-            }
-        }
-    });
+    _paneIcon.Click([this](auto&&, auto&&) { _Focus(); });
     _paneOverflow.Click([this](auto&&, auto&&) { _Focus(); });
     _borderFirst.Child(_leafLayout);
     _root.Children().Append(_borderFirst);
     _UpdatePaneHeader();
 }
 
-void Pane::_PaneGripPointerPressed(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
-{
-    const auto point = e.GetCurrentPoint(_paneGrip);
-    if (_paneDragPointerId || !point.Properties().IsLeftButtonPressed())
-    {
-        return;
-    }
-
-    _Focus();
-    if (!_paneGrip.CapturePointer(e.Pointer()))
-    {
-        return;
-    }
-
-    _paneDragPointerId = e.Pointer().PointerId();
-    _paneDragStartPoint = point.Position();
-    _paneGrip.Focus(FocusState::Pointer);
-    PaneDragPressed.raise(shared_from_this(), e);
-    e.Handled(true);
-}
-
-void Pane::_PaneGripPointerMoved(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
-{
-    if (!_paneDragPointerId || e.Pointer().PointerId() != *_paneDragPointerId)
-    {
-        return;
-    }
-
-    PaneDragUpdated.raise(shared_from_this(), e);
-    e.Handled(true);
-}
-
-void Pane::_PaneGripPointerReleased(const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
-{
-    if (!_paneDragPointerId || e.Pointer().PointerId() != *_paneDragPointerId)
-    {
-        return;
-    }
-
-    _paneDragPointerId.reset();
-    _paneGrip.ReleasePointerCapture(e.Pointer());
-
-    PaneDragCompleted.raise(shared_from_this(), e);
-    if (_content)
-    {
-        _content.Focus(FocusState::Programmatic);
-    }
-    e.Handled(true);
-}
-
-void Pane::_CancelPaneDrag(const bool restoreFocus)
-{
-    if (!_paneDragPointerId)
-    {
-        return;
-    }
-
-    _paneDragPointerId.reset();
-    _paneGrip.ReleasePointerCaptures();
-
-    PaneDragCancelled.raise(shared_from_this());
-    if (restoreFocus && _content)
-    {
-        _content.Focus(FocusState::Programmatic);
-    }
-}
-
 void Pane::_UpdatePaneHeader()
 {
-    if (!_paneHeader || !_paneTitle || !_paneGrip || !_paneStatus)
+    if (!_paneHeader || !_paneTitle || !_paneIcon || !_paneStatus)
     {
         return;
     }
@@ -2042,11 +2181,8 @@ void Pane::_UpdatePaneHeader()
     _paneStatus.Text(winrt::hstring{ status });
     auto headerName = std::wstring{ accessibleTitle.c_str() };
     headerName += L" pane";
-    auto gripName = std::wstring{ L"Move " };
-    gripName += accessibleTitle.c_str();
-    gripName += L" pane";
     Automation::AutomationProperties::SetName(_paneHeader, winrt::hstring{ headerName });
-    Automation::AutomationProperties::SetName(_paneGrip, winrt::hstring{ gripName });
+    Automation::AutomationProperties::SetName(_paneIcon, winrt::hstring{ headerName });
     const auto accessibleStatus = status.empty() ?
                                       std::wstring{ _lastActive ? L"Focused pane" : L"Unfocused pane" } :
                                       status;
@@ -2095,6 +2231,472 @@ winrt::hstring Pane::_PaneHeaderAccessibleTitle() const
     return winrt::hstring{ title };
 }
 
+void Pane::_CreateDividerVisual()
+{
+    if (_IsLeaf())
+    {
+        return;
+    }
+
+    if (_dividerHitTarget)
+    {
+        Automation::AutomationProperties::SetName(
+            _dividerHitTarget,
+            _splitState == SplitState::Vertical ?
+                L"Resize left and right panes" :
+                L"Resize top and bottom panes");
+        _root.Children().Append(_dividerVisual);
+        _root.Children().Append(_dividerPointerTarget);
+        _root.Children().Append(_dividerHitTarget);
+        _root.Children().Append(_snapIndicator);
+        _UpdateDividerPlacement();
+        return;
+    }
+
+    _dividerHitTarget = Controls::Primitives::Thumb{};
+    _dividerPointerTarget = Controls::Border{};
+    _dividerVisual = Controls::Border{};
+    _snapIndicator = Controls::Border{};
+    _snapIndicatorText = Controls::TextBlock{};
+
+    _dividerHitTarget.Padding(ThicknessHelper::FromUniformLength(0));
+    _dividerHitTarget.BorderThickness(ThicknessHelper::FromUniformLength(0));
+    _dividerHitTarget.Background(TokenBrush(0x01000000));
+    _dividerHitTarget.HorizontalContentAlignment(HorizontalAlignment::Stretch);
+    _dividerHitTarget.VerticalContentAlignment(VerticalAlignment::Stretch);
+    _dividerHitTarget.IsTabStop(true);
+    _dividerHitTarget.IsHitTestVisible(false);
+    _dividerHitTarget.Opacity(0);
+    Automation::AutomationProperties::SetName(
+        _dividerHitTarget,
+        _splitState == SplitState::Vertical ?
+            L"Resize left and right panes" :
+            L"Resize top and bottom panes");
+    Automation::AutomationProperties::SetHelpText(
+        _dividerHitTarget,
+        L"Drag to resize. Hold Alt for free resizing. Press Escape to cancel.");
+
+    _dividerPointerTarget.Background(TokenBrush(0x01000000));
+    Automation::AutomationProperties::SetAccessibilityView(
+        _dividerPointerTarget,
+        Automation::Peers::AccessibilityView::Raw);
+    _dividerVisual.IsHitTestVisible(false);
+    _dividerVisual.Background(TokenBrush(winTerm::Design::ColorTokens::BorderIdle));
+
+    _snapIndicatorText.FontSize(winTerm::Design::TypographyTokens::SnapIndicatorSize);
+    _snapIndicatorText.Foreground(TokenBrush(winTerm::Design::ColorTokens::TextPrimary));
+    _snapIndicatorText.HorizontalAlignment(HorizontalAlignment::Center);
+    _snapIndicatorText.VerticalAlignment(VerticalAlignment::Center);
+    _snapIndicator.Padding(ThicknessHelper::FromLengths(8, 3, 8, 3));
+    _snapIndicator.CornerRadius(CornerRadiusHelper::FromUniformRadius(
+        winTerm::Design::RadiusTokens::CompactControl));
+    _snapIndicator.Background(TokenBrush(winTerm::Design::ColorTokens::IndicatorSurface));
+    _snapIndicator.BorderBrush(TokenBrush(winTerm::Design::ColorTokens::AccentMint));
+    _snapIndicator.BorderThickness(ThicknessHelper::FromUniformLength(1));
+    _snapIndicator.Child(_snapIndicatorText);
+    _snapIndicator.IsHitTestVisible(false);
+    _snapIndicator.Visibility(Visibility::Collapsed);
+    Automation::AutomationProperties::SetAccessibilityView(
+        _snapIndicator,
+        Automation::Peers::AccessibilityView::Raw);
+
+    Controls::Canvas::SetZIndex(_dividerVisual, 99);
+    Controls::Canvas::SetZIndex(_dividerHitTarget, 100);
+    Controls::Canvas::SetZIndex(_dividerPointerTarget, 101);
+    Controls::Canvas::SetZIndex(_snapIndicator, 102);
+    _root.Children().Append(_dividerVisual);
+    _root.Children().Append(_dividerPointerTarget);
+    _root.Children().Append(_dividerHitTarget);
+    _root.Children().Append(_snapIndicator);
+
+    _dividerPointerTarget.PointerPressed([this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        _DividerPointerPressed(e);
+    });
+    _dividerPointerTarget.PointerMoved([this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        _DividerPointerMoved(e);
+    });
+    _dividerPointerTarget.PointerReleased([this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+        _DividerPointerReleased(e);
+    });
+    _dividerPointerTarget.PointerCanceled([this](auto&&, auto&&) {
+        _CancelDividerResize();
+    });
+    _dividerPointerTarget.PointerCaptureLost([this](auto&&, auto&&) {
+        _CancelDividerResize();
+    });
+
+    const auto addRootPointerHandler = [this](
+                                           const RoutedEvent& routedEvent,
+                                           auto&& handler) {
+        _root.AddHandler(
+            routedEvent,
+            winrt::box_value(
+                winrt::Windows::UI::Xaml::Input::PointerEventHandler{
+                    std::forward<decltype(handler)>(handler) }),
+            true);
+    };
+    addRootPointerHandler(
+        UIElement::PointerPressedEvent(),
+        [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+            _DividerPointerPressed(e);
+        });
+    addRootPointerHandler(
+        UIElement::PointerMovedEvent(),
+        [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+            _DividerPointerMoved(e);
+        });
+    addRootPointerHandler(
+        UIElement::PointerReleasedEvent(),
+        [this](auto&&, const XamlInput::PointerRoutedEventArgs& e) {
+            _DividerPointerReleased(e);
+        });
+    addRootPointerHandler(
+        UIElement::PointerCanceledEvent(),
+        [this](auto&&, auto&&) {
+            _CancelDividerResize();
+        });
+    addRootPointerHandler(
+        UIElement::PointerCaptureLostEvent(),
+        [this](auto&&, auto&&) {
+            _CancelDividerResize();
+        });
+
+    _dividerPointerTarget.PointerEntered([this](auto&&, auto&&) {
+        _dividerPointerOver = true;
+        _UpdateDividerState(_resizePointerId.has_value());
+        if (const auto window = Window::Current())
+        {
+            if (const auto coreWindow = window.CoreWindow())
+            {
+                coreWindow.PointerCursor(CoreCursor{
+                    _splitState == SplitState::Vertical ?
+                        CoreCursorType::SizeWestEast :
+                        CoreCursorType::SizeNorthSouth,
+                    0 });
+            }
+        }
+    });
+    _dividerPointerTarget.PointerExited([this](auto&&, auto&&) {
+        _dividerPointerOver = false;
+        _UpdateDividerState(_resizePointerId.has_value());
+        if (!_resizePointerId)
+        {
+            if (const auto window = Window::Current())
+            {
+                if (const auto coreWindow = window.CoreWindow())
+                {
+                    coreWindow.PointerCursor(CoreCursor{ CoreCursorType::Arrow, 0 });
+                }
+            }
+        }
+    });
+    _dividerHitTarget.KeyDown([this](auto&&, const XamlInput::KeyRoutedEventArgs& e) {
+        if (e.Key() == winrt::Windows::System::VirtualKey::Escape && _resizePointerId)
+        {
+            _CancelDividerResize();
+            e.Handled(true);
+        }
+    });
+    _dividerHitTarget.GotFocus([this](auto&&, auto&&) {
+        _UpdateDividerState(true);
+    });
+    _dividerHitTarget.LostFocus([this](auto&&, auto&&) {
+        _UpdateDividerState(_resizePointerId.has_value());
+    });
+    _root.SizeChanged([this](auto&&, auto&&) {
+        _UpdateDividerPlacement();
+    });
+    _UpdateDividerPlacement();
+}
+
+void Pane::_UpdateDividerPlacement()
+{
+    if (!_dividerHitTarget || _IsLeaf())
+    {
+        return;
+    }
+
+    const auto hitThickness = winTerm::Design::InteractionTokens::DividerPointerHitThickness;
+    const auto visibleThickness = winTerm::Design::InteractionTokens::DividerVisibleThickness;
+    if (_splitState == SplitState::Vertical)
+    {
+        Controls::Grid::SetColumn(_dividerHitTarget, 0);
+        Controls::Grid::SetColumnSpan(_dividerHitTarget, 2);
+        Controls::Grid::SetRow(_dividerHitTarget, 0);
+        Controls::Grid::SetColumn(_dividerVisual, 0);
+        Controls::Grid::SetColumnSpan(_dividerVisual, 2);
+        Controls::Grid::SetRow(_dividerVisual, 0);
+        Controls::Grid::SetColumn(_dividerPointerTarget, 0);
+        Controls::Grid::SetColumnSpan(_dividerPointerTarget, 2);
+        Controls::Grid::SetRow(_dividerPointerTarget, 0);
+        Controls::Grid::SetColumn(_snapIndicator, 0);
+        Controls::Grid::SetColumnSpan(_snapIndicator, 2);
+        _dividerHitTarget.Width(hitThickness);
+        _dividerHitTarget.Height(std::numeric_limits<double>::quiet_NaN());
+        _dividerHitTarget.HorizontalAlignment(HorizontalAlignment::Left);
+        _dividerHitTarget.VerticalAlignment(VerticalAlignment::Stretch);
+        _dividerPointerTarget.Width(hitThickness);
+        _dividerPointerTarget.Height(std::numeric_limits<double>::quiet_NaN());
+        _dividerPointerTarget.HorizontalAlignment(HorizontalAlignment::Left);
+        _dividerPointerTarget.VerticalAlignment(VerticalAlignment::Stretch);
+        _dividerVisual.Width(visibleThickness);
+        _dividerVisual.Height(std::numeric_limits<double>::quiet_NaN());
+        _dividerVisual.HorizontalAlignment(HorizontalAlignment::Center);
+        _dividerVisual.VerticalAlignment(VerticalAlignment::Stretch);
+
+        const auto dividerPosition = _desiredSplitPosition * _root.ActualWidth();
+        _dividerHitTarget.Margin(ThicknessHelper::FromLengths(
+            dividerPosition - (hitThickness / 2.0),
+            0,
+            0,
+            0));
+        _dividerPointerTarget.Margin(ThicknessHelper::FromLengths(
+            dividerPosition - (hitThickness / 2.0),
+            0,
+            0,
+            0));
+        _dividerVisual.Margin(ThicknessHelper::FromLengths(
+            dividerPosition - (visibleThickness / 2.0),
+            0,
+            0,
+            0));
+        _snapIndicator.HorizontalAlignment(HorizontalAlignment::Left);
+        _snapIndicator.VerticalAlignment(VerticalAlignment::Center);
+        _snapIndicator.Margin(ThicknessHelper::FromLengths(
+            std::clamp(dividerPosition + 8.0, 0.0, std::max(0.0, _root.ActualWidth() - 72.0)),
+            0,
+            0,
+            0));
+    }
+    else
+    {
+        Controls::Grid::SetRow(_dividerHitTarget, 0);
+        Controls::Grid::SetRowSpan(_dividerHitTarget, 2);
+        Controls::Grid::SetColumn(_dividerHitTarget, 0);
+        Controls::Grid::SetRow(_dividerVisual, 0);
+        Controls::Grid::SetRowSpan(_dividerVisual, 2);
+        Controls::Grid::SetColumn(_dividerVisual, 0);
+        Controls::Grid::SetRow(_dividerPointerTarget, 0);
+        Controls::Grid::SetRowSpan(_dividerPointerTarget, 2);
+        Controls::Grid::SetColumn(_dividerPointerTarget, 0);
+        Controls::Grid::SetRow(_snapIndicator, 0);
+        Controls::Grid::SetRowSpan(_snapIndicator, 2);
+        _dividerHitTarget.Width(std::numeric_limits<double>::quiet_NaN());
+        _dividerHitTarget.Height(hitThickness);
+        _dividerHitTarget.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _dividerHitTarget.VerticalAlignment(VerticalAlignment::Top);
+        _dividerPointerTarget.Width(std::numeric_limits<double>::quiet_NaN());
+        _dividerPointerTarget.Height(hitThickness);
+        _dividerPointerTarget.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _dividerPointerTarget.VerticalAlignment(VerticalAlignment::Top);
+        _dividerVisual.Width(std::numeric_limits<double>::quiet_NaN());
+        _dividerVisual.Height(visibleThickness);
+        _dividerVisual.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _dividerVisual.VerticalAlignment(VerticalAlignment::Center);
+
+        const auto dividerPosition = _desiredSplitPosition * _root.ActualHeight();
+        _dividerHitTarget.Margin(ThicknessHelper::FromLengths(
+            0,
+            dividerPosition - (hitThickness / 2.0),
+            0,
+            0));
+        _dividerPointerTarget.Margin(ThicknessHelper::FromLengths(
+            0,
+            dividerPosition - (hitThickness / 2.0),
+            0,
+            0));
+        _dividerVisual.Margin(ThicknessHelper::FromLengths(
+            0,
+            dividerPosition - (visibleThickness / 2.0),
+            0,
+            0));
+        _snapIndicator.HorizontalAlignment(HorizontalAlignment::Center);
+        _snapIndicator.VerticalAlignment(VerticalAlignment::Top);
+        _snapIndicator.Margin(ThicknessHelper::FromLengths(
+            0,
+            std::clamp(dividerPosition + 8.0, 0.0, std::max(0.0, _root.ActualHeight() - 32.0)),
+            0,
+            0));
+    }
+}
+
+void Pane::_UpdateDividerState(const bool active, const bool snapped)
+{
+    if (!_dividerVisual)
+    {
+        return;
+    }
+
+    const auto highContrast =
+        winrt::Windows::UI::ViewManagement::AccessibilitySettings{}.HighContrast();
+    if (highContrast)
+    {
+        _dividerVisual.Background(
+            active && _themeResources.focusedBorderBrush ?
+                _themeResources.focusedBorderBrush :
+                _themeResources.unfocusedBorderBrush);
+        return;
+    }
+
+    const auto color = active || snapped ?
+                           winTerm::Design::ColorTokens::AccentMint :
+                           _dividerPointerOver ?
+                               winTerm::Design::ColorTokens::BorderHover :
+                               winTerm::Design::ColorTokens::BorderIdle;
+    _dividerVisual.Background(TokenBrush(color));
+}
+
+void Pane::_DividerPointerPressed(const XamlInput::PointerRoutedEventArgs& e)
+{
+    const auto point = e.GetCurrentPoint(_root);
+    const auto properties = point.Properties();
+    const auto position = point.Position();
+    const auto leftButtonPressed =
+        properties.IsLeftButtonPressed() ||
+        properties.PointerUpdateKind() == winrt::Windows::UI::Input::PointerUpdateKind::LeftButtonPressed;
+    const auto dividerPosition =
+        _desiredSplitPosition *
+        (_splitState == SplitState::Vertical ? _root.ActualWidth() : _root.ActualHeight());
+    const auto pointerPosition =
+        _splitState == SplitState::Vertical ? position.X : position.Y;
+    const auto withinDividerHitTarget =
+        std::abs(pointerPosition - dividerPosition) <=
+        winTerm::Design::InteractionTokens::DividerPointerHitThickness / 2.0;
+    if (_resizePointerId || !leftButtonPressed || !withinDividerHitTarget)
+    {
+        return;
+    }
+
+    const auto widthOrHeight = _splitState == SplitState::Vertical;
+    const auto containerLength = widthOrHeight ? _root.ActualWidth() : _root.ActualHeight();
+    const auto firstMinSize = _firstChild->_GetMinSize();
+    const auto secondMinSize = _secondChild->_GetMinSize();
+    const winTerm::PaneResize::ResizeGeometry geometry{
+        containerLength,
+        widthOrHeight ? firstMinSize.Width : firstMinSize.Height,
+        widthOrHeight ? secondMinSize.Width : secondMinSize.Height,
+    };
+
+    auto transaction = std::make_unique<winTerm::PaneResize::PaneResizeTransaction>(_paneResizeSettings);
+    if (!transaction->Begin(_layoutNodeId, _desiredSplitPosition, geometry))
+    {
+        return;
+    }
+
+    // A child control can already own the implicit press capture by the time
+    // this handled-events-too route reaches the split root. The routed move
+    // and release handlers still observe that pointer, so a failed transfer
+    // must not discard an otherwise valid resize transaction.
+    _root.CapturePointer(e.Pointer());
+    _resizeTransaction = std::move(transaction);
+    _resizePointerId = e.Pointer().PointerId();
+    _dividerHitTarget.Focus(FocusState::Pointer);
+    _UpdateDividerState(true);
+    e.Handled(true);
+}
+
+void Pane::_DividerPointerMoved(const XamlInput::PointerRoutedEventArgs& e)
+{
+    if (!_resizePointerId ||
+        e.Pointer().PointerId() != *_resizePointerId ||
+        !_resizeTransaction)
+    {
+        return;
+    }
+
+    const auto point = e.GetCurrentPoint(_root).Position();
+    auto altPressed = false;
+    if (const auto window = Window::Current())
+    {
+        if (const auto coreWindow = window.CoreWindow())
+        {
+            altPressed = WI_IsFlagSet(
+                coreWindow.GetKeyState(winrt::Windows::System::VirtualKey::Menu),
+                CoreVirtualKeyStates::Down);
+        }
+    }
+
+    const auto update = _resizeTransaction->Update(
+        _splitState == SplitState::Vertical ? point.X : point.Y,
+        altPressed);
+    _desiredSplitPosition = gsl::narrow_cast<float>(update.ratio);
+    _CreateRowColDefinitions();
+    if (update.snapped && !update.indicator.empty())
+    {
+        _snapIndicatorText.Text(winrt::to_hstring(update.indicator));
+        _snapIndicator.Visibility(Visibility::Visible);
+        Automation::AutomationProperties::SetHelpText(
+            _dividerHitTarget,
+            winrt::to_hstring("Snapped to " + update.indicator + ". Hold Alt for free resizing."));
+    }
+    else
+    {
+        _snapIndicator.Visibility(Visibility::Collapsed);
+        Automation::AutomationProperties::SetHelpText(
+            _dividerHitTarget,
+            L"Drag to resize. Hold Alt for free resizing. Press Escape to cancel.");
+    }
+    _UpdateDividerState(true, update.snapped);
+    e.Handled(true);
+}
+
+void Pane::_DividerPointerReleased(const XamlInput::PointerRoutedEventArgs& e)
+{
+    if (!_resizePointerId ||
+        e.Pointer().PointerId() != *_resizePointerId ||
+        !_resizeTransaction)
+    {
+        return;
+    }
+
+    const auto originalPosition = gsl::narrow_cast<float>(_resizeTransaction->OriginalRatio());
+    const auto committed = _resizeTransaction->Commit();
+    const auto finalPosition = gsl::narrow_cast<float>(
+        committed.value_or(_desiredSplitPosition));
+    _resizePointerId.reset();
+    _root.ReleasePointerCapture(e.Pointer());
+    _resizeTransaction.reset();
+    _snapIndicator.Visibility(Visibility::Collapsed);
+    _UpdateDividerState(false);
+
+    if (std::abs(finalPosition - originalPosition) > std::numeric_limits<float>::epsilon())
+    {
+        PaneResizeCommitted.raise(
+            shared_from_this(),
+            _layoutNodeId,
+            originalPosition,
+            finalPosition);
+    }
+    if (const auto content = GetLastFocusedContent())
+    {
+        content.Focus(FocusState::Programmatic);
+    }
+    e.Handled(true);
+}
+
+void Pane::_CancelDividerResize()
+{
+    if (!_resizePointerId || !_resizeTransaction)
+    {
+        return;
+    }
+
+    if (const auto restored = _resizeTransaction->Cancel())
+    {
+        _desiredSplitPosition = gsl::narrow_cast<float>(*restored);
+        _CreateRowColDefinitions();
+    }
+    _resizePointerId.reset();
+    _root.ReleasePointerCaptures();
+    _resizeTransaction.reset();
+    _snapIndicator.Visibility(Visibility::Collapsed);
+    _UpdateDividerState(false);
+    if (const auto content = GetLastFocusedContent())
+    {
+        content.Focus(FocusState::Programmatic);
+    }
+}
+
 // Method Description:
 // - Sets up row/column definitions for this pane. There are three total
 //   row/cols. The middle one is for the separator. The first and third are for
@@ -2140,6 +2742,7 @@ void Pane::_CreateRowColDefinitions()
         _root.RowDefinitions().Append(firstRowDef);
         _root.RowDefinitions().Append(secondRowDef);
     }
+    _UpdateDividerPlacement();
 }
 
 // Method Description:
@@ -2651,6 +3254,10 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
 
     _splitState = actualSplitType;
     _desiredSplitPosition = 1.0f - splitSize;
+    if (_layoutNodeId == 0)
+    {
+        _layoutNodeId = NextLayoutNodeId();
+    }
     _secondChild = newPane;
     // If we want the new pane to be the first child, swap the children
     if (splitType == SplitDirection::Up || splitType == SplitDirection::Left)
@@ -2667,6 +3274,7 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
 
     _root.Children().Append(_borderFirst);
     _root.Children().Append(_borderSecond);
+    _CreateDividerVisual();
 
     _ApplySplitDefinitions();
 
@@ -2750,6 +3358,7 @@ void Pane::Restore(std::shared_ptr<Pane> zoomedPane)
 
             _root.Children().Append(_borderFirst);
             _root.Children().Append(_borderSecond);
+            _CreateDividerVisual();
         }
 
         // Always recurse into both children. If the (un)zoomed pane was one of
@@ -2994,7 +3603,7 @@ Pane::SnapSizeResult Pane::_CalcSnappedDimension(const bool widthOrHeight, const
         }
 
         const auto headerHeight = !widthOrHeight && _paneHeadersVisible ?
-                                      static_cast<float>(PaneHeaderHeight) :
+                                      static_cast<float>(_paneHeaderHeight) :
                                       0.0f;
         const auto contentDimension = std::max(0.0f, dimension - headerHeight);
         auto lower = snappable.SnapDownToGrid(
@@ -3210,7 +3819,7 @@ Size Pane::_GetMinSize() const
         newWidth += WI_IsFlagSet(_borders, Borders::Right) ? PaneBorderSize : 0;
         newHeight += WI_IsFlagSet(_borders, Borders::Top) ? PaneBorderSize : 0;
         newHeight += WI_IsFlagSet(_borders, Borders::Bottom) ? PaneBorderSize : 0;
-        newHeight += _paneHeadersVisible ? static_cast<float>(PaneHeaderHeight) : 0.0f;
+        newHeight += _paneHeadersVisible ? static_cast<float>(_paneHeaderHeight) : 0.0f;
 
         return { newWidth, newHeight };
     }

@@ -101,7 +101,7 @@ function Test-ShellExperienceFoundations
     }
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
-    if ($manifest.ModuleVersion -ne '1.0.0' -or
+    if ($manifest.ModuleVersion -ne '1.1.0' -or
         $manifest.PrivateData.PSData.Prerelease -ne '' -or
         $manifest.PowerShellVersion -ne '5.1')
     {
@@ -246,6 +246,12 @@ try
     if (-not $?)
     {
         throw 'Directed split and pane control source validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'test-pane-resizing.ps1') -Configuration $Configuration -Platform $Platform -SourceOnly
+    if (-not $?)
+    {
+        throw 'Pane resize source validation failed.'
     }
 
     & (Join-Path $PSScriptRoot 'test-diagnostics.ps1')

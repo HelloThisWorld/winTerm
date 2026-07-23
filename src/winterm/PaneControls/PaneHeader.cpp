@@ -10,10 +10,10 @@ using namespace winTerm::PaneControls;
 
 PaneHeader::PaneHeader(
     PaneHeaderSettings settings,
-    PaneHandle::OpenMenuCallback openMenu,
-    PaneHandle::FocusCallback focus) :
+    PaneIcon::OpenMenuCallback openMenu,
+    PaneIcon::FocusCallback focus) :
     _settings{ std::move(settings) },
-    _handle{ std::move(openMenu), std::move(focus) }
+    _icon{ std::move(openMenu), std::move(focus) }
 {
     _settings.Normalize();
 }
@@ -23,9 +23,9 @@ PaneHeaderPresentation PaneHeader::Present(const PaneHeaderState& state) const
     return PaneHeaderViewModel::Build(state, _settings);
 }
 
-PaneHandle& PaneHeader::Handle() noexcept
+PaneIcon& PaneHeader::Icon() noexcept
 {
-    return _handle;
+    return _icon;
 }
 
 const PaneHeaderSettings& PaneHeader::Settings() const noexcept

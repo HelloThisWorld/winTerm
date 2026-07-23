@@ -18,4 +18,10 @@ Capture must read the minimum UI state on the UI thread, produce a value snapsho
 
 The storage layout is a winTerm-only `workspaces` directory under the application state root. It contains `last-session.json`, its backup, `snapshots`, `named`, `imported`, `quarantine`, and a rebuildable `index.json`. This storage never uses Microsoft Terminal package identity or LocalState.
 
-Workspace schema v2 shares its `pane`, `split`, and `emptySlot` tree with the winTerm Visual Docking planner and preview geometry. Docking hover state and drag tokens remain outside persistence. `GridNode`, cross-process live pane transfer, terminal broker support, post-exit ConPTY reattachment, command replay, and SSH reconnection remain outside this architecture.
+Workspace schema v2 stores `pane`, `split`, and compatible `emptySlot` nodes.
+The 1.1 pane-resize transaction reuses the existing `split.ratio` field and
+does not add a schema field. Pointer capture, original/candidate ratios, snap
+state, indicator text, modifier keys, and resize history remain outside
+persistence. `GridNode`, terminal broker support, post-exit ConPTY
+reattachment, command replay, and SSH reconnection remain outside this
+architecture.

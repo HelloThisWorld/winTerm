@@ -1,19 +1,24 @@
-# Keyboard Pane Commands
+# Keyboard pane commands
 
-winTerm exposes configurable command IDs without assigning unconditional default shortcuts:
+winTerm exposes configurable actions through the inherited keybinding and
+Command Palette system:
 
-| Command ID | Command |
-|---|---|
-| `splitPaneTop` | Split Pane Top |
-| `splitPaneBottom` | Split Pane Bottom |
-| `splitPaneLeft` | Split Pane Left |
-| `splitPaneRight` | Split Pane Right |
-| `movePaneToNewTab` | Move Pane to New Tab |
-| `movePaneToNewWindow` | Move Pane to New Window |
-| `closeFocusedPane` | Close Focused Pane |
-| `startPaneMoveMode` | Start Pane Move Mode |
-| `openPaneMenu` | Open Pane Menu |
+| Action | Behavior |
+| --- | --- |
+| `splitPane` with `splitDirection: up` | Split Pane Top |
+| `splitPane` with `splitDirection: down` | Split Pane Bottom |
+| `splitPane` with `splitDirection: left` | Split Pane Left |
+| `splitPane` with `splitDirection: right` | Split Pane Right |
+| `resizePane` with a direction | Resize by 2%; hold Shift for 5% |
+| `balancePanes` | Balance the immediate sibling split |
+| `undoPaneResize` | Restore the previous committed pane ratio |
+| `redoPaneResize` | Reapply the undone pane ratio |
+| `closePane` | Close the focused pane |
 
-Keyboard move mode uses Arrow keys to select a zone, Tab/Shift+Tab to change targets, Enter to request the move, and Escape to cancel. It remains available when pane headers are hidden.
+Default command IDs are `Terminal.BalancePanes`,
+`Terminal.UndoPaneResize`, and `Terminal.RedoPaneResize`. Users may assign
+keys without overwriting existing bindings.
 
-The existing Terminal action schema is retained for serialized split and move actions. No existing user keybinding is overwritten.
+The legacy `movePane` identifier is accepted during settings parsing for
+compatibility but is disabled in the winTerm application and has no default,
+menu, command-line, or runtime move implementation.
