@@ -1,51 +1,34 @@
-# Current Development Progress
+# Current development progress
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 ## Repository state
 
-- Current branch: `main`
-- Microsoft Terminal upstream revision: `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.0.0`
-- Internal monotonic package version: `1.0.8.0`
-- Release tag: `v1.0.0`
+- Branch: `codex/fix-live-pane-drag-release`
+- Starting commit: `ecd0350849e918c261f789e32648eafaa3988d31`
+- Microsoft Terminal upstream revision:
+  `1cea42d433253d95c4487a3037db48197b5e72f4`
+- Application and module version: `1.1.0`
+- Package version: `1.1.0.0`
+- Intended tag: `v1.1.0`
 - Supported release target: Windows 11 x64
 
-## Implemented foundations
+## Implemented in the working tree
 
-- Unpackaged self-contained application staging, Inno Setup, and Portable ZIP
-  distribution pipelines.
-- Directed splits, compact pane headers, a unified pane menu, explicit
-  pane-handle drag states, Snap-style docking models, rollback, session
-  ownership leases, layout history, and Workspace Schema 2 persistence.
-- Release allowlisting, checksums, release metadata, third-party notices, SPDX
-  and CycloneDX SBOMs, branding validation, and GitHub release automation.
-- Installer and Portable isolation, upgrade, data preservation, uninstall, and
-  Windows Terminal isolation test scripts.
+- Removed winTerm pane repositioning sources, overlay/target/session models,
+  settings, menus, command-line entry point, keyboard mode, and tests.
+- Added branch-local border resize transactions, minimum-size filtering,
+  common-ratio snapping, 8/14-pixel hysteresis, Alt bypass, rollback,
+  one-entry history, undo/redo, and Balance Panes.
+- Added native Settings controls, centralized design tokens, and website-aligned
+  titlebar, tab, pane-header, divider, and terminal-shell resources.
+- Updated version metadata, source validation, migration guidance, user
+  documentation, acceptance matrix, release notes, and website handoff.
 
-## Current evidence
+## Evidence
 
-Passed locally:
-
-- Settings Model x64 Debug build.
-- Native Terminal App library x64 Debug build.
-- All 65 tests selected by `*WinTerm*`.
-- Version, branding, release-workflow, source-boundary, and workspace-fixture
-  checks.
-- Case-insensitive retired-brand scan with no matches.
-
-Known limitations:
-
-- Live pane-drag UI, Narrator, High Contrast, mixed-DPI, and live
-  session-identity acceptance scenarios were not completed in the local run.
-- Cross-process and cross-elevation live pane transfer remains unsupported.
-- ARM64 artifacts are not published.
-- The x64 installer is distributed unsigned unless a production Authenticode
-  certificate is configured.
-
-## Distribution action
-
-Build the x64 Release stage, installer, Portable ZIP, notices, SBOMs, release
-notes, and checksums; verify the exact asset allowlist; then publish only those
-files on the `v1.0.0` GitHub Release. The README points to the official installer
-and Portable asset URLs.
+The directed-split/pane-control and pane-resize source validations pass in
+Windows PowerShell. Compiled native tests, Release application launch, visual
+inspection, manual DPI/accessibility/rendering/shell scenarios, and 1.1
+installer/Portable creation remain release gates until their results are
+recorded.

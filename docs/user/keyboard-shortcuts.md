@@ -1,7 +1,26 @@
 # Keyboard shortcuts
 
-Use the existing configurable Windows Terminal keybinding system. winTerm does not invent default Docking shortcuts; unassigned commands remain unassigned until the user binds them. Verify bindings in Settings or the command palette.
+winTerm uses the configurable Microsoft Terminal keybinding system. Review or
+assign bindings in Settings or the Command Palette.
 
-Pane commands include Split Pane Top/Bottom/Left/Right, Move Pane to New Tab, Move Pane to New Window, Close Focused Pane, Start Pane Move Mode, and Open Pane Menu. See the [command ID reference](../keyboard-shortcuts.md).
+Pane layout commands include:
 
-In pane move mode, use Arrow keys to select a zone, Tab or Shift+Tab to change the target, Enter to commit, and Escape to cancel.
+- Split Pane Top, Bottom, Left, and Right
+- Resize Pane Left, Right, Up, and Down
+- Balance Panes
+- Undo Pane Resize
+- Redo Pane Resize
+- Close Focused Pane
+- Open Pane Menu
+
+Keyboard resize changes the immediate split containing the focused pane by 2%.
+Hold **Shift** for a 5% step. Valid configured snap points are evaluated while
+crossing them. Keyboard layout changes create one history entry and preserve
+the running shell.
+
+During pointer resizing, hold **Alt** for free resize or press **Escape** to
+cancel. Those keys are handled by the divider and are not sent to the shell
+while it owns pointer capture.
+
+Pane movement commands are not available in winTerm 1.1. A legacy custom
+`movePane` action can still be parsed safely but is disabled.

@@ -5,7 +5,7 @@
     <XesUseOneStoreVersioning>true</XesUseOneStoreVersioning>
     <XesBaseYearForStoreVersion>2026</XesBaseYearForStoreVersion>
     <VersionMajor>1</VersionMajor>
-    <VersionMinor>0</VersionMinor>
+    <VersionMinor>1</VersionMinor>
     <VersionInfoProductName Condition="'$(WindowsTerminalBranding)'=='WinTerm'">winTerm</VersionInfoProductName>
     <VersionInfoProductName Condition="'$(VersionInfoProductName)'==''">Windows Terminal</VersionInfoProductName>
     <VersionInfoCulture>1033</VersionInfoCulture>
