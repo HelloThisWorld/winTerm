@@ -62,10 +62,6 @@ jobs:
         shell: pwsh
         run: .\scripts\winterm\benchmark-workspace.ps1
 
-      - name: Run docking model benchmark
-        shell: pwsh
-        run: .\scripts\winterm\benchmark-docking.ps1
-
   package:
     name: x64 unpackaged distributions and installer tests
     needs: build-and-test
