@@ -1,16 +1,16 @@
 # Current development progress
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 ## Repository state
 
-- Branch: `codex/fix-live-pane-drag-release`
-- Starting commit: `ecd0350849e918c261f789e32648eafaa3988d31`
+- Branch: `codex/release-v1.1.1`
+- Starting commit: `a503b8dfaee05c533ba5981d83d22e92e31b3e20`
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application and module version: `1.1.0`
-- Package version: `1.1.0.0`
-- Intended tag: `v1.1.0`
+- Application and module version: `1.1.1`
+- Package version: `1.1.1.0`
+- Intended tag: `v1.1.1`
 - Supported release target: Windows 11 x64
 
 ## Implemented in the working tree
