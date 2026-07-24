@@ -99,6 +99,24 @@ workspace contents, working directories, or usage analytics. Crash upload is
 off and opt-in. See [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), and
 [SUPPORT.md](SUPPORT.md).
 
+## Code signing policy
+
+Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+
+### Roles
+
+- Authors, committers, and reviewers:
+  [HelloThisWorld](https://github.com/HelloThisWorld)
+- Approver:
+  [HelloThisWorld](https://github.com/HelloThisWorld)
+
+Official release artifacts are built from this public repository using
+GitHub Actions.
+
+Every release signing request requires manual approval.
+
+See [PRIVACY.md](PRIVACY.md) for the winTerm privacy policy.
+
 ## License and upstream
 
 winTerm preserves the Microsoft Terminal MIT license, copyrights, and
