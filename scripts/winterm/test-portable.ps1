@@ -102,6 +102,41 @@ function Stop-PortableProcesses
     while ($foundProcess -and [DateTime]::UtcNow -lt $deadline)
 }
 
+function Remove-DirectoryWithRetry
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter()]
+        [int]$MaximumAttempts = 5
+    )
+
+    # A just-terminated process (or an antivirus scan of freshly written
+    # binaries) can keep a mapped file locked for a short moment. A transient
+    # lock must not fail a run whose functional gates have already passed.
+    for ($attempt = 1; $attempt -le $MaximumAttempts; $attempt++)
+    {
+        try
+        {
+            Remove-Item -LiteralPath $Path -Recurse -Force
+            return
+        }
+        catch
+        {
+            if (-not (Test-Path -LiteralPath $Path))
+            {
+                return
+            }
+            if ($attempt -ge $MaximumAttempts)
+            {
+                throw
+            }
+            Start-Sleep -Milliseconds (250 * $attempt)
+        }
+    }
+}
+
 try
 {
     $resolvedPortable = (Resolve-Path -LiteralPath $PortablePath).Path
@@ -185,6 +220,6 @@ finally
             throw "Refusing to remove Portable test directory outside the temporary root: $resolvedExtractRoot"
         }
         Stop-PortableProcesses -Root $resolvedExtractRoot
-        Remove-Item -LiteralPath $resolvedExtractRoot -Recurse -Force
+        Remove-DirectoryWithRetry -Path $resolvedExtractRoot
     }
 }
