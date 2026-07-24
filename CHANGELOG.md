@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.1.2 - 2026-07-24
+
+### Fixed
+
+- Pane divider visuals no longer draw ghost lines away from the actual split
+  boundary. The visible divider previously used a primary-axis Center
+  alignment with a leading-edge margin, which re-centered the line in the
+  space remaining after the margin; it now shares the leading-edge coordinate
+  system of its pointer target, so exactly one line renders at each logical
+  split position and nested dividers stay inside their owning split node.
+- Added source-level regression coverage that locks the visible divider, the
+  pointer target, and the logical split position to one shared leading-edge
+  alignment model and keeps divider visuals reattached across split, close,
+  swap, restore, and workspace rebuild paths.
+
+### Distribution
+
+- Publishes the corrected pane-divider rendering as the verified x64 Setup EXE
+  and Portable ZIP.
+- Workspace schema 2, docking model 1, shell protocol 1, and theme schema 1
+  are unchanged.
+- The Setup EXE is not code-signed unless a trusted Authenticode certificate
+  is configured at publication; verify it with `SHA256SUMS.txt`.
+
 ## 1.1.1 - 2026-07-24
 
 ### Fixed
