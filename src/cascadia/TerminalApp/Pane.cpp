@@ -2441,7 +2441,12 @@ void Pane::_UpdateDividerPlacement()
         _dividerPointerTarget.VerticalAlignment(VerticalAlignment::Stretch);
         _dividerVisual.Width(visibleThickness);
         _dividerVisual.Height(std::numeric_limits<double>::quiet_NaN());
-        _dividerVisual.HorizontalAlignment(HorizontalAlignment::Center);
+        // The visible line must use the same leading-edge coordinate system as
+        // the hit/pointer targets: a Left alignment whose margin is the split
+        // position minus half the element's own thickness. A Center alignment
+        // would re-center the line inside the remaining space after the margin,
+        // drawing a ghost divider away from the actual split boundary.
+        _dividerVisual.HorizontalAlignment(HorizontalAlignment::Left);
         _dividerVisual.VerticalAlignment(VerticalAlignment::Stretch);
 
         const auto dividerPosition = _desiredSplitPosition * _root.ActualWidth();
@@ -2492,7 +2497,9 @@ void Pane::_UpdateDividerPlacement()
         _dividerVisual.Width(std::numeric_limits<double>::quiet_NaN());
         _dividerVisual.Height(visibleThickness);
         _dividerVisual.HorizontalAlignment(HorizontalAlignment::Stretch);
-        _dividerVisual.VerticalAlignment(VerticalAlignment::Center);
+        // Same leading-edge coordinate system as the hit/pointer targets; see
+        // the vertical branch above for why Center would draw a ghost line.
+        _dividerVisual.VerticalAlignment(VerticalAlignment::Top);
 
         const auto dividerPosition = _desiredSplitPosition * _root.ActualHeight();
         _dividerHitTarget.Margin(ThicknessHelper::FromLengths(
