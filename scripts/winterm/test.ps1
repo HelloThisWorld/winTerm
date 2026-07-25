@@ -101,7 +101,7 @@ function Test-ShellExperienceFoundations
     }
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
-    if ($manifest.ModuleVersion -ne '1.1.2' -or
+    if ($manifest.ModuleVersion -ne '1.1.3' -or
         $manifest.PrivateData.PSData.Prerelease -ne '' -or
         $manifest.PowerShellVersion -ne '5.1')
     {

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.1.3 - 2026-07-26
+
+### Changed
+
+- Refreshed the native title bar, tab strip, pane headers, dividers, window
+  controls, and terminal-shell palette to match the visual language used on
+  winterm.dev while preserving existing terminal and pane behavior.
+- Regenerated the complete Windows application, package, tile, ICO, and High
+  Contrast artwork set from the canonical `assets/winterm/icons/winterm.svg`
+  source.
+- Updated application, package, PowerShell module, About, Workspace fallback,
+  and release metadata to `1.1.3` with intended tag `v1.1.3`.
+
+### Fixed
+
+- Wrapped the tab strip and bottom border in a single XAML content container,
+  resolving the duplicate `ContentPresenter.Content` assignment that blocked
+  both Debug and Release builds.
+
+### Distribution
+
+- Publishes the website-aligned native shell as the verified x64 Setup EXE and
+  Portable ZIP.
+- Workspace schema 2, docking model 1, shell protocol 1, and theme schema 1
+  remain unchanged.
+- The Setup EXE is not Authenticode-signed; Windows may display Unknown
+  Publisher or SmartScreen, so verify it with `SHA256SUMS.txt`.
+
 ## 1.1.2 - 2026-07-24
 
 ### Fixed
