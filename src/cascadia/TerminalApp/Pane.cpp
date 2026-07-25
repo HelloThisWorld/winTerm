@@ -1427,20 +1427,54 @@ void Pane::UpdateVisuals()
     _borderSecond.BorderBrush(brush);
     if (_paneHeader)
     {
-        _paneHeader.Background(TokenBrush(winTerm::Design::ColorTokens::PaneHeaderSurface));
+        _paneHeader.Background(
+            _themeResources.paneHeaderBackgroundBrush ?
+                _themeResources.paneHeaderBackgroundBrush :
+                TokenBrush(winTerm::Design::ColorTokens::PaneHeaderSurface));
+        if (_paneHeaderBorder)
+        {
+            _paneHeaderBorder.Background(
+                _themeResources.paneHeaderBorderBrush ?
+                    _themeResources.paneHeaderBorderBrush :
+                    TokenBrush(winTerm::Design::ColorTokens::PaneHeaderBorder));
+        }
         if (_paneIcon)
         {
-            _paneIcon.Foreground(TokenBrush(
-                _lastActive ?
-                    winTerm::Design::ColorTokens::AccentMint :
-                    winTerm::Design::ColorTokens::TextMuted));
+            _paneIcon.Foreground(
+                _lastActive && _themeResources.accentBrush ?
+                    _themeResources.accentBrush :
+                    !_lastActive && _themeResources.mutedTextBrush ?
+                        _themeResources.mutedTextBrush :
+                        TokenBrush(
+                            _lastActive ?
+                                winTerm::Design::ColorTokens::AccentMint :
+                                winTerm::Design::ColorTokens::TextMuted));
         }
         if (_paneTitle)
         {
-            _paneTitle.Foreground(TokenBrush(
-                _lastActive ?
-                    winTerm::Design::ColorTokens::TextPrimary :
-                    winTerm::Design::ColorTokens::TextSecondary));
+            _paneTitle.Foreground(
+                _lastActive && _themeResources.primaryTextBrush ?
+                    _themeResources.primaryTextBrush :
+                    !_lastActive && _themeResources.secondaryTextBrush ?
+                        _themeResources.secondaryTextBrush :
+                        TokenBrush(
+                            _lastActive ?
+                                winTerm::Design::ColorTokens::TextPrimary :
+                                winTerm::Design::ColorTokens::TextSecondary));
+        }
+        if (_paneStatus)
+        {
+            _paneStatus.Foreground(
+                _themeResources.accentBrush ?
+                    _themeResources.accentBrush :
+                    TokenBrush(winTerm::Design::ColorTokens::AccentMint));
+        }
+        if (_paneOverflow)
+        {
+            _paneOverflow.Foreground(
+                _themeResources.mutedTextBrush ?
+                    _themeResources.mutedTextBrush :
+                    TokenBrush(winTerm::Design::ColorTokens::TextMuted));
         }
         _UpdatePaneHeader();
     }
@@ -2041,6 +2075,7 @@ void Pane::_AttachLeafVisual()
 
     _leafLayout = Controls::Grid{};
     _paneHeader = Controls::Grid{};
+    _paneHeaderBorder = Controls::Border{};
     _contentHost = Controls::Border{};
     _paneIcon = Controls::Button{};
     _paneOverflow = Controls::Button{};
@@ -2080,6 +2115,9 @@ void Pane::_AttachLeafVisual()
     _paneIcon.Height(_paneHeaderHeight);
     _paneIcon.Visibility(_showPaneProfileIcon ? Visibility::Visible : Visibility::Collapsed);
     _paneIcon.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
+    _paneIcon.BorderThickness(ThicknessHelper::FromUniformLength(0));
+    _paneIcon.CornerRadius(CornerRadiusHelper::FromUniformRadius(
+        winTerm::Design::RadiusTokens::CompactControl));
     Automation::AutomationProperties::SetHelpText(
         _paneIcon,
         L"Focus this pane. Right-click for pane commands.");
@@ -2101,7 +2139,18 @@ void Pane::_AttachLeafVisual()
     _paneOverflow.Width(PaneHeaderButtonWidth);
     _paneOverflow.Height(_paneHeaderHeight);
     _paneOverflow.Padding(ThicknessHelper::FromLengths(0, 0, 0, 0));
+    _paneOverflow.BorderThickness(ThicknessHelper::FromUniformLength(0));
+    _paneOverflow.CornerRadius(CornerRadiusHelper::FromUniformRadius(
+        winTerm::Design::RadiusTokens::CompactControl));
     Automation::AutomationProperties::SetName(_paneOverflow, L"Open pane menu");
+
+    _paneHeaderBorder.Height(1);
+    _paneHeaderBorder.VerticalAlignment(VerticalAlignment::Bottom);
+    _paneHeaderBorder.IsHitTestVisible(false);
+    Controls::Grid::SetColumnSpan(_paneHeaderBorder, 4);
+    Automation::AutomationProperties::SetAccessibilityView(
+        _paneHeaderBorder,
+        Automation::Peers::AccessibilityView::Raw);
 
     Controls::Grid::SetColumn(_paneIcon, 0);
     Controls::Grid::SetColumn(_paneTitle, 1);
@@ -2111,6 +2160,7 @@ void Pane::_AttachLeafVisual()
     _paneHeader.Children().Append(_paneTitle);
     _paneHeader.Children().Append(_paneStatus);
     _paneHeader.Children().Append(_paneOverflow);
+    _paneHeader.Children().Append(_paneHeaderBorder);
     _paneHeader.Visibility(_paneHeadersVisible ? Visibility::Visible : Visibility::Collapsed);
 
     Controls::Grid::SetRow(_paneHeader, 0);
@@ -2281,7 +2331,10 @@ void Pane::_CreateDividerVisual()
         _dividerPointerTarget,
         Automation::Peers::AccessibilityView::Raw);
     _dividerVisual.IsHitTestVisible(false);
-    _dividerVisual.Background(TokenBrush(winTerm::Design::ColorTokens::BorderIdle));
+    _dividerVisual.Background(
+        _themeResources.dividerBrush ?
+            _themeResources.dividerBrush :
+            TokenBrush(winTerm::Design::ColorTokens::BorderIdle));
 
     _snapIndicatorText.FontSize(winTerm::Design::TypographyTokens::SnapIndicatorSize);
     _snapIndicatorText.Foreground(TokenBrush(winTerm::Design::ColorTokens::TextPrimary));
@@ -2534,23 +2587,27 @@ void Pane::_UpdateDividerState(const bool active, const bool snapped)
         return;
     }
 
-    const auto highContrast =
-        winrt::Windows::UI::ViewManagement::AccessibilitySettings{}.HighContrast();
-    if (highContrast)
+    if (active || snapped)
     {
         _dividerVisual.Background(
-            active && _themeResources.focusedBorderBrush ?
-                _themeResources.focusedBorderBrush :
-                _themeResources.unfocusedBorderBrush);
-        return;
+            _themeResources.accentBrush ?
+                _themeResources.accentBrush :
+                TokenBrush(winTerm::Design::ColorTokens::AccentMint));
     }
-
-    const auto color = active || snapped ?
-                           winTerm::Design::ColorTokens::AccentMint :
-                           _dividerPointerOver ?
-                               winTerm::Design::ColorTokens::BorderHover :
-                               winTerm::Design::ColorTokens::BorderIdle;
-    _dividerVisual.Background(TokenBrush(color));
+    else if (_dividerPointerOver)
+    {
+        _dividerVisual.Background(
+            _themeResources.dividerHoverBrush ?
+                _themeResources.dividerHoverBrush :
+                TokenBrush(winTerm::Design::ColorTokens::BorderHover));
+    }
+    else
+    {
+        _dividerVisual.Background(
+            _themeResources.dividerBrush ?
+                _themeResources.dividerBrush :
+                TokenBrush(winTerm::Design::ColorTokens::BorderIdle));
+    }
 }
 
 void Pane::_DividerPointerPressed(const XamlInput::PointerRoutedEventArgs& e)

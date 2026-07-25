@@ -6,6 +6,7 @@
 namespace winTerm::Design::RadiusTokens
 {
     inline constexpr double CompactControl{ 4.0 };
+    inline constexpr double ActiveTabTop{ 7.0 };
     inline constexpr double MenuItem{ 5.0 };
     inline constexpr double Flyout{ 9.0 };
 }

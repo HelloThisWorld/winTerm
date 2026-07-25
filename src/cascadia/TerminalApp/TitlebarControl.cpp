@@ -20,6 +20,13 @@ namespace winrt::TerminalApp::implementation
     {
         InitializeComponent();
 
+#if defined(WT_BRANDING_WINTERM)
+        WinTermTitlebarSurface().Visibility(Visibility::Visible);
+        WinTermBrandRoot().Visibility(Visibility::Visible);
+        WindowTitle().Visibility(Visibility::Visible);
+        _updateBrandIcon();
+#endif
+
         // Register our event handlers on the MMC buttons.
         MinMaxCloseControl().MinimizeClick({ this, &TitlebarControl::Minimize_Click });
         MinMaxCloseControl().MaximizeClick({ this, &TitlebarControl::Maximize_Click });
@@ -61,6 +68,15 @@ namespace winrt::TerminalApp::implementation
     void TitlebarControl::Focused(bool focused)
     {
         MinMaxCloseControl().Focused(focused);
+
+#if defined(WT_BRANDING_WINTERM)
+        const auto highContrast =
+            winrt::Windows::UI::ViewManagement::AccessibilitySettings{}.HighContrast();
+        const auto opacity = focused || highContrast ? 1.0 : 0.68;
+        WinTermBrandRoot().Opacity(opacity);
+        WindowTitle().Opacity(opacity);
+        ContentRoot().Opacity(focused || highContrast ? 1.0 : 0.82);
+#endif
     }
 
     IInspectable TitlebarControl::Content()
@@ -73,13 +89,19 @@ namespace winrt::TerminalApp::implementation
         ContentRoot().Content(content);
     }
 
+    void TitlebarControl::SetWindowTitle(const winrt::hstring& title)
+    {
+        WindowTitle().Text(title);
+    }
+
     void TitlebarControl::Root_SizeChanged(const IInspectable& /*sender*/,
                                            const Windows::UI::Xaml::SizeChangedEventArgs& /*e*/)
     {
         const auto windowWidth = ActualWidth();
         const auto minMaxCloseWidth = MinMaxCloseControl().ActualWidth();
         const auto dragBarMinWidth = DragBar().MinWidth();
-        const auto maxWidth = windowWidth - minMaxCloseWidth - dragBarMinWidth;
+        const auto brandWidth = WinTermBrandRoot().ActualWidth();
+        const auto maxWidth = windowWidth - minMaxCloseWidth - dragBarMinWidth - brandWidth;
         // Only set our MaxWidth if it's greater than 0. Setting it to a
         // negative value will cause a crash.
         if (maxWidth >= 0)
@@ -183,6 +205,10 @@ namespace winrt::TerminalApp::implementation
 
     void TitlebarControl::_backgroundChanged(winrt::Windows::UI::Xaml::Media::Brush brush)
     {
+#if defined(WT_BRANDING_WINTERM)
+        _updateBrandIcon();
+#endif
+
         // Loosely cribbed from TerminalPage::_SetNewTabButtonColor
         til::color c;
         if (auto acrylic = brush.try_as<winrt::Windows::UI::Xaml::Media::AcrylicBrush>())
@@ -202,6 +228,26 @@ namespace winrt::TerminalApp::implementation
         const auto isBrightColor = ColorFix::GetLightness(c) >= lightnessThreshold;
         MinMaxCloseControl().RequestedTheme(isBrightColor ? winrt::Windows::UI::Xaml::ElementTheme::Light :
                                                             winrt::Windows::UI::Xaml::ElementTheme::Dark);
+    }
+
+    void TitlebarControl::_updateBrandIcon()
+    {
+#if defined(WT_BRANDING_WINTERM)
+        auto iconUri = L"ms-appx:///Images/Square44x44Logo.png";
+        const auto highContrast =
+            winrt::Windows::UI::ViewManagement::AccessibilitySettings{}.HighContrast();
+        if (highContrast)
+        {
+            iconUri = GetSysColor(COLOR_WINDOW) == 0x00FFFFFF ?
+                          L"ms-appx:///Images/terminal_contrast-white.ico" :
+                          L"ms-appx:///Images/terminal_contrast-black.ico";
+        }
+
+        winrt::Windows::UI::Xaml::Media::Imaging::BitmapImage image{
+            winrt::Windows::Foundation::Uri{ iconUri }
+        };
+        WinTermAppIcon().Source(image);
+#endif
     }
 
 }

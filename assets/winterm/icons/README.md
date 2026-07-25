@@ -2,7 +2,7 @@
 
 ## Source format
 
-`winterm.svg` is the canonical vector source. Its geometry and color values are mirrored by `generate_icons.py` for deterministic raster generation.
+`winterm.svg` is the canonical vector source. `generate_icons.py` parses its geometry and color values directly for deterministic raster generation; it does not keep a second hand-drawn copy of the normal icon.
 
 ## Generated sizes
 
@@ -11,7 +11,7 @@ The source asset set contains PNG files at 16, 20, 24, 32, 40, 44, 48, 64, 96, 1
 ## Regeneration
 
 1. Install Python 3 and Pillow in an isolated development environment.
-2. Update both `winterm.svg` and the matching geometry constants in `generate_icons.py`.
+2. Update `winterm.svg`. Keep its intentionally small supported shape vocabulary documented by generator validation.
 3. Run `python assets/winterm/icons/generate_icons.py` from any directory.
 4. Review every generated size, especially 16, 20, 24, 32, 44, 48, 150, and 310 pixels.
 5. Run `scripts/winterm/verify-branding.ps1` before committing the replacement.
