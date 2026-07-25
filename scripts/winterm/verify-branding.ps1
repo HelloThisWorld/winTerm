@@ -204,6 +204,7 @@ try
         'THIRD_PARTY_NOTICES.md',
         'src\cascadia\CascadiaPackage\NOTICE.html',
         'assets\winterm\licenses\open-source-licenses.html',
+        'assets\winterm\icons\generate_icons.py',
         'assets\winterm\icons\winterm.svg',
         'assets\winterm\icons\winterm.ico',
         'res\terminal\images-WinTerm\StoreLogo.png',
@@ -212,7 +213,9 @@ try
         'res\terminal\images-WinTerm\SmallTile.png',
         'res\terminal\images-WinTerm\Wide310x150Logo.png',
         'res\terminal\images-WinTerm\LargeTile.png',
-        'res\terminal\images-WinTerm\terminal.ico'
+        'res\terminal\images-WinTerm\terminal.ico',
+        'res\terminal\images-WinTerm\terminal_contrast-black.ico',
+        'res\terminal\images-WinTerm\terminal_contrast-white.ico'
     )
     foreach ($relativePath in $requiredFiles)
     {
@@ -232,6 +235,11 @@ try
     $wingetGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1') -Raw
     $releaseGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-release-artifacts.ps1') -Raw
     $updateGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-stable-update-manifest.ps1') -Raw
+    $iconGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'assets\winterm\icons\generate_icons.py') -Raw
+    $terminalResources = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\WindowsTerminal\WindowsTerminal.rc') -Raw
+    $windowIconRuntime = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\WindowsTerminal\icon.cpp') -Raw
+    $islandWindow = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\WindowsTerminal\IslandWindow.cpp') -Raw
+    $titlebarControl = Get-Content -LiteralPath (Join-Path $repositoryRoot 'src\cascadia\TerminalApp\TitlebarControl.cpp') -Raw
 
     Test-Requirement -Condition ($packageProject.Contains('Package-winTerm.appxmanifest') -and $packageProject.Contains('<OCExecutionAliasName Condition="''$(WindowsTerminalBranding)''==''WinTerm''">winterm</OCExecutionAliasName>')) -Message 'Package project selects the winTerm manifest and launcher alias'
     Test-Requirement -Condition ($brandingTargets.Contains('WT_BRANDING_WINTERM')) -Message 'Dedicated winTerm compile-time branding token exists'
@@ -248,6 +256,11 @@ try
     Test-Requirement -Condition ($wingetGenerator.Contains('Publisher: helloThisWorld') -and $wingetGenerator.Contains('PackageIdentifier: HelloThisWorld.winTerm') -and $wingetGenerator.Contains('InstallerType: inno')) -Message 'WinGet generation uses protected publisher, product ID, and Inno type'
     Test-Requirement -Condition ($releaseGenerator.Contains("publisher = 'helloThisWorld'") -and $releaseGenerator.Contains("productId = 'HelloThisWorld.winTerm'")) -Message 'Release SBOM and metadata generation use protected winTerm identity'
     Test-Requirement -Condition ($updateGenerator.Contains("publisher = 'helloThisWorld'") -and $updateGenerator.Contains("productId = 'HelloThisWorld.winTerm'")) -Message 'Update metadata generation uses protected winTerm identity'
+    Test-Requirement -Condition ($iconGenerator.Contains('SOURCE_SVG = SOURCE_DIRECTORY / "winterm.svg"') -and $iconGenerator.Contains('ElementTree.parse(SOURCE_SVG)')) -Message 'Generated application artwork is parsed from the canonical winterm.svg source'
+    Test-Requirement -Condition ($terminalResources -match '(?s)#if defined\(WT_BRANDING_WINTERM\).*images-WinTerm\\\\terminal\.ico.*images-WinTerm\\\\terminal_contrast-black\.ico.*images-WinTerm\\\\terminal_contrast-white\.ico.*#elif defined\(WT_BRANDING_RELEASE\)') -Message 'WinTerm executable resources select normal and High Contrast canonical icons only in the WinTerm branding branch'
+    Test-Requirement -Condition ($windowIconRuntime.Contains('WM_SETICON') -and $islandWindow.Contains('UpdateWindowIconForActiveMetrics(_window.get())')) -Message 'Runtime applies WinTerm small and large window icons after HWND creation'
+    Test-Requirement -Condition ($titlebarControl.Contains('ms-appx:///Images/Square44x44Logo.png') -and $titlebarControl.Contains('#if defined(WT_BRANDING_WINTERM)')) -Message 'Custom titlebar displays the packaged WinTerm icon only for WinTerm branding'
+    Test-Requirement -Condition ($installerDefinition.Contains('SetupIconFile=..\..\assets\winterm\icons\winterm.ico') -and $installerDefinition.Contains('Filename: "{app}\winTerm.exe"')) -Message 'Installer and installed shortcuts use canonical WinTerm icon sources'
 
     if (-not [string]::IsNullOrWhiteSpace($PackageOutput))
     {

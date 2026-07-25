@@ -58,7 +58,6 @@
                   Visibility="{x:Bind TabStatus.IsInputBroadcastActive, Mode=OneWay}" />
         <TextBlock x:Name="HeaderTextBlock"
                    MaxWidth="180"
-                   Foreground="{ThemeResource WinTermTextBrush}"
                    TextTrimming="CharacterEllipsis"
                    Text="{x:Bind Title, Mode=OneWay}"
                    Visibility="Visible" />

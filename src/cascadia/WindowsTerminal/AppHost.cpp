@@ -298,7 +298,12 @@ void AppHost::Initialize()
             _window->ShowWindowChanged(show);
         });
 
-    _window->UpdateTitle(_windowLogic.Title());
+    const auto title = _windowLogic.Title();
+    _window->UpdateTitle(title);
+    if (_useNonClientArea)
+    {
+        static_cast<NonClientIslandWindow*>(_window.get())->SetTitlebarTitle(title);
+    }
 
     // Set up the content of the application. If the app has a custom titlebar,
     // set that content as well.
@@ -398,7 +403,12 @@ void AppHost::_revokeWindowCallbacks()
 //   a window message so we can update the window's title on the main thread.
 void AppHost::_AppTitleChanged(const winrt::Windows::Foundation::IInspectable& /*sender*/, const winrt::Windows::Foundation::IInspectable& /*args*/)
 {
-    _window->UpdateTitle(_windowLogic.Title());
+    const auto title = _windowLogic.Title();
+    _window->UpdateTitle(title);
+    if (_useNonClientArea)
+    {
+        static_cast<NonClientIslandWindow*>(_window.get())->SetTitlebarTitle(title);
+    }
 }
 
 // The terminal page is responsible for persisting its own state, but it does

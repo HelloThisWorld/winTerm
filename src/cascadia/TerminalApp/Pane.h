@@ -58,6 +58,14 @@ struct PaneResources
     winrt::Windows::UI::Xaml::Media::SolidColorBrush focusedBorderBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush unfocusedBorderBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush broadcastBorderBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush paneHeaderBackgroundBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush paneHeaderBorderBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush primaryTextBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush secondaryTextBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush mutedTextBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush accentBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush dividerBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush dividerHoverBrush{ nullptr };
 };
 
 class Pane : public std::enable_shared_from_this<Pane>
@@ -247,6 +255,7 @@ private:
     winrt::Windows::UI::Xaml::Controls::Border _borderSecond{};
     winrt::Windows::UI::Xaml::Controls::Grid _leafLayout{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Grid _paneHeader{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _paneHeaderBorder{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Border _contentHost{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Button _paneIcon{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Button _paneOverflow{ nullptr };

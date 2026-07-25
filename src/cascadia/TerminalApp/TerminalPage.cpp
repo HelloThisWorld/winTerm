@@ -25,6 +25,7 @@
 #include "SnippetsPaneContent.h"
 #include "TabRowControl.h"
 #include "TerminalSettingsCache.h"
+#include "../../winterm/Design/DesignTokens.h"
 
 #include "LaunchPositionRequest.g.cpp"
 #include "RenameWindowRequestedArgs.g.cpp"
@@ -5160,6 +5161,23 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_updatePaneResources(const winrt::Windows::UI::Xaml::ElementTheme& requestedTheme)
     {
         const auto res = Application::Current().Resources();
+        const auto loadWinTermBrush = [&](const wchar_t* key,
+                                          SolidColorBrush& destination,
+                                          const uint32_t fallbackArgb) {
+            const auto resourceKey = winrt::box_value(key);
+            if (res.HasKey(resourceKey))
+            {
+                destination = ThemeLookup(res, requestedTheme, resourceKey).try_as<SolidColorBrush>();
+            }
+            if (!destination)
+            {
+                destination = SolidColorBrush{ ColorHelper::FromArgb(
+                    static_cast<uint8_t>((fallbackArgb >> 24) & 0xff),
+                    static_cast<uint8_t>((fallbackArgb >> 16) & 0xff),
+                    static_cast<uint8_t>((fallbackArgb >> 8) & 0xff),
+                    static_cast<uint8_t>(fallbackArgb & 0xff)) };
+            }
+        };
         const auto accentColorKey = winrt::box_value(L"SystemAccentColor");
         if (res.HasKey(accentColorKey))
         {
@@ -5209,6 +5227,39 @@ namespace winrt::TerminalApp::implementation
             // will eat focus.
             _paneResources.broadcastBorderBrush = SolidColorBrush{ Colors::Black() };
         }
+
+        loadWinTermBrush(
+            L"WinTermPaneHeaderBrush",
+            _paneResources.paneHeaderBackgroundBrush,
+            winTerm::Design::ColorTokens::PaneHeaderSurface);
+        loadWinTermBrush(
+            L"WinTermPaneHeaderBorderBrush",
+            _paneResources.paneHeaderBorderBrush,
+            winTerm::Design::ColorTokens::PaneHeaderBorder);
+        loadWinTermBrush(
+            L"WinTermTextBrush",
+            _paneResources.primaryTextBrush,
+            winTerm::Design::ColorTokens::TextPrimary);
+        loadWinTermBrush(
+            L"WinTermSecondaryTextBrush",
+            _paneResources.secondaryTextBrush,
+            winTerm::Design::ColorTokens::TextSecondary);
+        loadWinTermBrush(
+            L"WinTermMutedTextBrush",
+            _paneResources.mutedTextBrush,
+            winTerm::Design::ColorTokens::TextMuted);
+        loadWinTermBrush(
+            L"WinTermAccentBrush",
+            _paneResources.accentBrush,
+            winTerm::Design::ColorTokens::AccentMint);
+        loadWinTermBrush(
+            L"WinTermDividerBrush",
+            _paneResources.dividerBrush,
+            winTerm::Design::ColorTokens::BorderIdle);
+        loadWinTermBrush(
+            L"WinTermDividerHoverBrush",
+            _paneResources.dividerHoverBrush,
+            winTerm::Design::ColorTokens::BorderHover);
     }
 
     void TerminalPage::_adjustProcessPriority() const

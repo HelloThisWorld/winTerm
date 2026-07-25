@@ -8,6 +8,7 @@
 #include "Tab.g.cpp"
 #include "Utils.h"
 #include "AppLogic.h"
+#include "../../winterm/Design/DesignTokens.h"
 #include "../../types/inc/ColorFix.hpp"
 
 using namespace winrt;
@@ -133,6 +134,12 @@ namespace winrt::TerminalApp::implementation
     void Tab::_MakeTabViewItem()
     {
         TabViewItem(::winrt::MUX::Controls::TabViewItem{});
+        TabViewItem().Height(winTerm::Design::DensityTokens::CompactTabHeight);
+        TabViewItem().MinHeight(winTerm::Design::DensityTokens::CompactTabHeight);
+        TabViewItem().Resources().Insert(
+            winrt::box_value(L"OverlayCornerRadius"),
+            winrt::box_value(CornerRadiusHelper::FromUniformRadius(
+                winTerm::Design::RadiusTokens::ActiveTabTop)));
 
         // GH#3609 If the tab was tapped, and no one else was around to handle
         // it, then ask our parent to toss focus into the active control.

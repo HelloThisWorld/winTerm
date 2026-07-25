@@ -156,7 +156,8 @@
                 tabs will be flush with the top of the window. See GH#2541 for
                 details.
             -->
-            <x:Double x:Key="CaptionButtonHeightWindowed">40.0</x:Double>
+            <StaticResource x:Key="CaptionButtonHeightWindowed"
+                            ResourceKey="WinTermTitlebarHeight" />
             <!--  32 + (1 to compensate for GH#10746) + (-1 for GH#15164)  -->
             <x:Double x:Key="CaptionButtonHeightMaximized">32.0</x:Double>
 
@@ -271,9 +272,9 @@
 
     <Button x:Name="MinimizeButton"
             x:Uid="MinimizeButton"
-            Width="46.0"
+            Width="{ThemeResource WinTermCaptionButtonWidth}"
             Height="{StaticResource CaptionButtonHeightWindowed}"
-            MinWidth="46.0"
+            MinWidth="{ThemeResource WinTermCaptionButtonWidth}"
             AutomationProperties.AccessibilityView="Raw"
             Click="_MinimizeClick"
             Style="{StaticResource CaptionButton}">
@@ -303,9 +304,9 @@
     </Button>
     <Button x:Name="MaximizeButton"
             x:Uid="MaximizeButton"
-            Width="46.0"
+            Width="{ThemeResource WinTermCaptionButtonWidth}"
             Height="{StaticResource CaptionButtonHeightWindowed}"
-            MinWidth="46.0"
+            MinWidth="{ThemeResource WinTermCaptionButtonWidth}"
             AutomationProperties.AccessibilityView="Raw"
             Click="_MaximizeClick"
             Style="{StaticResource CaptionButton}">
@@ -337,9 +338,9 @@
     </Button>
     <Button x:Name="CloseButton"
             x:Uid="CloseButton"
-            Width="46.0"
+            Width="{ThemeResource WinTermCaptionButtonWidth}"
             Height="{StaticResource CaptionButtonHeightWindowed}"
-            MinWidth="46.0"
+            MinWidth="{ThemeResource WinTermCaptionButtonWidth}"
             AutomationProperties.AccessibilityView="Raw"
             Click="_CloseClick"
             Style="{StaticResource CaptionButton}">
