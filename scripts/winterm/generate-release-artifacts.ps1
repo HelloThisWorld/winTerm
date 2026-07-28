@@ -96,14 +96,34 @@ function Ensure-ReleaseNotesSigningDisclosure
     )
 
     $notes = Get-Content -LiteralPath $Path -Raw
-    if ($Status -eq 'unsigned' -and $notes -notmatch '(?i)unsigned|not code-signed')
+    $additions = @()
+
+    # "unsigned", "not code-signed", and "not Authenticode-signed" all count as
+    # an existing disclosure; a narrower match here previously duplicated the
+    # Signing section on the published Release.
+    if ($Status -eq 'unsigned' -and $notes -notmatch '(?i)\bunsigned\b|not\s+(?:code|authenticode)[-\s]signed')
     {
-        $disclosure = @(
+        $additions += @(
             '## Signing'
             ''
-            'The Setup EXE is not code-signed. Windows may display a SmartScreen warning; verify the downloaded file against `SHA256SUMS.txt` before running it.'
-        ) -join [Environment]::NewLine
-        $updatedNotes = $notes.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine + $disclosure + [Environment]::NewLine
+            'The Setup EXE is not Authenticode-signed. Windows may display Unknown Publisher or a SmartScreen warning; verify the downloaded file against `SHA256SUMS.txt` before running it.'
+        )
+    }
+
+    if ($notes -notmatch '(?i)code signing policy')
+    {
+        if ($additions.Count -gt 0) { $additions += '' }
+        $additions += @(
+            '## Policies'
+            ''
+            '- [Code signing policy](https://github.com/HelloThisWorld/winTerm/blob/main/CODE_SIGNING_POLICY.md)'
+            '- [Privacy policy](https://github.com/HelloThisWorld/winTerm/blob/main/PRIVACY.md)'
+        )
+    }
+
+    if ($additions.Count -gt 0)
+    {
+        $updatedNotes = $notes.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine + ($additions -join [Environment]::NewLine) + [Environment]::NewLine
         [IO.File]::WriteAllText($Path, $updatedNotes, [Text.UTF8Encoding]::new($false))
     }
 

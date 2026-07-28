@@ -4,7 +4,7 @@ winTerm does not collect general usage analytics. It does not collect or upload 
 
 ## Network and optional features
 
-- **Update checks are off.** winTerm 1.0 contains no enabled update request path because explicit user consent is not yet implemented. A future opt-in request may contain only application version, architecture, release channel, and public release metadata.
+- **Update checks are off.** Current winTerm releases contain no enabled update request path because explicit user consent is not yet implemented. A future opt-in request may contain only application version, architecture, release channel, and public release metadata.
 - **Crash-report upload is off by default** and remains opt-in. Local crash metadata is not uploaded unless the user explicitly chooses a reviewed, redacted report.
 - **Diagnostic bundles are created only when the user requests one.** They exclude terminal output, commands, clipboard data, environment variables, SSH configuration, full settings, raw Workspace files, full paths, tokens, email addresses, and connection strings by default.
 
@@ -16,7 +16,7 @@ winTerm may store settings, named Workspaces, recovery snapshots, imported Theme
 
 ## User control
 
-Diagnostic bundles are generated and shared by the user. Review a bundle before attaching it to a report. Crash upload, if introduced after 1.0, must remain disabled until the user opts in and must be independently reversible.
+Diagnostic bundles are generated and shared by the user. Review a bundle before attaching it to a report. Crash upload, if introduced in a future release, must remain disabled until the user opts in and must be independently reversible.
 
 ## Removing local data
 

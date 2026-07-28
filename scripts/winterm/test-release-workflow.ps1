@@ -72,8 +72,10 @@ try
     }
     foreach ($required in @(
         'Ensure-ReleaseNotesSigningDisclosure',
-        'The Setup EXE is not code-signed.',
-        'SHA256SUMS.txt'
+        'The Setup EXE is not Authenticode-signed.',
+        'SHA256SUMS.txt',
+        'Code signing policy',
+        'Privacy policy'
     ))
     {
         if (-not $releaseGenerator.Contains($required))

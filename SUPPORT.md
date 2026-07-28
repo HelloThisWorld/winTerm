@@ -2,13 +2,13 @@
 
 ## Supported releases
 
-The latest public Stable winTerm release is supported. A prerelease is supported for testing and feedback only. winTerm 1.0.2 is the current Stable release.
+The latest public Stable winTerm release is supported. A prerelease is supported for testing and feedback only. The current Stable release is always the version published at the [latest official Release](https://github.com/HelloThisWorld/winTerm/releases/latest).
 
 ## Platforms and architectures
 
 - Windows 11 x64 is the intended fully supported platform after clean installation, upgrade, uninstall, and runtime validation pass.
 - Windows 11 ARM64 is unsupported unless an ARM64 asset is actually published with native build, install, and launch evidence.
-- Windows 10 is unsupported for the winTerm 1.0 Stable commitment.
+- Windows 10 is unsupported for the winTerm Stable commitment.
 
 ## Shells and feature levels
 

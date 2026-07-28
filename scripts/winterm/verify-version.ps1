@@ -101,6 +101,13 @@ try
     Assert-Condition ($hostResource.Contains("`"FileVersion`", `"$($version.packageVersion)\0`"")) 'Terminal host display file version matches release metadata'
     Assert-Condition ($hostResource.Contains("`"ProductVersion`", `"$($version.applicationVersion)\0`"")) 'Terminal host display product version matches release metadata'
 
+    $shimResource = Get-Text 'src\winterm-tools\winterm-shim\winterm-shim.rc'
+    Assert-Condition ($shimResource.Contains("FILEVERSION $packageVersionTuple")) 'Shim launcher file version matches release metadata'
+    Assert-Condition ($shimResource.Contains("PRODUCTVERSION $packageVersionTuple")) 'Shim launcher numeric product version matches release metadata'
+    Assert-Condition ($shimResource.Contains("`"FileVersion`", `"$($version.packageVersion)\0`"")) 'Shim launcher display file version matches release metadata'
+    Assert-Condition ($shimResource.Contains("`"ProductVersion`", `"$($version.applicationVersion)\0`"")) 'Shim launcher display product version matches release metadata'
+    Assert-Condition ($shimResource.Contains('"ProductName", "winTerm\0"')) 'Shim launcher product name is winTerm'
+
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('WorkspaceSchemaVersion{ 2 }')) 'Workspace model remains at Schema version 2'
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('DockingModelVersion{ 1 }')) 'Workspace model remains at Docking version 1'
     Assert-Condition ((Get-Text 'src\winterm\Shell\Protocol\ShellIntegrationProtocol.h').Contains('ShellProtocolVersion{ 1 }')) 'Shell protocol remains at version 1'
