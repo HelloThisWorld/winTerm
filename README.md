@@ -103,6 +103,8 @@ off and opt-in. See [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), and
 
 Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
+The canonical policy is [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+
 ### Roles
 
 - Authors, committers, and reviewers:
@@ -111,9 +113,13 @@ Free code signing provided by SignPath.io, certificate by SignPath Foundation.
   [HelloThisWorld](https://github.com/HelloThisWorld)
 
 Official release artifacts are built from this public repository using
-GitHub Actions.
+GitHub Actions on GitHub-hosted runners, from an immutable release tag.
 
 Every release signing request requires manual approval.
+
+**Current status:** the latest public release is not Authenticode-signed; no
+SignPath certificate has been issued yet. See
+[CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) for the authoritative status.
 
 See [PRIVACY.md](PRIVACY.md) for the winTerm privacy policy.
 

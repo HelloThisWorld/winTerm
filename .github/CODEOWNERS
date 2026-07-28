@@ -1,0 +1,30 @@
+# Require maintainer review for build, release, signing, and policy surfaces.
+# CODEOWNERS is enforced only when branch protection requires code owner
+# reviews; see docs/signing/signpath-readiness.md for the server-side status.
+
+* @HelloThisWorld
+
+# CI and automation
+/.github/ @HelloThisWorld
+
+# Build, packaging, installer, and release engineering
+/scripts/winterm/ @HelloThisWorld
+/build/ @HelloThisWorld
+/packaging/ @HelloThisWorld
+/custom.props @HelloThisWorld
+/Directory.Build.props @HelloThisWorld
+/Directory.Build.targets @HelloThisWorld
+
+# Version, branding, and release metadata
+/src/winterm/Branding/ @HelloThisWorld
+/src/winterm-tools/ @HelloThisWorld
+
+# Policies
+/CODE_SIGNING_POLICY.md @HelloThisWorld
+/PRIVACY.md @HelloThisWorld
+/SECURITY.md @HelloThisWorld
+/SUPPORT.md @HelloThisWorld
+/LICENSE @HelloThisWorld
+/NOTICE.md @HelloThisWorld
+/THIRD_PARTY_NOTICES.md @HelloThisWorld
+/docs/signing/ @HelloThisWorld

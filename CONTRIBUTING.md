@@ -32,3 +32,15 @@ Do not claim a build, package, architecture, signature, installer, or runtime te
 ## Pull requests
 
 Describe scope, tests, security and privacy impact, accessibility impact, package impact, schema impact, and known limitations. Release pull requests must link the current release checklist and record signing, architecture, install, upgrade, uninstall, and coexistence status.
+
+## External contributions and protected review areas
+
+Every change from an external contributor is accepted only through a pull request reviewed and approved by a maintainer listed in `CODE_SIGNING_POLICY.md`. Maintainer review must explicitly cover, in addition to the code itself:
+
+- CI configuration and every file under `.github/workflows/`;
+- build, packaging, installer, and release scripts under `scripts/winterm/` and `build/`;
+- anything that downloads a dependency, tool, or other build input, including pinned URLs, versions, and hashes;
+- signing configuration, release metadata, and version/branding sources such as `src/winterm/Branding/`;
+- the policy documents `CODE_SIGNING_POLICY.md`, `PRIVACY.md`, and `SECURITY.md`.
+
+Changes in these areas must never be merged on the strength of passing checks alone.
