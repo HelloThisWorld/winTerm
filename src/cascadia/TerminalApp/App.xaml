@@ -238,6 +238,16 @@
                                              Color="#8E9EAD" />
                             <SolidColorBrush x:Key="WinTermAccentBrush"
                                              Color="#63E6BE" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressTrackBrush"
+                                             Color="#99111820" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressRunningBrush"
+                                             Color="#63E6BE" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressWaitingBrush"
+                                             Color="#F4C95D" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressSuccessBrush"
+                                             Color="#4DDC88" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressErrorBrush"
+                                             Color="#FF6B6B" />
 
                             <SolidColorBrush x:Key="BroadcastPaneBorderColor"
                                              Color="{StaticResource SystemAccentColorDark2}" />
@@ -288,6 +298,16 @@
                                              Color="#5F6F7C" />
                             <SolidColorBrush x:Key="WinTermAccentBrush"
                                              Color="#087A63" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressTrackBrush"
+                                             Color="#665F6F7C" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressRunningBrush"
+                                             Color="#087A63" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressWaitingBrush"
+                                             Color="#8A5D00" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressSuccessBrush"
+                                             Color="#087A42" />
+                            <SolidColorBrush x:Key="WinTermVisualProgressErrorBrush"
+                                             Color="#B42318" />
 
                             <SolidColorBrush x:Key="BroadcastPaneBorderColor"
                                               Color="{StaticResource SystemAccentColorLight2}" />
@@ -339,6 +359,16 @@
                                             ResourceKey="SystemColorGrayTextColorBrush" />
                             <StaticResource x:Key="WinTermAccentBrush"
                                             ResourceKey="SystemColorHighlightColorBrush" />
+                            <StaticResource x:Key="WinTermVisualProgressTrackBrush"
+                                            ResourceKey="SystemColorGrayTextColorBrush" />
+                            <StaticResource x:Key="WinTermVisualProgressRunningBrush"
+                                            ResourceKey="SystemColorHighlightColorBrush" />
+                            <StaticResource x:Key="WinTermVisualProgressWaitingBrush"
+                                            ResourceKey="SystemColorWindowTextColorBrush" />
+                            <StaticResource x:Key="WinTermVisualProgressSuccessBrush"
+                                            ResourceKey="SystemColorHighlightColorBrush" />
+                            <StaticResource x:Key="WinTermVisualProgressErrorBrush"
+                                            ResourceKey="SystemColorWindowTextColorBrush" />
 
                             <StaticResource x:Key="SettingsUiTabBrush"
                                             ResourceKey="SystemControlBackgroundBaseLowBrush" />

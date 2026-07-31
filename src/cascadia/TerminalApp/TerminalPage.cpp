@@ -5260,6 +5260,26 @@ namespace winrt::TerminalApp::implementation
             L"WinTermDividerHoverBrush",
             _paneResources.dividerHoverBrush,
             winTerm::Design::ColorTokens::BorderHover);
+        loadWinTermBrush(
+            L"WinTermVisualProgressTrackBrush",
+            _paneResources.progressTrackBrush,
+            winTerm::Design::ColorTokens::ProgressTrack);
+        loadWinTermBrush(
+            L"WinTermVisualProgressRunningBrush",
+            _paneResources.progressRunningBrush,
+            winTerm::Design::ColorTokens::AccentMint);
+        loadWinTermBrush(
+            L"WinTermVisualProgressWaitingBrush",
+            _paneResources.progressWaitingBrush,
+            winTerm::Design::ColorTokens::ProgressWaiting);
+        loadWinTermBrush(
+            L"WinTermVisualProgressSuccessBrush",
+            _paneResources.progressSuccessBrush,
+            winTerm::Design::ColorTokens::ProgressSuccess);
+        loadWinTermBrush(
+            L"WinTermVisualProgressErrorBrush",
+            _paneResources.progressErrorBrush,
+            winTerm::Design::ColorTokens::ProgressError);
     }
 
     void TerminalPage::_adjustProcessPriority() const
