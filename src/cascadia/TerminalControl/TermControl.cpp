@@ -322,6 +322,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _revokers.TitleChanged = _core.TitleChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleTitleChanged });
         _revokers.TabColorChanged = _core.TabColorChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleTabColorChanged });
         _revokers.TaskbarProgressChanged = _core.TaskbarProgressChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleSetTaskbarProgress });
+        _revokers.ShellIntegrationChanged = _core.ShellIntegrationChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleShellIntegrationChanged });
         _revokers.ConnectionStateChanged = _core.ConnectionStateChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleConnectionStateChanged });
         _revokers.ShowWindowChanged = _core.ShowWindowChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleShowWindowChanged });
         _revokers.CloseTerminalRequested = _core.CloseTerminalRequested(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleCloseTerminalRequested });
@@ -3365,6 +3366,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     const uint64_t TermControl::TaskbarProgress() const noexcept
     {
         return _core.TaskbarProgress();
+    }
+
+    const uint64_t TermControl::ShellIntegrationState() const noexcept
+    {
+        return _core.ShellIntegrationState();
+    }
+
+    const int64_t TermControl::ShellIntegrationExitCode() const noexcept
+    {
+        return _core.ShellIntegrationExitCode();
     }
 
     void TermControl::BellLightOn()

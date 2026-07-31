@@ -88,6 +88,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 #pragma region ICoreState
         const uint64_t TaskbarState() const noexcept;
         const uint64_t TaskbarProgress() const noexcept;
+        const uint64_t ShellIntegrationState() const noexcept;
+        const int64_t ShellIntegrationExitCode() const noexcept;
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;
@@ -225,6 +227,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         BUBBLED_FORWARDED_TYPED_EVENT(TitleChanged,             IInspectable, Control::TitleChangedEventArgs);
         BUBBLED_FORWARDED_TYPED_EVENT(TabColorChanged,          IInspectable, IInspectable);
         BUBBLED_FORWARDED_TYPED_EVENT(SetTaskbarProgress,       IInspectable, IInspectable);
+        BUBBLED_FORWARDED_TYPED_EVENT(ShellIntegrationChanged, IInspectable, IInspectable);
         BUBBLED_FORWARDED_TYPED_EVENT(ConnectionStateChanged,   IInspectable, IInspectable);
         BUBBLED_FORWARDED_TYPED_EVENT(ShowWindowChanged,        IInspectable, Control::ShowWindowArgs);
         BUBBLED_FORWARDED_TYPED_EVENT(CloseTerminalRequested,   IInspectable, IInspectable);
@@ -464,6 +467,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Control::ControlCore::WriteToClipboard_revoker WriteToClipboard;
             Control::ControlCore::TabColorChanged_revoker TabColorChanged;
             Control::ControlCore::TaskbarProgressChanged_revoker TaskbarProgressChanged;
+            Control::ControlCore::ShellIntegrationChanged_revoker ShellIntegrationChanged;
             Control::ControlCore::ConnectionStateChanged_revoker ConnectionStateChanged;
             Control::ControlCore::ShowWindowChanged_revoker ShowWindowChanged;
             Control::ControlCore::CloseTerminalRequested_revoker CloseTerminalRequested;

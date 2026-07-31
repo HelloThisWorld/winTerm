@@ -446,7 +446,8 @@ void ConhostInternalGetSet::NotifyBufferRotation(const int)
 {
 }
 
-void ConhostInternalGetSet::NotifyShellIntegrationMark()
+void ConhostInternalGetSet::NotifyShellIntegrationMark(const ::Microsoft::Console::VirtualTerminal::ShellIntegrationMarkKind /*kind*/,
+                                                       const std::optional<uint32_t> /*exitCode*/)
 {
     // Not implemented for conhost - shell integration marks are a Terminal app feature.
 }

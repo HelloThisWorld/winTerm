@@ -33,6 +33,8 @@ namespace Microsoft.Terminal.Control
         String Title { get; };
         UInt64 TaskbarState { get; };
         UInt64 TaskbarProgress { get; };
+        UInt64 ShellIntegrationState { get; };
+        Int64 ShellIntegrationExitCode { get; };
 
         String WorkingDirectory { get; };
 

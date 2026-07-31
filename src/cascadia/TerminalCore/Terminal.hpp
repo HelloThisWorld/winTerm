@@ -159,7 +159,7 @@ public:
 
     bool IsVtInputEnabled() const noexcept override;
     void NotifyBufferRotation(const int delta) override;
-    void NotifyShellIntegrationMark() override;
+    void NotifyShellIntegrationMark(::Microsoft::Console::VirtualTerminal::ShellIntegrationMarkKind kind, std::optional<uint32_t> exitCode) override;
 
     void InvokeCompletions(std::wstring_view menuJson, unsigned int replaceLength) override;
 
@@ -229,6 +229,7 @@ public:
     void SetCopyToClipboardCallback(std::function<void(wil::zwstring_view)> pfn) noexcept;
     void SetScrollPositionChangedCallback(std::function<void(const int, const int, const int)> pfn) noexcept;
     void TaskbarProgressChangedCallback(std::function<void()> pfn) noexcept;
+    void ShellIntegrationChangedCallback(std::function<void()> pfn) noexcept;
     void SetShowWindowCallback(std::function<void(bool)> pfn) noexcept;
     void SetPlayMidiNoteCallback(std::function<void(const int, const int, const std::chrono::microseconds)> pfn) noexcept;
     void CompletionsChangedCallback(std::function<void(std::wstring_view, unsigned int)> pfn) noexcept;
@@ -245,6 +246,8 @@ public:
 
     const size_t GetTaskbarState() const noexcept;
     const size_t GetTaskbarProgress() const noexcept;
+    const size_t GetShellIntegrationState() const noexcept;
+    const int64_t GetShellIntegrationExitCode() const noexcept;
 
     void ColorSelection(const TextAttribute& attr, winrt::Microsoft::Terminal::Core::MatchMode matchMode);
     void PreviewText(std::wstring_view input);
@@ -337,6 +340,7 @@ private:
 
     std::function<void(const int, const int, const int)> _pfnScrollPositionChanged;
     std::function<void()> _pfnTaskbarProgressChanged;
+    std::function<void()> _pfnShellIntegrationChanged;
     std::function<void(bool)> _pfnShowWindowChanged;
     std::function<void(const int, const int, const std::chrono::microseconds)> _pfnPlayMidiNote;
     std::function<void(std::wstring_view, unsigned int)> _pfnCompletionsChanged;
@@ -373,6 +377,8 @@ private:
 
     size_t _taskbarState = 0;
     size_t _taskbarProgress = 0;
+    size_t _shellIntegrationState = 0;
+    int64_t _shellIntegrationExitCode = -1;
 
     size_t _hyperlinkPatternId = 0;
 

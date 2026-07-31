@@ -163,6 +163,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 #pragma region ICoreState
         const size_t TaskbarState() const noexcept;
         const size_t TaskbarProgress() const noexcept;
+        const size_t ShellIntegrationState() const noexcept;
+        const int64_t ShellIntegrationExitCode() const noexcept;
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;
@@ -281,6 +283,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::typed_event<> BackgroundColorChanged;
         til::typed_event<IInspectable, Control::ScrollPositionChangedArgs> ScrollPositionChanged;
         til::typed_event<> TaskbarProgressChanged;
+        til::typed_event<> ShellIntegrationChanged;
         til::typed_event<> ConnectionStateChanged;
         til::typed_event<> HoveredHyperlinkChanged;
         til::typed_event<IInspectable, IInspectable> RendererEnteredErrorState;
@@ -330,6 +333,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                             const int viewHeight,
                                             const int bufferSize);
         void _terminalTaskbarProgressChanged();
+        void _terminalShellIntegrationChanged();
         void _terminalShowWindowChanged(bool showOrHide);
         void _terminalPlayMidiNote(const int noteNumber,
                                    const int velocity,
