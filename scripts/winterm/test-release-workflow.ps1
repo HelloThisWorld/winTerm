@@ -13,7 +13,7 @@ try
 {
     $workflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\release.yml') -Raw
     $wingetWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winget.yml') -Raw
-    $fullBuildWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winterm-full-build.yml') -Raw
+    $validationWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winterm-validation.yml') -Raw
     $wingetGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1') -Raw
     $releaseGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-release-artifacts.ps1') -Raw
 
@@ -84,7 +84,7 @@ try
         }
     }
 
-    foreach ($workflowToInspect in @($workflow, $wingetWorkflow, $fullBuildWorkflow))
+    foreach ($workflowToInspect in @($workflow, $wingetWorkflow, $validationWorkflow))
     {
         foreach ($line in $workflowToInspect -split "`r?`n")
         {
@@ -160,10 +160,41 @@ try
         'winTerm-${{ env.WINTERM_VERSION }}-portable-x64.zip'
     ))
     {
-        if (-not $fullBuildWorkflow.Contains($required))
+        if (-not $validationWorkflow.Contains($required))
         {
-            throw "Full-build CI is missing required unpackaged distribution gate '$required'."
+            throw "Classified PR CI is missing required unpackaged distribution gate '$required'."
         }
+    }
+
+    foreach ($required in @(
+        'classify-changes:',
+        'change_class:',
+        'run_fast_build:',
+        'run_full_build:',
+        'run_package:',
+        'ci-gate:',
+        'if: always()',
+        'cancel-in-progress: true',
+        'validation:',
+        '- auto',
+        '- fast',
+        '- full'
+    ))
+    {
+        if (-not $validationWorkflow.Contains($required))
+        {
+            throw "Classified PR CI is missing required boundary '$required'."
+        }
+    }
+    if ($validationWorkflow -match '(?m)^\s*push\s*:' -or
+        $validationWorkflow -match '(?m)^\s*pull_request_target\s*:' -or
+        $validationWorkflow -match '(?m)^\s*paths-ignore\s*:')
+    {
+        throw 'PR validation contains a duplicate push trigger, pull_request_target, or trigger-level path exclusion.'
+    }
+    if (Test-Path -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winterm-full-build.yml'))
+    {
+        throw 'The retired duplicate full-build PR workflow still exists.'
     }
 
     Write-Host 'PASS: unpackaged release and WinGet workflow security and publication boundaries.' -ForegroundColor Green
