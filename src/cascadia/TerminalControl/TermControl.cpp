@@ -323,6 +323,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _revokers.TabColorChanged = _core.TabColorChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleTabColorChanged });
         _revokers.TaskbarProgressChanged = _core.TaskbarProgressChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleSetTaskbarProgress });
         _revokers.ShellIntegrationChanged = _core.ShellIntegrationChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleShellIntegrationChanged });
+        _revokers.VisualProgressProviderChanged = _core.VisualProgressProviderChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleVisualProgressProviderChanged });
         _revokers.ConnectionStateChanged = _core.ConnectionStateChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleConnectionStateChanged });
         _revokers.ShowWindowChanged = _core.ShowWindowChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleShowWindowChanged });
         _revokers.CloseTerminalRequested = _core.CloseTerminalRequested(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleCloseTerminalRequested });
@@ -2673,6 +2674,17 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void TermControl::Detach()
     {
+        try
+        {
+            // Revoke replacement before disconnecting the event path to the
+            // pane renderer. The destination pane reenables recognition only
+            // after its renderer is ready.
+            _core.ConfigureVisualProgressRecognition(false, false);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
         _revokers = {};
 
         Control::ControlInteractivity old{ nullptr };
@@ -2948,6 +2960,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     void TermControl::WindowVisibilityChanged(const bool showOrHide)
     {
         _core.WindowVisibilityChanged(showOrHide);
+    }
+
+    void TermControl::ConfigureVisualProgressRecognition(const bool enabled, const bool replaceRecognizedOutput)
+    {
+        _core.ConfigureVisualProgressRecognition(enabled, replaceRecognizedOutput);
     }
 
     // Method Description:
@@ -3376,6 +3393,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     const int64_t TermControl::ShellIntegrationExitCode() const noexcept
     {
         return _core.ShellIntegrationExitCode();
+    }
+
+    const uint64_t TermControl::VisualProgressProviderState() const noexcept
+    {
+        return _core.VisualProgressProviderState();
     }
 
     void TermControl::BellLightOn()

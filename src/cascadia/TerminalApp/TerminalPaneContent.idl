@@ -12,7 +12,9 @@ namespace TerminalApp
 
         UInt64 ShellIntegrationState { get; };
         Int64 ShellIntegrationExitCode { get; };
+        UInt64 VisualProgressProviderState { get; };
         event Windows.Foundation.TypedEventHandler<TerminalPaneContent, Object> ShellIntegrationChanged;
+        event Windows.Foundation.TypedEventHandler<TerminalPaneContent, Object> VisualProgressProviderChanged;
 
         void MarkAsDefterm();
 

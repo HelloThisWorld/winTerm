@@ -76,6 +76,11 @@ struct PaneResources
     winrt::Windows::UI::Xaml::Media::SolidColorBrush progressErrorBrush{ nullptr };
 };
 
+namespace winTerm::VisualProgress
+{
+    class RainbowArcRenderer;
+}
+
 class Pane : public std::enable_shared_from_this<Pane>
 {
 public:
@@ -277,12 +282,7 @@ private:
     winrt::Windows::UI::Xaml::Controls::Border _snapIndicator{ nullptr };
     winrt::Windows::UI::Xaml::Controls::TextBlock _snapIndicatorText{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Grid _visualProgressOverlay{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::Grid _visualProgressFillLayout{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::Border _visualProgressTrack{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::Border _visualProgressFill{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _visualProgressLeadingColumn{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _visualProgressFillColumn{ nullptr };
-    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _visualProgressTrailingColumn{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Grid _visualProgressCompositionHost{ nullptr };
 
     PaneResources _themeResources;
 
@@ -307,6 +307,7 @@ private:
     winrt::TerminalApp::IPaneContent::TitleChanged_revoker _paneTitleChangedRevoker;
     winrt::TerminalApp::IPaneContent::TaskbarProgressChanged_revoker _paneTaskbarProgressChangedRevoker;
     winrt::TerminalApp::TerminalPaneContent::ShellIntegrationChanged_revoker _paneShellIntegrationChangedRevoker;
+    winrt::TerminalApp::TerminalPaneContent::VisualProgressProviderChanged_revoker _paneVisualProgressProviderChangedRevoker;
     winrt::TerminalApp::IPaneContent::ReadOnlyChanged_revoker _paneReadOnlyChangedRevoker;
 
     Borders _borders{ Borders::None };
@@ -323,10 +324,13 @@ private:
     std::unique_ptr<winTerm::PaneResize::PaneResizeTransaction> _resizeTransaction;
     bool _dividerPointerOver{ false };
     std::atomic<bool> _visualProgressEnabled{ false };
+    std::atomic<bool> _visualProgressReplaceRecognizedOutput{ false };
     std::atomic<bool> _visualProgressFaulted{ false };
+    std::atomic<bool> _visualProgressRendererReady{ false };
     std::atomic<bool> _visualProgressUpdateQueued{ false };
     winTerm::VisualProgress::ProgressStateMachine _visualProgressState;
     winTerm::VisualProgress::ProgressUpdateMailbox _visualProgressMailbox;
+    std::shared_ptr<winTerm::VisualProgress::RainbowArcRenderer> _visualProgressRenderer;
 
     bool _IsLeaf() const noexcept;
     bool _HasFocusedChild() const noexcept;
@@ -339,11 +343,13 @@ private:
     void _DestroyVisualProgressOverlay() noexcept;
     void _UpdateVisualProgressFromTaskbar();
     void _UpdateVisualProgressFromShellIntegration();
+    void _UpdateVisualProgressFromProvider();
+    void _ConfigureVisualProgressRecognition() noexcept;
     void _QueueVisualProgressUpdate(const winTerm::VisualProgress::ProgressSnapshot& snapshot);
     void _ScheduleVisualProgressUpdate();
+    void _RefreshVisualProgressRenderer() noexcept;
     void _ApplyVisualProgressSnapshot(const winTerm::VisualProgress::ProgressSnapshot& snapshot) noexcept;
     void _DisableVisualProgressOnUI() noexcept;
-    winrt::Windows::UI::Xaml::Media::SolidColorBrush _VisualProgressBrush(winTerm::VisualProgress::ProgressStatus status) const;
     void _UpdatePaneHeader();
     winrt::hstring _PaneHeaderTitle() const;
     winrt::hstring _PaneHeaderAccessibleTitle() const;

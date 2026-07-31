@@ -40,6 +40,11 @@ namespace ControlUnitTests
     class ControlInteractivityTests;
 };
 
+namespace winTerm::VisualProgress
+{
+    class RecognitionEngine;
+}
+
 #define RUNTIME_SETTING(type, name, setting)                 \
 private:                                                     \
     std::optional<type> _runtime##name{ std::nullopt };      \
@@ -165,6 +170,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const size_t TaskbarProgress() const noexcept;
         const size_t ShellIntegrationState() const noexcept;
         const int64_t ShellIntegrationExitCode() const noexcept;
+        const uint64_t VisualProgressProviderState() const noexcept;
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;
@@ -244,6 +250,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool IsInReadOnlyMode() const;
         void ToggleReadOnlyMode();
         void SetReadOnlyMode(const bool readOnlyState);
+        void ConfigureVisualProgressRecognition(bool enabled, bool replaceRecognizedOutput);
 
         hstring ReadEntireBuffer() const;
         Control::CommandHistoryContext CommandHistory() const;
@@ -284,6 +291,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::typed_event<IInspectable, Control::ScrollPositionChangedArgs> ScrollPositionChanged;
         til::typed_event<> TaskbarProgressChanged;
         til::typed_event<> ShellIntegrationChanged;
+        til::typed_event<> VisualProgressProviderChanged;
         til::typed_event<> ConnectionStateChanged;
         til::typed_event<> HoveredHyperlinkChanged;
         til::typed_event<IInspectable, IInspectable> RendererEnteredErrorState;
@@ -429,6 +437,17 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::atomic<bool> _initializedTerminal{ false };
         bool _isReadOnly{ false };
         bool _closing{ false };
+        std::mutex _visualProgressRecognitionMutex;
+        std::mutex _visualProgressSuppressionMutex;
+        std::unique_ptr<winTerm::VisualProgress::RecognitionEngine> _visualProgressRecognition;
+        std::atomic<uint64_t> _visualProgressProviderState{};
+        std::atomic<uint64_t> _visualProgressProviderGeneration{};
+        std::atomic<uint32_t> _visualProgressProviderSequence{};
+        std::atomic<bool> _visualProgressRecognitionEnabled{};
+        std::atomic<bool> _visualProgressReplacementEnabled{};
+        std::atomic<bool> _visualProgressRecognitionResetRequested{};
+        std::atomic<uint64_t> _visualProgressRecognitionGeneration{};
+        std::atomic<bool> _visualProgressAlternateScreen{};
 
         struct StashedColorScheme
         {

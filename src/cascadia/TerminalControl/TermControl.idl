@@ -68,6 +68,7 @@ namespace Microsoft.Terminal.Control
         event Windows.Foundation.TypedEventHandler<Object, OpenHyperlinkEventArgs> OpenHyperlink;
         event Windows.Foundation.TypedEventHandler<Object, Object> SetTaskbarProgress;
         event Windows.Foundation.TypedEventHandler<Object, Object> ShellIntegrationChanged;
+        event Windows.Foundation.TypedEventHandler<Object, Object> VisualProgressProviderChanged;
         event Windows.Foundation.TypedEventHandler<Object, NoticeEventArgs> RaiseNotice;
         event Windows.Foundation.TypedEventHandler<Object, Object> WarningBell;
         event Windows.Foundation.TypedEventHandler<Object, Object> HidePointerCursor;
@@ -116,6 +117,7 @@ namespace Microsoft.Terminal.Control
         Single SnapDimensionToGrid(Boolean widthOrHeight, Single dimension);
 
         void WindowVisibilityChanged(Boolean showOrHide);
+        void ConfigureVisualProgressRecognition(Boolean enabled, Boolean replaceRecognizedOutput);
 
         void ScrollViewport(Int32 viewTop);
 
