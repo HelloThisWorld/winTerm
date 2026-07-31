@@ -220,6 +220,12 @@ try
         throw 'Release workflow validation failed.'
     }
 
+    & (Join-Path $PSScriptRoot 'test-ci-classification.ps1')
+    if (-not $?)
+    {
+        throw 'CI change classification validation failed.'
+    }
+
     & (Join-Path $PSScriptRoot 'validate-assets.ps1')
     if (-not $?)
     {
@@ -252,6 +258,12 @@ try
     if (-not $?)
     {
         throw 'Pane resize source validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'test-visual-progress.ps1') -Configuration $Configuration -Platform $Platform -SourceOnly
+    if (-not $?)
+    {
+        throw 'Visual Progress source validation failed.'
     }
 
     & (Join-Path $PSScriptRoot 'test-diagnostics.ps1')

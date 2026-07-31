@@ -10,6 +10,10 @@ namespace TerminalApp
     {
         Microsoft.Terminal.Control.TermControl GetTermControl();
 
+        UInt64 ShellIntegrationState { get; };
+        Int64 ShellIntegrationExitCode { get; };
+        event Windows.Foundation.TypedEventHandler<TerminalPaneContent, Object> ShellIntegrationChanged;
+
         void MarkAsDefterm();
 
         Microsoft.Terminal.Settings.Model.Profile GetProfile();

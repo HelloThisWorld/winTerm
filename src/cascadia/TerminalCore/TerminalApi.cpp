@@ -416,8 +416,17 @@ void Terminal::NotifyBufferRotation(const int delta)
     }
 }
 
-void Terminal::NotifyShellIntegrationMark()
+void Terminal::NotifyShellIntegrationMark(const ::Microsoft::Console::VirtualTerminal::ShellIntegrationMarkKind kind,
+                                          const std::optional<uint32_t> exitCode)
 {
+    _assertLocked();
+    _shellIntegrationState = static_cast<size_t>(kind);
+    _shellIntegrationExitCode = exitCode ? static_cast<int64_t>(*exitCode) : -1;
+
     // Notify the scrollbar that marks have been added so it can refresh the mark indicators
     _NotifyScrollEvent();
+    if (_pfnShellIntegrationChanged)
+    {
+        _pfnShellIntegrationChanged();
+    }
 }

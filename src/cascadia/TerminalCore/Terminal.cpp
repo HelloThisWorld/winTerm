@@ -1174,6 +1174,11 @@ void Microsoft::Terminal::Core::Terminal::TaskbarProgressChangedCallback(std::fu
     _pfnTaskbarProgressChanged.swap(pfn);
 }
 
+void Microsoft::Terminal::Core::Terminal::ShellIntegrationChangedCallback(std::function<void()> pfn) noexcept
+{
+    _pfnShellIntegrationChanged.swap(pfn);
+}
+
 // Method Description:
 // - Propagates an incoming set window visibility call from the PTY up into our window control layers
 // Arguments:
@@ -1264,6 +1269,16 @@ const size_t Microsoft::Terminal::Core::Terminal::GetTaskbarState() const noexce
 const size_t Microsoft::Terminal::Core::Terminal::GetTaskbarProgress() const noexcept
 {
     return _taskbarProgress;
+}
+
+const size_t Microsoft::Terminal::Core::Terminal::GetShellIntegrationState() const noexcept
+{
+    return _shellIntegrationState;
+}
+
+const int64_t Microsoft::Terminal::Core::Terminal::GetShellIntegrationExitCode() const noexcept
+{
+    return _shellIntegrationExitCode;
 }
 
 void Microsoft::Terminal::Core::Terminal::CompletionsChangedCallback(std::function<void(std::wstring_view, unsigned int)> pfn) noexcept

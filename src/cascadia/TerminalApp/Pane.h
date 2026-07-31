@@ -23,6 +23,9 @@
 #include "TaskbarState.h"
 #include "TerminalPaneContent.h"
 #include "../../winterm/PaneResize/PaneResizeModel.h"
+#include "../../winterm/VisualProgress/VisualProgressModel.h"
+
+#include <atomic>
 
 // fwdecl unittest classes
 namespace TerminalAppLocalTests
@@ -66,6 +69,11 @@ struct PaneResources
     winrt::Windows::UI::Xaml::Media::SolidColorBrush accentBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush dividerBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush dividerHoverBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush progressTrackBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush progressRunningBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush progressWaitingBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush progressSuccessBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush progressErrorBrush{ nullptr };
 };
 
 class Pane : public std::enable_shared_from_this<Pane>
@@ -268,6 +276,13 @@ private:
     winrt::Windows::UI::Xaml::Controls::Border _dividerVisual{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Border _snapIndicator{ nullptr };
     winrt::Windows::UI::Xaml::Controls::TextBlock _snapIndicatorText{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Grid _visualProgressOverlay{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Grid _visualProgressFillLayout{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _visualProgressTrack{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::Border _visualProgressFill{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _visualProgressLeadingColumn{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _visualProgressFillColumn{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::ColumnDefinition _visualProgressTrailingColumn{ nullptr };
 
     PaneResources _themeResources;
 
@@ -291,6 +306,7 @@ private:
     winrt::TerminalApp::IPaneContent::CloseRequested_revoker _closeRequestedRevoker;
     winrt::TerminalApp::IPaneContent::TitleChanged_revoker _paneTitleChangedRevoker;
     winrt::TerminalApp::IPaneContent::TaskbarProgressChanged_revoker _paneTaskbarProgressChangedRevoker;
+    winrt::TerminalApp::TerminalPaneContent::ShellIntegrationChanged_revoker _paneShellIntegrationChangedRevoker;
     winrt::TerminalApp::IPaneContent::ReadOnlyChanged_revoker _paneReadOnlyChangedRevoker;
 
     Borders _borders{ Borders::None };
@@ -306,6 +322,11 @@ private:
     std::optional<uint32_t> _resizePointerId;
     std::unique_ptr<winTerm::PaneResize::PaneResizeTransaction> _resizeTransaction;
     bool _dividerPointerOver{ false };
+    std::atomic<bool> _visualProgressEnabled{ false };
+    std::atomic<bool> _visualProgressFaulted{ false };
+    std::atomic<bool> _visualProgressUpdateQueued{ false };
+    winTerm::VisualProgress::ProgressStateMachine _visualProgressState;
+    winTerm::VisualProgress::ProgressUpdateMailbox _visualProgressMailbox;
 
     bool _IsLeaf() const noexcept;
     bool _HasFocusedChild() const noexcept;
@@ -313,6 +334,16 @@ private:
     winrt::TerminalApp::IPaneContent _takePaneContent();
     void _setPaneContent(winrt::TerminalApp::IPaneContent content);
     void _AttachLeafVisual();
+    void _SetVisualProgressEnabled(bool enabled);
+    void _CreateVisualProgressOverlay();
+    void _DestroyVisualProgressOverlay() noexcept;
+    void _UpdateVisualProgressFromTaskbar();
+    void _UpdateVisualProgressFromShellIntegration();
+    void _QueueVisualProgressUpdate(const winTerm::VisualProgress::ProgressSnapshot& snapshot);
+    void _ScheduleVisualProgressUpdate();
+    void _ApplyVisualProgressSnapshot(const winTerm::VisualProgress::ProgressSnapshot& snapshot) noexcept;
+    void _DisableVisualProgressOnUI() noexcept;
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush _VisualProgressBrush(winTerm::VisualProgress::ProgressStatus status) const;
     void _UpdatePaneHeader();
     winrt::hstring _PaneHeaderTitle() const;
     winrt::hstring _PaneHeaderAccessibleTitle() const;

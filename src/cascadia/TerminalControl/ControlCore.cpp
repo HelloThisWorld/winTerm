@@ -127,6 +127,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         auto pfnTerminalTaskbarProgressChanged = [this] { _terminalTaskbarProgressChanged(); };
         _terminal->TaskbarProgressChangedCallback(pfnTerminalTaskbarProgressChanged);
 
+        auto pfnTerminalShellIntegrationChanged = [this] { _terminalShellIntegrationChanged(); };
+        _terminal->ShellIntegrationChangedCallback(pfnTerminalShellIntegrationChanged);
+
         auto pfnShowWindowChanged = [this](auto&& PH1) { _terminalShowWindowChanged(std::forward<decltype(PH1)>(PH1)); };
         _terminal->SetShowWindowCallback(pfnShowWindowChanged);
 
@@ -1580,6 +1583,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return _terminal->GetTaskbarProgress();
     }
 
+    const size_t ControlCore::ShellIntegrationState() const noexcept
+    {
+        const auto lock = _terminal->LockForReading();
+        return _terminal->GetShellIntegrationState();
+    }
+
+    const int64_t ControlCore::ShellIntegrationExitCode() const noexcept
+    {
+        const auto lock = _terminal->LockForReading();
+        return _terminal->GetShellIntegrationExitCode();
+    }
+
     int ControlCore::ScrollOffset()
     {
         const auto lock = _terminal->LockForReading();
@@ -1674,6 +1689,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     void ControlCore::_terminalTaskbarProgressChanged()
     {
         TaskbarProgressChanged.raise(*this, nullptr);
+    }
+
+    void ControlCore::_terminalShellIntegrationChanged()
+    {
+        ShellIntegrationChanged.raise(*this, nullptr);
     }
 
     void ControlCore::_terminalShowWindowChanged(bool showOrHide)

@@ -45,6 +45,8 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring Title() { return _control.Title(); }
         uint64_t TaskbarState() { return _control.TaskbarState(); }
         uint64_t TaskbarProgress() { return _control.TaskbarProgress(); }
+        uint64_t ShellIntegrationState() { return _control.ShellIntegrationState(); }
+        int64_t ShellIntegrationExitCode() { return _control.ShellIntegrationExitCode(); }
         bool ReadOnly() { return _control.ReadOnly(); }
         winrt::hstring Icon() const;
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() const noexcept;
@@ -54,6 +56,7 @@ namespace winrt::TerminalApp::implementation
         Windows::Foundation::Size GridUnitSize();
 
         til::typed_event<TerminalApp::TerminalPaneContent, winrt::Windows::Foundation::IInspectable> RestartTerminalRequested;
+        til::typed_event<TerminalApp::TerminalPaneContent, winrt::Windows::Foundation::IInspectable> ShellIntegrationChanged;
 
         // See BasicPaneEvents for most generic event definitions
 
@@ -77,6 +80,7 @@ namespace winrt::TerminalApp::implementation
             winrt::Microsoft::Terminal::Control::TermControl::TitleChanged_revoker _TitleChanged;
             winrt::Microsoft::Terminal::Control::TermControl::TabColorChanged_revoker _TabColorChanged;
             winrt::Microsoft::Terminal::Control::TermControl::SetTaskbarProgress_revoker _SetTaskbarProgress;
+            winrt::Microsoft::Terminal::Control::TermControl::ShellIntegrationChanged_revoker _ShellIntegrationChanged;
             winrt::Microsoft::Terminal::Control::TermControl::ReadOnlyChanged_revoker _ReadOnlyChanged;
             winrt::Microsoft::Terminal::Control::TermControl::FocusFollowMouseRequested_revoker _FocusFollowMouseRequested;
 
@@ -94,6 +98,7 @@ namespace winrt::TerminalApp::implementation
         void _controlTitleChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
         void _controlTabColorChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
         void _controlSetTaskbarProgress(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
+        void _controlShellIntegrationChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
         void _controlReadOnlyChanged(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
         void _controlFocusFollowMouseRequested(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::Foundation::IInspectable& args);
 

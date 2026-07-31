@@ -40,6 +40,7 @@ namespace winrt::TerminalApp::implementation
         _controlEvents._TitleChanged = _control.TitleChanged(winrt::auto_revoke, { get_weak(), &TerminalPaneContent::_controlTitleChanged });
         _controlEvents._TabColorChanged = _control.TabColorChanged(winrt::auto_revoke, { get_weak(), &TerminalPaneContent::_controlTabColorChanged });
         _controlEvents._SetTaskbarProgress = _control.SetTaskbarProgress(winrt::auto_revoke, { get_weak(), &TerminalPaneContent::_controlSetTaskbarProgress });
+        _controlEvents._ShellIntegrationChanged = _control.ShellIntegrationChanged(winrt::auto_revoke, { get_weak(), &TerminalPaneContent::_controlShellIntegrationChanged });
         _controlEvents._ReadOnlyChanged = _control.ReadOnlyChanged(winrt::auto_revoke, { get_weak(), &TerminalPaneContent::_controlReadOnlyChanged });
         _controlEvents._FocusFollowMouseRequested = _control.FocusFollowMouseRequested(winrt::auto_revoke, { get_weak(), &TerminalPaneContent::_controlFocusFollowMouseRequested });
     }
@@ -172,6 +173,10 @@ namespace winrt::TerminalApp::implementation
     void TerminalPaneContent::_controlSetTaskbarProgress(const IInspectable&, const IInspectable&)
     {
         TaskbarProgressChanged.raise(*this, nullptr);
+    }
+    void TerminalPaneContent::_controlShellIntegrationChanged(const IInspectable&, const IInspectable&)
+    {
+        ShellIntegrationChanged.raise(*this, nullptr);
     }
     void TerminalPaneContent::_controlReadOnlyChanged(const IInspectable&, const IInspectable&)
     {

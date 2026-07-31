@@ -131,6 +131,7 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, ShowPaneHeaders);
         INHERITABLE_SETTING(Boolean, ShowPaneProfileIcon);
         INHERITABLE_SETTING(Boolean, ShowPaneActiveStatus);
+        INHERITABLE_SETTING(Boolean, VisualProgressEnabled);
 
         Windows.Foundation.Collections.IMapView<String, ColorScheme> ColorSchemes();
         void AddColorScheme(ColorScheme scheme);

@@ -88,7 +88,8 @@ Author(s):
     X(Model::ApplicationUIDensity, ApplicationUIDensity, "winterm.applicationUI.density", Model::ApplicationUIDensity::Compact)                                                                     \
     X(bool, ShowPaneHeaders, "winterm.applicationUI.showPaneHeaders", true)                                                                                                                          \
     X(bool, ShowPaneProfileIcon, "winterm.applicationUI.showPaneProfileIcon", true)                                                                                                                  \
-    X(bool, ShowPaneActiveStatus, "winterm.applicationUI.showPaneActiveStatus", true)
+    X(bool, ShowPaneActiveStatus, "winterm.applicationUI.showPaneActiveStatus", true)                                                                                                                  \
+    X(bool, VisualProgressEnabled, "visualProgress.enabled", false)
 
 // Also add these settings to:
 // * Profile.idl

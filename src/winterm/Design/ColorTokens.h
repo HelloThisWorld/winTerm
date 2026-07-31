@@ -27,4 +27,8 @@ namespace winTerm::Design::ColorTokens
     inline constexpr uint32_t TextSecondary{ 0xFFC5D0DA };
     inline constexpr uint32_t TextMuted{ 0xFF8E9EAD };
     inline constexpr uint32_t IndicatorSurface{ 0xF2111B24 };
+    inline constexpr uint32_t ProgressTrack{ 0x99111820 };
+    inline constexpr uint32_t ProgressWaiting{ 0xFFF4C95D };
+    inline constexpr uint32_t ProgressSuccess{ 0xFF4DDC88 };
+    inline constexpr uint32_t ProgressError{ 0xFFFF6B6B };
 }

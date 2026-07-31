@@ -22,9 +22,18 @@ Author(s):
 
 #include <deque>
 #include <memory>
+#include <optional>
 
 namespace Microsoft::Console::VirtualTerminal
 {
+    enum class ShellIntegrationMarkKind : uint8_t
+    {
+        Prompt = 1,
+        CommandStart = 2,
+        CommandExecuted = 3,
+        CommandFinished = 4,
+    };
+
     class ITerminalApi
     {
         using RenderSettings = Microsoft::Console::Render::RenderSettings;
@@ -87,7 +96,7 @@ namespace Microsoft::Console::VirtualTerminal
         virtual bool ResizeWindow(const til::CoordType width, const til::CoordType height) = 0;
 
         virtual void NotifyBufferRotation(const int delta) = 0;
-        virtual void NotifyShellIntegrationMark() = 0;
+        virtual void NotifyShellIntegrationMark(ShellIntegrationMarkKind kind, std::optional<uint32_t> exitCode = std::nullopt) = 0;
 
         virtual void InvokeCompletions(std::wstring_view menuJson, unsigned int replaceLength) = 0;
 
