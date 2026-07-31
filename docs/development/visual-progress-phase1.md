@@ -2,6 +2,8 @@
 
 Phase 1 provides the static, fail-open foundation for Visual Progress. It is a developer preview, not the finished v1.2.0 rainbow effect.
 
+Phase 2 builds directly on this foundation; see [Visual Progress Phase 2](visual-progress-phase2.md) for the Rainbow Arc Weld renderer, bounded CLI recognition, and safe transient replacement preview.
+
 ## Architecture
 
 The implementation reuses the standard terminal progress path:
