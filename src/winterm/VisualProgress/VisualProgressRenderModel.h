@@ -113,6 +113,7 @@ namespace winTerm::VisualProgress
         bool successSweep{};
         bool finalSparkBurst{};
         bool errorPulse{};
+        bool errorWithoutProgress{};
         bool fadeOut{};
         bool sparksEligible{};
         bool staticFallback{};
@@ -196,7 +197,11 @@ namespace winTerm::VisualProgress
             case ProgressStatus::Error:
                 plan.kind = RenderTransitionKind::Error;
                 plan.targetProgress = _meaningfulProgress(snapshot, current);
-                plan.headVisible = snapshot.mode == ProgressMode::Determinate && plan.targetProgress > 0.0f;
+                plan.errorWithoutProgress = plan.targetProgress <= ProgressEpsilon;
+                // A zero value remains a real zero. The renderer may present a
+                // status-only head/track treatment, but must not invent fill.
+                plan.headVisible = snapshot.mode == ProgressMode::Determinate &&
+                                   (plan.targetProgress > 0.0f || plan.errorWithoutProgress);
                 plan.errorPulse = motionAllowed;
                 plan.duration = std::chrono::milliseconds::zero();
                 break;
@@ -270,11 +275,15 @@ namespace winTerm::VisualProgress
             plan.rainbowMoving = motionAllowed && _snapshot.status == ProgressStatus::Running;
             plan.indeterminateMoving = plan.rainbowMoving && _snapshot.mode == ProgressMode::Indeterminate;
             plan.breathe = motionAllowed && _snapshot.status == ProgressStatus::Waiting;
+            plan.errorWithoutProgress = _snapshot.status == ProgressStatus::Error &&
+                                        _targetProgress <= ProgressEpsilon;
             plan.sparksEligible = motionAllowed &&
                                   environment.paneActive &&
                                   _snapshot.status == ProgressStatus::Running &&
                                   _tier == RenderTier::Full;
-            plan.headVisible = _snapshot.mode == ProgressMode::Indeterminate || _targetProgress > 0.0f;
+            plan.headVisible = _snapshot.mode == ProgressMode::Indeterminate ||
+                               _targetProgress > 0.0f ||
+                               plan.errorWithoutProgress;
             if (!plan.visible)
             {
                 plan.releaseAfterTransition = true;
