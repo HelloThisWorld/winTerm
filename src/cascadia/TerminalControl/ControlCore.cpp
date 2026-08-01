@@ -12,6 +12,7 @@
 #include <unicode.hpp>
 
 #include "EventArgs.h"
+#include "../../winterm/VisualProgress/ProgressRecognition.h"
 #include "../../renderer/atlas/AtlasEngine.h"
 #include "../../renderer/base/renderer.hpp"
 #include "../../renderer/uia/UiaRenderer.hpp"
@@ -260,6 +261,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         _connectionOutputEventRevoker.revoke();
         _connectionStateChangedRevoker.revoke();
+        uint64_t previousProvider{};
+        {
+            // Closing the connection is also an immediate fail-open boundary.
+            // Serialize it with the final suppression decision, but release the
+            // short gate before raising events or waiting in Connection::Close.
+            std::scoped_lock suppressionGate{ _visualProgressSuppressionMutex };
+            _visualProgressRecognitionGeneration.fetch_add(1, std::memory_order_acq_rel);
+            _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+            previousProvider = _visualProgressProviderState.exchange(0, std::memory_order_acq_rel);
+            _visualProgressAlternateScreen.store(false, std::memory_order_release);
+        }
+        if (previousProvider != 0)
+        {
+            VisualProgressProviderChanged.raise(*this, nullptr);
+        }
 
         // One of the tasks for `ITerminalConnection::Close()` is to block until all pending
         // callback calls have completed. This solves the race-condition issue mentioned above.
@@ -267,6 +283,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             _connection.Close();
             _connection = nullptr;
+        }
+
+        // Close() above joins pending output callbacks. With no callback able
+        // to touch the recognizer, clear its bounded buffers synchronously so
+        // a later connection never inherits partial provider state.
+        {
+            std::scoped_lock lock{ _visualProgressRecognitionMutex };
+            if (_visualProgressRecognition)
+            {
+                _visualProgressRecognition->Reset();
+            }
+            _visualProgressRecognitionResetRequested.store(false, std::memory_order_release);
         }
     }
 
@@ -1595,6 +1623,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return _terminal->GetShellIntegrationExitCode();
     }
 
+    const uint64_t ControlCore::VisualProgressProviderState() const noexcept
+    {
+        return _visualProgressProviderState.load(std::memory_order_acquire);
+    }
+
     int ControlCore::ScrollOffset()
     {
         const auto lock = _terminal->LockForReading();
@@ -1693,6 +1726,17 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void ControlCore::_terminalShellIntegrationChanged()
     {
+        // OSC 133 prompt is the per-pane ownership boundary. Defer parser
+        // cleanup to the next output callback so this terminal callback never
+        // waits on the recognition mutex while the terminal lock is held.
+        const auto shellState = static_cast<winTerm::VisualProgress::ShellLifecycleState>(_terminal->GetShellIntegrationState());
+        if (shellState == winTerm::VisualProgress::ShellLifecycleState::Prompt ||
+            shellState == winTerm::VisualProgress::ShellLifecycleState::CommandFinished)
+        {
+            _visualProgressRecognitionGeneration.fetch_add(1, std::memory_order_acq_rel);
+            _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+            _visualProgressProviderState.store(0, std::memory_order_release);
+        }
         ShellIntegrationChanged.raise(*this, nullptr);
     }
 
@@ -1874,6 +1918,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         _closeConnection();
+        ConfigureVisualProgressRecognition(false, false);
     }
 
     void ControlCore::PersistTo(HANDLE handle) const
@@ -2277,6 +2322,75 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _isReadOnly = readOnlyState;
     }
 
+    void ControlCore::ConfigureVisualProgressRecognition(const bool enabled, const bool replaceRecognizedOutput)
+    {
+        if (!enabled)
+        {
+            uint64_t previousProvider{};
+            {
+                // This short gate makes Configure(false) an immediate
+                // suppression boundary without waiting for a parser callback
+                // that may currently be inside Terminal::Write.
+                std::scoped_lock suppressionGate{ _visualProgressSuppressionMutex };
+                _visualProgressReplacementEnabled.store(false, std::memory_order_release);
+                _visualProgressRecognitionEnabled.store(false, std::memory_order_release);
+                _visualProgressRecognitionGeneration.fetch_add(1, std::memory_order_acq_rel);
+                _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                _visualProgressAlternateScreen.store(false, std::memory_order_release);
+                previousProvider = _visualProgressProviderState.exchange(0, std::memory_order_acq_rel);
+            }
+
+            // Teardown must not stall pane close/detach. If an output callback
+            // owns the parser, it observes enabled=false and destroys the
+            // bounded engine before releasing the lock.
+            std::unique_lock recognitionLock{ _visualProgressRecognitionMutex, std::try_to_lock };
+            if (recognitionLock.owns_lock())
+            {
+                _visualProgressRecognition.reset();
+                _visualProgressRecognitionResetRequested.store(false, std::memory_order_release);
+            }
+            if (previousProvider != 0)
+            {
+                VisualProgressProviderChanged.raise(*this, nullptr);
+            }
+            return;
+        }
+
+        bool recognitionAvailable{};
+        {
+            std::scoped_lock lock{ _visualProgressRecognitionMutex };
+            if (!_visualProgressRecognition)
+            {
+                try
+                {
+                    _visualProgressRecognition = std::make_unique<winTerm::VisualProgress::RecognitionEngine>();
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION();
+                }
+            }
+            recognitionAvailable = static_cast<bool>(_visualProgressRecognition);
+
+            // Publish configuration only after the optional recognizer has
+            // been created, and arbitrate with the final suppression decision.
+            std::scoped_lock suppressionGate{ _visualProgressSuppressionMutex };
+            _visualProgressReplacementEnabled.store(recognitionAvailable && replaceRecognizedOutput, std::memory_order_release);
+            _visualProgressRecognitionEnabled.store(recognitionAvailable, std::memory_order_release);
+        }
+
+        if (!recognitionAvailable)
+        {
+            _visualProgressRecognitionGeneration.fetch_add(1, std::memory_order_acq_rel);
+            _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+            _visualProgressAlternateScreen.store(false, std::memory_order_release);
+            if (_visualProgressProviderState.exchange(0, std::memory_order_acq_rel) != 0)
+            {
+                VisualProgressProviderChanged.raise(*this, nullptr);
+            }
+        }
+    }
+
     void ControlCore::_raiseReadOnlyWarning()
     {
         auto noticeArgs = winrt::make<NoticeEventArgs>(NoticeLevel::Info, RS_(L"TermControlReadOnly"));
@@ -2286,9 +2400,265 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         try
         {
+            const auto output = winrt_array_to_wstring_view(str);
+            winTerm::VisualProgress::RecognitionResult recognition;
+            bool inspected{};
+            bool ingressUnavailable{};
+            uint64_t recognitionGeneration{};
+            bool raiseProviderChanged{};
+            std::unique_lock<std::mutex> recognitionLock{ _visualProgressRecognitionMutex, std::defer_lock };
+
+            const auto invalidateRecognition = [&]() noexcept {
+                // Invalidation participates in the same linearization point as
+                // replacement. Never wait here: losing the gate means the raw
+                // output wins and we retry after Terminal::Write.
+                std::unique_lock suppressionGate{ _visualProgressSuppressionMutex, std::try_to_lock };
+                if (!suppressionGate.owns_lock())
+                {
+                    return false;
+                }
+
+                const auto generation = _visualProgressRecognitionGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
+                _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+
+                // Clear only a provider value published before this
+                // invalidation. A concurrently published newer generation is
+                // owned by that callback and must not be erased here.
+                for (uint8_t attempt = 0; attempt < 2; ++attempt)
+                {
+                    auto packed = _visualProgressProviderState.load(std::memory_order_acquire);
+                    if (packed == 0 || _visualProgressProviderGeneration.load(std::memory_order_acquire) >= generation)
+                    {
+                        break;
+                    }
+                    if (_visualProgressProviderState.compare_exchange_strong(
+                            packed,
+                            0,
+                            std::memory_order_acq_rel,
+                            std::memory_order_acquire))
+                    {
+                        raiseProviderChanged = true;
+                        break;
+                    }
+                }
+                return true;
+            };
+
+            if (_visualProgressRecognitionEnabled.load(std::memory_order_acquire))
+            {
+                try
+                {
+                    if (recognitionLock.try_lock() && _visualProgressRecognition)
+                    {
+                        const auto resetRequested = _visualProgressRecognitionResetRequested.exchange(false, std::memory_order_acq_rel);
+                        if (!resetRequested || _visualProgressRecognition->TryReset())
+                        {
+                            recognitionGeneration = _visualProgressRecognitionGeneration.load(std::memory_order_acquire);
+                            const winTerm::VisualProgress::RecognitionOptions options{
+                                .replacementEnabled = _visualProgressReplacementEnabled.load(std::memory_order_acquire),
+                                .rendererEnabled = true,
+                                .normalScreen = !_visualProgressAlternateScreen.load(std::memory_order_acquire),
+                                .parserHealthy = true,
+                            };
+                            recognition = _visualProgressRecognition->Consume(output, GetTickCount64(), options);
+                            if (recognition.progress)
+                            {
+                                // Assign order while ingress is serialized,
+                                // not later when raw terminal writes may have
+                                // allowed a newer callback to finish first.
+                                recognition.progress->sequence =
+                                    (_visualProgressProviderSequence.fetch_add(1, std::memory_order_acq_rel) % 0x7fffffffu) + 1u;
+                            }
+                            inspected = true;
+                        }
+                        else
+                        {
+                            _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                            ingressUnavailable = true;
+                        }
+                    }
+                    else
+                    {
+                        // Dropping inspection is always safe: the original
+                        // bytes still reach the terminal and parser state
+                        // resets before the next attempt.
+                        _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                        ingressUnavailable = true;
+                    }
+                }
+                catch (...)
+                {
+                    // Recognition is optional. No recognition failure may
+                    // bypass the mandatory raw terminal write below.
+                    LOG_CAUGHT_EXCEPTION();
+                    _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                    ingressUnavailable = true;
+                }
+            }
+
+            const auto unsafeIngress = ingressUnavailable ||
+                                       (inspected && (!recognition.accepted || !recognition.healthy || recognition.overflow));
+            if (unsafeIngress)
+            {
+                // Invalidate before the mandatory write so every overlapping
+                // inspected callback fails its final generation gate. If a
+                // configuration boundary owns the gate, raw output still wins
+                // and the post-write attempt establishes the parser boundary.
+                static_cast<void>(invalidateRecognition());
+            }
+
+            bool wasAlternateScreen{};
+            bool isAlternateScreen{};
             {
                 const auto lock = _terminal->LockForWriting();
-                _terminal->Write(winrt_array_to_wstring_view(str));
+                wasAlternateScreen = _terminal->IsInAlternateScreenBuffer();
+                bool maySuppress{};
+                {
+                    // This gate is deliberately try-only for output. A
+                    // concurrent settings/detach boundary always wins and
+                    // makes this callback write the original bytes.
+                    std::unique_lock suppressionGate{ _visualProgressSuppressionMutex, std::try_to_lock };
+                    maySuppress = suppressionGate.owns_lock() &&
+                                  inspected &&
+                                  recognition.accepted &&
+                                  recognition.healthy &&
+                                  recognition.suppressInput &&
+                                  _visualProgressRecognitionEnabled.load(std::memory_order_acquire) &&
+                                  _visualProgressReplacementEnabled.load(std::memory_order_acquire) &&
+                                  !_visualProgressRecognitionResetRequested.load(std::memory_order_acquire) &&
+                                  _visualProgressRecognitionGeneration.load(std::memory_order_acquire) == recognitionGeneration &&
+                                  !wasAlternateScreen;
+                }
+                if (!maySuppress)
+                {
+                    // Recognition state has already consumed this callback.
+                    // Release its arbitration lock before the mandatory raw
+                    // terminal write, which can invoke reentrant callbacks or
+                    // block for reasons unrelated to decorative progress.
+                    if (recognitionLock.owns_lock())
+                    {
+                        recognitionLock.unlock();
+                    }
+                    _terminal->Write(output);
+                }
+                isAlternateScreen = _terminal->IsInAlternateScreenBuffer();
+
+                // A callback that lost the nonblocking ingress race can
+                // overlap a parser owner on either side of its raw write.
+                // Invalidate before releasing the terminal lock so no newer
+                // callback can reach its suppression decision first. This is
+                // still try-only: disable/close already establish the boundary,
+                // while enable leaves reset requested for its parser owner.
+                if (unsafeIngress && !recognitionLock.owns_lock())
+                {
+                    if (!invalidateRecognition())
+                    {
+                        _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                    }
+                }
+                if (wasAlternateScreen || isAlternateScreen)
+                {
+                    if (!invalidateRecognition())
+                    {
+                        _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                    }
+                }
+            }
+
+            _visualProgressAlternateScreen.store(isAlternateScreen, std::memory_order_release);
+
+            const auto resetSinceInspection = inspected &&
+                                              (_visualProgressRecognitionResetRequested.load(std::memory_order_acquire) ||
+                                               _visualProgressRecognitionGeneration.load(std::memory_order_acquire) != recognitionGeneration);
+            const auto discardRecognition = unsafeIngress || resetSinceInspection || wasAlternateScreen || isAlternateScreen;
+
+            // Raw writes release parser arbitration before Terminal::Write.
+            // Reacquire only long enough to publish; on contention, dropping
+            // the decorative update is the fail-open result.
+            if (!discardRecognition && inspected && recognition.progress && !recognitionLock.owns_lock())
+            {
+                static_cast<void>(recognitionLock.try_lock());
+            }
+            if (!discardRecognition && inspected && recognition.progress &&
+                     recognitionLock.owns_lock() &&
+                     _visualProgressRecognitionEnabled.load(std::memory_order_acquire) &&
+                     _visualProgressRecognitionGeneration.load(std::memory_order_acquire) == recognitionGeneration)
+            {
+                auto progress = *recognition.progress;
+                const auto packed = winTerm::VisualProgress::PackProviderProgress(progress);
+
+                const auto currentPacked = _visualProgressProviderState.load(std::memory_order_acquire);
+                if (_visualProgressProviderGeneration.load(std::memory_order_acquire) == recognitionGeneration &&
+                    currentPacked != 0 &&
+                    winTerm::VisualProgress::UnpackProviderProgress(currentPacked).sequence >= progress.sequence)
+                {
+                    // A later callback already won publication while this raw
+                    // write was in progress.
+                    recognition.progress.reset();
+                }
+
+                if (recognition.progress)
+                {
+                    // Generation is stored before the value. An invalidator
+                    // that observes the new value therefore also observes its
+                    // owner.
+                    _visualProgressProviderGeneration.store(recognitionGeneration, std::memory_order_release);
+                    const auto previous = _visualProgressProviderState.exchange(packed, std::memory_order_acq_rel);
+                    if (_visualProgressRecognitionGeneration.load(std::memory_order_acquire) != recognitionGeneration ||
+                        _visualProgressRecognitionResetRequested.load(std::memory_order_acquire) ||
+                        !_visualProgressRecognitionEnabled.load(std::memory_order_acquire))
+                    {
+                        // Remove only the value this callback published.
+                        // Prompt, close, detach, or a contending callback may
+                        // already own a newer generation.
+                        auto expected = packed;
+                        if (_visualProgressProviderGeneration.load(std::memory_order_acquire) == recognitionGeneration &&
+                            _visualProgressProviderState.compare_exchange_strong(
+                                expected,
+                                0,
+                                std::memory_order_acq_rel,
+                                std::memory_order_acquire))
+                        {
+                            raiseProviderChanged = true;
+                        }
+                    }
+                    else if (previous != packed)
+                    {
+                        raiseProviderChanged = true;
+                    }
+                }
+            }
+
+            if (!recognitionLock.owns_lock() &&
+                _visualProgressRecognitionResetRequested.load(std::memory_order_acquire))
+            {
+                static_cast<void>(recognitionLock.try_lock());
+            }
+            if (recognitionLock.owns_lock())
+            {
+                // Prompt/command completion can request reset from inside
+                // Terminal::Write. Clear bounded content before releasing the
+                // arbitration lock even if no later output arrives.
+                if (!_visualProgressRecognitionEnabled.load(std::memory_order_acquire))
+                {
+                    _visualProgressRecognition.reset();
+                    _visualProgressRecognitionResetRequested.store(false, std::memory_order_release);
+                }
+                else if (_visualProgressRecognitionResetRequested.exchange(false, std::memory_order_acq_rel) &&
+                         _visualProgressRecognition &&
+                         !_visualProgressRecognition->TryReset())
+                {
+                    _visualProgressRecognitionResetRequested.store(true, std::memory_order_release);
+                }
+                recognitionLock.unlock();
+            }
+
+            if (raiseProviderChanged)
+            {
+                // Raising after both terminal and recognition locks keeps UI
+                // work out of the parser/write critical path and avoids
+                // reentrant Configure deadlocks.
+                VisualProgressProviderChanged.raise(*this, nullptr);
             }
 
             if (!_pendingResponses.empty())

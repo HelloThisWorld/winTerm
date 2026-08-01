@@ -5,6 +5,8 @@
 #include "Pane.h"
 
 #include "../../winterm/Design/DesignTokens.h"
+#include "../../winterm/VisualProgress/RainbowArcRenderer.h"
+#include "../../winterm/VisualProgress/RainbowArcVisualConstants.h"
 
 #include <algorithm>
 #include <atomic>
@@ -1484,7 +1486,10 @@ void Pane::UpdateVisuals()
     }
     if (_visualProgressOverlay)
     {
-        _ApplyVisualProgressSnapshot(_visualProgressState.Current());
+        // Focus, theme, visibility, and activation changes update renderer
+        // eligibility only. Reapplying the same semantic snapshot here would
+        // replay one-shot success/error transitions.
+        _RefreshVisualProgressRenderer();
     }
 }
 
@@ -1553,9 +1558,13 @@ void Pane::UpdateSettings(const CascadiaSettings& settings)
 {
     const auto globals = settings.GlobalSettings();
     const auto emergencyOverride = wil::TryGetEnvironmentVariableW<std::wstring>(L"WINTERM_DISABLE_VISUAL_PROGRESS");
+    _visualProgressReplaceRecognizedOutput.store(
+        globals.VisualProgressReplaceRecognizedOutput(),
+        std::memory_order_release);
     _SetVisualProgressEnabled(winTerm::VisualProgress::IsFeatureEnabled(
         globals.VisualProgressEnabled(),
         emergencyOverride));
+    _ConfigureVisualProgressRecognition();
 
     _paneResizeSettings.enableSnapping = globals.PaneResizeSnapping();
     switch (globals.PaneResizeSnapPoints())
@@ -2046,6 +2055,9 @@ IPaneContent Pane::_takePaneContent()
     _paneTitleChangedRevoker.revoke();
     _paneTaskbarProgressChangedRevoker.revoke();
     _paneShellIntegrationChangedRevoker.revoke();
+    _paneVisualProgressProviderChangedRevoker.revoke();
+    _visualProgressRendererReady.store(false, std::memory_order_release);
+    _ConfigureVisualProgressRecognition();
     _paneReadOnlyChangedRevoker.revoke();
     _visualProgressState.Reset();
     _visualProgressMailbox.Close();
@@ -2088,6 +2100,10 @@ void Pane::_setPaneContent(IPaneContent content)
             _paneShellIntegrationChangedRevoker = terminalContent.ShellIntegrationChanged(
                 winrt::auto_revoke,
                 [this](auto&&, auto&&) { _UpdateVisualProgressFromShellIntegration(); });
+            _paneVisualProgressProviderChangedRevoker = terminalContent.VisualProgressProviderChanged(
+                winrt::auto_revoke,
+                [this](auto&&, auto&&) { _UpdateVisualProgressFromProvider(); });
+            _ConfigureVisualProgressRecognition();
         }
         _paneReadOnlyChangedRevoker = _content.ReadOnlyChanged(
             winrt::auto_revoke,
@@ -2225,6 +2241,10 @@ void Pane::_SetVisualProgressEnabled(const bool enabled)
     _visualProgressEnabled.store(enabled, std::memory_order_release);
     if (!enabled)
     {
+        // Revoke parser/replacement eligibility before tearing down the
+        // decorative renderer so no in-flight output can be hidden without
+        // an available presentation.
+        _ConfigureVisualProgressRecognition();
         _visualProgressState.SetEnabled(false);
         _visualProgressMailbox.Close();
         _DestroyVisualProgressOverlay();
@@ -2239,7 +2259,9 @@ void Pane::_SetVisualProgressEnabled(const bool enabled)
         _CreateVisualProgressOverlay();
         _UpdateVisualProgressFromShellIntegration();
         _UpdateVisualProgressFromTaskbar();
+        _UpdateVisualProgressFromProvider();
     }
+    _ConfigureVisualProgressRecognition();
 }
 
 void Pane::_CreateVisualProgressOverlay()
@@ -2252,39 +2274,45 @@ void Pane::_CreateVisualProgressOverlay()
     try
     {
         _visualProgressOverlay = Controls::Grid{};
-        _visualProgressFillLayout = Controls::Grid{};
-        _visualProgressTrack = Controls::Border{};
-        _visualProgressFill = Controls::Border{};
-        _visualProgressLeadingColumn = Controls::ColumnDefinition{};
-        _visualProgressFillColumn = Controls::ColumnDefinition{};
-        _visualProgressTrailingColumn = Controls::ColumnDefinition{};
+        _visualProgressCompositionHost = Controls::Grid{};
 
-        _visualProgressOverlay.Height(6.0);
-        _visualProgressOverlay.Margin(ThicknessHelper::FromLengths(10.0, 0.0, 10.0, 8.0));
+        _visualProgressOverlay.Height(winTerm::VisualProgress::RainbowArcVisualConstants::OverlayHostHeight);
         _visualProgressOverlay.VerticalAlignment(VerticalAlignment::Bottom);
         _visualProgressOverlay.HorizontalAlignment(HorizontalAlignment::Stretch);
         _visualProgressOverlay.IsHitTestVisible(false);
-        _visualProgressOverlay.Visibility(Visibility::Collapsed);
+        _visualProgressOverlay.Visibility(Visibility::Visible);
         Controls::Grid::SetRow(_visualProgressOverlay, 1);
         Automation::AutomationProperties::SetAccessibilityView(
             _visualProgressOverlay,
             Automation::Peers::AccessibilityView::Raw);
 
-        const auto radius = CornerRadiusHelper::FromUniformRadius(winTerm::Design::RadiusTokens::CompactControl);
-        _visualProgressTrack.CornerRadius(radius);
-        _visualProgressTrack.IsHitTestVisible(false);
-        _visualProgressFill.CornerRadius(radius);
-        _visualProgressFill.IsHitTestVisible(false);
+        _visualProgressCompositionHost.HorizontalAlignment(HorizontalAlignment::Stretch);
+        _visualProgressCompositionHost.VerticalAlignment(VerticalAlignment::Stretch);
+        _visualProgressCompositionHost.IsHitTestVisible(false);
+        Automation::AutomationProperties::SetAccessibilityView(
+            _visualProgressCompositionHost,
+            Automation::Peers::AccessibilityView::Raw);
 
-        _visualProgressFillLayout.ColumnDefinitions().Append(_visualProgressLeadingColumn);
-        _visualProgressFillLayout.ColumnDefinitions().Append(_visualProgressFillColumn);
-        _visualProgressFillLayout.ColumnDefinitions().Append(_visualProgressTrailingColumn);
-        Controls::Grid::SetColumn(_visualProgressFill, 1);
-        _visualProgressFillLayout.Children().Append(_visualProgressFill);
-        _visualProgressOverlay.Children().Append(_visualProgressTrack);
-        _visualProgressOverlay.Children().Append(_visualProgressFillLayout);
+        _visualProgressOverlay.Children().Append(_visualProgressCompositionHost);
         _leafLayout.Children().Append(_visualProgressOverlay);
-        _ApplyVisualProgressSnapshot(_visualProgressState.Current());
+
+        _visualProgressRenderer = winTerm::VisualProgress::RainbowArcRenderer::TryCreate(_visualProgressCompositionHost);
+        const auto rendererReady = _visualProgressRenderer && !_visualProgressRenderer->Faulted();
+        _visualProgressRendererReady.store(rendererReady, std::memory_order_release);
+        if (!rendererReady)
+        {
+            _DisableVisualProgressOnUI();
+            return;
+        }
+
+        _visualProgressRenderer->SetPaneActive(_lastActive);
+        _visualProgressRenderer->Apply(_visualProgressState.Current());
+        if (_visualProgressRenderer->Faulted())
+        {
+            _DisableVisualProgressOnUI();
+            return;
+        }
+        _ConfigureVisualProgressRecognition();
     }
     catch (...)
     {
@@ -2295,6 +2323,13 @@ void Pane::_CreateVisualProgressOverlay()
 
 void Pane::_DestroyVisualProgressOverlay() noexcept
 {
+    _visualProgressRendererReady.store(false, std::memory_order_release);
+    if (_visualProgressRenderer)
+    {
+        _visualProgressRenderer->Close();
+        _visualProgressRenderer.reset();
+    }
+
     try
     {
         if (_leafLayout && _visualProgressOverlay)
@@ -2312,12 +2347,7 @@ void Pane::_DestroyVisualProgressOverlay() noexcept
     }
 
     _visualProgressOverlay = nullptr;
-    _visualProgressFillLayout = nullptr;
-    _visualProgressTrack = nullptr;
-    _visualProgressFill = nullptr;
-    _visualProgressLeadingColumn = nullptr;
-    _visualProgressFillColumn = nullptr;
-    _visualProgressTrailingColumn = nullptr;
+    _visualProgressCompositionHost = nullptr;
 }
 
 void Pane::_UpdateVisualProgressFromTaskbar()
@@ -2348,6 +2378,42 @@ void Pane::_UpdateVisualProgressFromShellIntegration()
     }
 }
 
+void Pane::_UpdateVisualProgressFromProvider()
+{
+    if (!_visualProgressEnabled.load(std::memory_order_acquire) || _visualProgressFaulted.load(std::memory_order_acquire))
+    {
+        return;
+    }
+    if (const auto terminalContent = _content.try_as<TerminalPaneContent>())
+    {
+        const auto provider = winTerm::VisualProgress::UnpackProviderProgress(terminalContent.VisualProgressProviderState());
+        if (const auto snapshot = _visualProgressState.ApplyProvider(provider))
+        {
+            _QueueVisualProgressUpdate(*snapshot);
+        }
+    }
+}
+
+void Pane::_ConfigureVisualProgressRecognition() noexcept
+{
+    try
+    {
+        if (const auto terminalContent = _content.try_as<TerminalPaneContent>())
+        {
+            const auto enabled = _visualProgressEnabled.load(std::memory_order_acquire) &&
+                                 !_visualProgressFaulted.load(std::memory_order_acquire) &&
+                                 _visualProgressRendererReady.load(std::memory_order_acquire);
+            terminalContent.GetTermControl().ConfigureVisualProgressRecognition(
+                enabled,
+                enabled && _visualProgressReplaceRecognizedOutput.load(std::memory_order_acquire));
+        }
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+    }
+}
+
 void Pane::_QueueVisualProgressUpdate(const winTerm::VisualProgress::ProgressSnapshot& snapshot)
 {
     if (!_visualProgressEnabled.load(std::memory_order_acquire) || _visualProgressFaulted.load(std::memory_order_acquire) || !_visualProgressMailbox.Publish(snapshot))
@@ -2372,6 +2438,7 @@ void Pane::_ScheduleVisualProgressUpdate()
             _visualProgressUpdateQueued.store(false, std::memory_order_release);
             _visualProgressFaulted.store(true, std::memory_order_release);
             _visualProgressMailbox.Close();
+            _ConfigureVisualProgressRecognition();
             LOG_HR(E_FAIL);
             return;
         }
@@ -2399,6 +2466,7 @@ void Pane::_ScheduleVisualProgressUpdate()
         _visualProgressUpdateQueued.store(false, std::memory_order_release);
         _visualProgressFaulted.store(true, std::memory_order_release);
         _visualProgressMailbox.Close();
+        _ConfigureVisualProgressRecognition();
     }
 }
 
@@ -2406,36 +2474,45 @@ void Pane::_ApplyVisualProgressSnapshot(const winTerm::VisualProgress::ProgressS
 {
     try
     {
-        if (!_visualProgressOverlay || !_visualProgressFill || !_visualProgressTrack ||
-            !_visualProgressLeadingColumn || !_visualProgressFillColumn || !_visualProgressTrailingColumn)
+        if (!_visualProgressOverlay || !_visualProgressCompositionHost || !_visualProgressRenderer)
+        {
+            _DisableVisualProgressOnUI();
+            return;
+        }
+
+        _visualProgressRenderer->SetPaneActive(_lastActive);
+        _visualProgressRenderer->RefreshEnvironment();
+        _visualProgressRenderer->Apply(snapshot);
+        if (_visualProgressRenderer->Faulted())
+        {
+            _visualProgressRendererReady.store(false, std::memory_order_release);
+            _ConfigureVisualProgressRecognition();
+            _DisableVisualProgressOnUI();
+            return;
+        }
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
+        _DisableVisualProgressOnUI();
+    }
+}
+
+void Pane::_RefreshVisualProgressRenderer() noexcept
+{
+    try
+    {
+        if (!_visualProgressRenderer)
         {
             return;
         }
 
-        _visualProgressTrack.Background(
-            _themeResources.progressTrackBrush ?
-                _themeResources.progressTrackBrush :
-                TokenBrush(winTerm::Design::ColorTokens::ProgressTrack));
-        _visualProgressFill.Background(_VisualProgressBrush(snapshot.status));
-        _visualProgressOverlay.Visibility(snapshot.visible ? Visibility::Visible : Visibility::Collapsed);
-        if (!snapshot.visible)
+        _visualProgressRenderer->SetPaneActive(_lastActive);
+        _visualProgressRenderer->RefreshEnvironment();
+        if (_visualProgressRenderer->Faulted())
         {
-            return;
+            _DisableVisualProgressOnUI();
         }
-
-        double leading{};
-        double fill{ static_cast<double>(snapshot.value) };
-        double trailing{ 100.0 - fill };
-        if (snapshot.mode == winTerm::VisualProgress::ProgressMode::Indeterminate)
-        {
-            leading = 30.0;
-            fill = 40.0;
-            trailing = 30.0;
-        }
-        _visualProgressLeadingColumn.Width(GridLengthHelper::FromValueAndType(leading, GridUnitType::Star));
-        _visualProgressFillColumn.Width(GridLengthHelper::FromValueAndType(fill, GridUnitType::Star));
-        _visualProgressTrailingColumn.Width(GridLengthHelper::FromValueAndType(trailing, GridUnitType::Star));
-        _visualProgressFill.Visibility(fill > 0.0 ? Visibility::Visible : Visibility::Collapsed);
     }
     catch (...)
     {
@@ -2448,34 +2525,11 @@ void Pane::_DisableVisualProgressOnUI() noexcept
 {
     _visualProgressFaulted.store(true, std::memory_order_release);
     _visualProgressEnabled.store(false, std::memory_order_release);
+    _visualProgressRendererReady.store(false, std::memory_order_release);
     _visualProgressState.SetEnabled(false);
     _visualProgressMailbox.Close();
+    _ConfigureVisualProgressRecognition();
     _DestroyVisualProgressOverlay();
-}
-
-SolidColorBrush Pane::_VisualProgressBrush(const winTerm::VisualProgress::ProgressStatus status) const
-{
-    switch (status)
-    {
-    case winTerm::VisualProgress::ProgressStatus::Waiting:
-        return _themeResources.progressWaitingBrush ?
-                   _themeResources.progressWaitingBrush :
-                   TokenBrush(winTerm::Design::ColorTokens::ProgressWaiting);
-    case winTerm::VisualProgress::ProgressStatus::Success:
-        return _themeResources.progressSuccessBrush ?
-                   _themeResources.progressSuccessBrush :
-                   TokenBrush(winTerm::Design::ColorTokens::ProgressSuccess);
-    case winTerm::VisualProgress::ProgressStatus::Error:
-        return _themeResources.progressErrorBrush ?
-                   _themeResources.progressErrorBrush :
-                   TokenBrush(winTerm::Design::ColorTokens::ProgressError);
-    case winTerm::VisualProgress::ProgressStatus::Running:
-    case winTerm::VisualProgress::ProgressStatus::Cancelled:
-    default:
-        return _themeResources.progressRunningBrush ?
-                   _themeResources.progressRunningBrush :
-                   TokenBrush(winTerm::Design::ColorTokens::AccentMint);
-    }
 }
 
 void Pane::_UpdatePaneHeader()
@@ -3605,6 +3659,9 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
         //   Move our control, guid, isDefTermSession into the first one.
         _firstChild = std::make_shared<Pane>(_takePaneContent());
         _firstChild->_broadcastEnabled = _broadcastEnabled;
+        _firstChild->_visualProgressReplaceRecognizedOutput.store(
+            _visualProgressReplaceRecognizedOutput.load(std::memory_order_acquire),
+            std::memory_order_release);
         _firstChild->_SetVisualProgressEnabled(_visualProgressEnabled.load(std::memory_order_acquire));
     }
 

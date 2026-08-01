@@ -89,7 +89,8 @@ Author(s):
     X(bool, ShowPaneHeaders, "winterm.applicationUI.showPaneHeaders", true)                                                                                                                          \
     X(bool, ShowPaneProfileIcon, "winterm.applicationUI.showPaneProfileIcon", true)                                                                                                                  \
     X(bool, ShowPaneActiveStatus, "winterm.applicationUI.showPaneActiveStatus", true)                                                                                                                  \
-    X(bool, VisualProgressEnabled, "visualProgress.enabled", false)
+    X(bool, VisualProgressEnabled, "visualProgress.enabled", false)                                                                                                                                     \
+    X(bool, VisualProgressReplaceRecognizedOutput, "visualProgress.replaceRecognizedOutput", false)
 
 // Also add these settings to:
 // * Profile.idl

@@ -1281,6 +1281,11 @@ const int64_t Microsoft::Terminal::Core::Terminal::GetShellIntegrationExitCode()
     return _shellIntegrationExitCode;
 }
 
+bool Microsoft::Terminal::Core::Terminal::IsInAlternateScreenBuffer() const noexcept
+{
+    return _inAltBuffer();
+}
+
 void Microsoft::Terminal::Core::Terminal::CompletionsChangedCallback(std::function<void(std::wstring_view, unsigned int)> pfn) noexcept
 {
     _pfnCompletionsChanged.swap(pfn);

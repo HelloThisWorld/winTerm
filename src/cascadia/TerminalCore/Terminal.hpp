@@ -248,6 +248,9 @@ public:
     const size_t GetTaskbarProgress() const noexcept;
     const size_t GetShellIntegrationState() const noexcept;
     const int64_t GetShellIntegrationExitCode() const noexcept;
+    // Callers must already hold the terminal lock. This read-only boundary is
+    // used only to fail open before optional transient-output replacement.
+    bool IsInAlternateScreenBuffer() const noexcept;
 
     void ColorSelection(const TextAttribute& attr, winrt::Microsoft::Terminal::Core::MatchMode matchMode);
     void PreviewText(std::wstring_view input);
