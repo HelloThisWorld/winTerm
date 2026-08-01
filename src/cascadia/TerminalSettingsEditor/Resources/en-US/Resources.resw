@@ -2873,4 +2873,43 @@
   <data name="Globals_PaneResizeReset.Content" xml:space="preserve">
     <value>Reset pane resizing to defaults</value>
   </data>
+  <data name="Globals_VisualProgressHeader.Text" xml:space="preserve">
+    <value>Visual progress</value>
+  </data>
+  <data name="Globals_VisualProgressEnabled.Header" xml:space="preserve">
+    <value>Show visual progress</value>
+  </data>
+  <data name="Globals_VisualProgressEnabled.HelpText" xml:space="preserve">
+    <value>Show command and transfer progress near the bottom of each pane.</value>
+  </data>
+  <data name="Globals_VisualProgressRecognizeCliProgress.Header" xml:space="preserve">
+    <value>Detect progress from supported command-line tools</value>
+  </data>
+  <data name="Globals_VisualProgressRecognizeCliProgress.HelpText" xml:space="preserve">
+    <value>Recognize bounded progress output from supported tools locally without storing terminal content. Explicit application and shell progress remains available when this is off.</value>
+  </data>
+  <data name="Globals_VisualProgressPerformanceMode.Header" xml:space="preserve">
+    <value>Visual effects</value>
+  </data>
+  <data name="Globals_VisualProgressPerformanceMode.HelpText" xml:space="preserve">
+    <value>Automatic adapts rainbow animation, glow, and sparks to current conditions. Full prefers every effect, Balanced removes sparks, and Minimal uses a static gradient or solid indicator.</value>
+  </data>
+  <data name="Globals_VisualProgressPerformanceModeAutomatic.Content" xml:space="preserve">
+    <value>Automatic (recommended)</value>
+  </data>
+  <data name="Globals_VisualProgressPerformanceModeFull.Content" xml:space="preserve">
+    <value>Full</value>
+  </data>
+  <data name="Globals_VisualProgressPerformanceModeBalanced.Content" xml:space="preserve">
+    <value>Balanced</value>
+  </data>
+  <data name="Globals_VisualProgressPerformanceModeMinimal.Content" xml:space="preserve">
+    <value>Minimal</value>
+  </data>
+  <data name="Globals_VisualProgressReplaceRecognizedOutput.Header" xml:space="preserve">
+    <value>Replace recognized transient progress text</value>
+  </data>
+  <data name="Globals_VisualProgressReplaceRecognizedOutput.HelpText" xml:space="preserve">
+    <value>Warning: this changes visible terminal output. Hide only high-confidence temporary progress meters from supported tools. Logs, warnings, errors, prompts, and summaries remain visible. This remains off by default.</value>
+  </data>
 </root>

@@ -63,6 +63,14 @@ namespace Microsoft.Terminal.Settings.Model
         Comfortable,
     };
 
+    enum VisualProgressPerformanceMode
+    {
+        Automatic,
+        Full,
+        Balanced,
+        Minimal,
+    };
+
     [default_interface] runtimeclass GlobalAppSettings {
         Guid DefaultProfile;
 
@@ -132,6 +140,8 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, ShowPaneProfileIcon);
         INHERITABLE_SETTING(Boolean, ShowPaneActiveStatus);
         INHERITABLE_SETTING(Boolean, VisualProgressEnabled);
+        INHERITABLE_SETTING(Boolean, VisualProgressRecognizeCliProgress);
+        INHERITABLE_SETTING(VisualProgressPerformanceMode, VisualProgressPerformanceMode);
         INHERITABLE_SETTING(Boolean, VisualProgressReplaceRecognizedOutput);
 
         Windows.Foundation.Collections.IMapView<String, ColorScheme> ColorSchemes();

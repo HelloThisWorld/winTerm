@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <utility>
+
 // Par for the course, the XAML timer class is "self-referential". Releasing all references
 // to an instance will not stop the timer. Only calling Stop() explicitly will achieve that.
 struct SafeDispatcherTimer
@@ -13,7 +15,7 @@ struct SafeDispatcherTimer
     SafeDispatcherTimer(SafeDispatcherTimer&&) = delete;
     SafeDispatcherTimer& operator=(SafeDispatcherTimer&&) = delete;
 
-    ~SafeDispatcherTimer()
+    ~SafeDispatcherTimer() noexcept
     {
         Destroy();
     }
@@ -61,20 +63,35 @@ struct SafeDispatcherTimer
         }
     }
 
-    void Destroy()
+    void Destroy() noexcept
     {
-        if (!_timer)
+        // Clear our state before calling into XAML. Dispatcher shutdown can
+        // make Stop() or event revocation fail, and timer destruction must
+        // remain safe from noexcept owners and destructors.
+        auto timer = std::exchange(_timer, nullptr);
+        const auto token = std::exchange(_token, {});
+        if (!timer)
         {
             return;
         }
 
-        _timer.Stop();
-        if (_token)
+        try
         {
-            _timer.Tick(_token);
+            timer.Stop();
         }
-        _timer = nullptr;
-        _token = {};
+        catch (...)
+        {
+        }
+        if (token)
+        {
+            try
+            {
+                timer.Tick(token);
+            }
+            catch (...)
+            {
+            }
+        }
     }
 
 private:

@@ -100,6 +100,10 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_InitializeTab(winrt::com_ptr<Tab> newTabImpl, uint32_t insertPosition)
     {
         newTabImpl->Initialize();
+        // A newly-created tab must observe the current global settings just as
+        // existing tabs do during a settings reload. This is particularly
+        // important for live Visual Progress enablement and recognition state.
+        newTabImpl->UpdateSettings(_settings);
 
         // If insert position is not passed, calculate it
         if (insertPosition == -1)
@@ -1015,6 +1019,7 @@ namespace winrt::TerminalApp::implementation
             }
 
             _adjustProcessPriorityThrottled->Run();
+            _RefreshVisualProgressGovernor();
         }
         CATCH_LOG();
     }

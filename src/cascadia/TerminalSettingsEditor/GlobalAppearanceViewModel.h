@@ -21,6 +21,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         GETSET_BINDABLE_ENUM_SETTING(NewTabPosition, Model::NewTabPosition, _GlobalSettings.NewTabPosition);
         GETSET_BINDABLE_ENUM_SETTING(TabWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, _GlobalSettings.TabWidthMode);
         GETSET_BINDABLE_ENUM_SETTING(ApplicationUIDensity, Model::ApplicationUIDensity, _GlobalSettings.ApplicationUIDensity);
+        GETSET_BINDABLE_ENUM_SETTING(VisualProgressPerformanceMode, Model::VisualProgressPerformanceMode, _GlobalSettings.VisualProgressPerformanceMode);
 
     public:
         winrt::Windows::Foundation::IInspectable CurrentTheme();
@@ -29,6 +30,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         bool InvertedDisableAnimations();
         void InvertedDisableAnimations(bool value);
+        bool VisualProgressReplacementAvailable();
 
         void ShowTitlebarToggled(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::RoutedEventArgs& args);
 
@@ -46,6 +48,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowPaneHeaders);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowPaneProfileIcon);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, ShowPaneActiveStatus);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, VisualProgressEnabled);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, VisualProgressRecognizeCliProgress);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, VisualProgressReplaceRecognizedOutput);
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

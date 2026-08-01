@@ -24,7 +24,11 @@ namespace Microsoft.Terminal.Settings.Editor
         IInspectable CurrentApplicationUIDensity;
         Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> ApplicationUIDensityList { get; };
 
+        IInspectable CurrentVisualProgressPerformanceMode;
+        Windows.Foundation.Collections.IObservableVector<Microsoft.Terminal.Settings.Editor.EnumEntry> VisualProgressPerformanceModeList { get; };
+
         Boolean InvertedDisableAnimations;
+        Boolean VisualProgressReplacementAvailable { get; };
 
         void ShowTitlebarToggled(IInspectable sender, Windows.UI.Xaml.RoutedEventArgs args);
 
@@ -42,5 +46,8 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowPaneHeaders);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowPaneProfileIcon);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, ShowPaneActiveStatus);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, VisualProgressEnabled);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, VisualProgressRecognizeCliProgress);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, VisualProgressReplaceRecognizedOutput);
     }
 }

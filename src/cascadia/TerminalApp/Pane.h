@@ -23,7 +23,9 @@
 #include "TaskbarState.h"
 #include "TerminalPaneContent.h"
 #include "../../winterm/PaneResize/PaneResizeModel.h"
+#include "../../winterm/VisualProgress/VisualProgressAccessibility.h"
 #include "../../winterm/VisualProgress/VisualProgressModel.h"
+#include "../../winterm/VisualProgress/VisualProgressPerformanceGovernor.h"
 
 #include <atomic>
 
@@ -121,6 +123,12 @@ public:
     void SetActive();
     void SetPaneHeadersVisible(bool visible);
     void SetVisualProgressHostWindowState(bool visible, bool focused) noexcept;
+    void SetVisualProgressTabVisible(bool visible) noexcept;
+    bool IsVisualProgressGovernorEligible() const noexcept;
+    bool NeedsVisualProgressAccessibilityTick() const noexcept;
+    void TickVisualProgressAccessibility() noexcept;
+    void SetVisualProgressActivePaneCount(uint16_t count) noexcept;
+    void ObserveVisualProgressDispatchLatency(std::chrono::milliseconds latency) noexcept;
 
     struct BuildStartupState
     {
@@ -249,6 +257,7 @@ public:
     til::event<gotFocusArgs> GotFocus;
     til::event<winrt::delegate<std::shared_ptr<Pane>>> LostFocus;
     til::event<winrt::delegate<std::shared_ptr<Pane>>> Detached;
+    til::event<winrt::delegate<>> VisualProgressActivityChanged;
 
     using paneResizeCommittedArgs = winrt::delegate<
         std::shared_ptr<Pane>,
@@ -284,6 +293,7 @@ private:
     winrt::Windows::UI::Xaml::Controls::TextBlock _snapIndicatorText{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Grid _visualProgressOverlay{ nullptr };
     winrt::Windows::UI::Xaml::Controls::Grid _visualProgressCompositionHost{ nullptr };
+    winrt::Windows::UI::Xaml::Controls::ProgressBar _visualProgressSemanticProgress{ nullptr };
 
     PaneResources _themeResources;
 
@@ -310,6 +320,8 @@ private:
     winrt::TerminalApp::TerminalPaneContent::ShellIntegrationChanged_revoker _paneShellIntegrationChangedRevoker;
     winrt::TerminalApp::TerminalPaneContent::VisualProgressProviderChanged_revoker _paneVisualProgressProviderChangedRevoker;
     winrt::TerminalApp::IPaneContent::ReadOnlyChanged_revoker _paneReadOnlyChangedRevoker;
+    winrt::Windows::UI::Xaml::FrameworkElement::Loaded_revoker _leafLayoutLoadedRevoker;
+    winrt::Windows::UI::Xaml::FrameworkElement::Unloaded_revoker _leafLayoutUnloadedRevoker;
 
     Borders _borders{ Borders::None };
 
@@ -325,14 +337,23 @@ private:
     std::unique_ptr<winTerm::PaneResize::PaneResizeTransaction> _resizeTransaction;
     bool _dividerPointerOver{ false };
     std::atomic<bool> _visualProgressEnabled{ false };
+    std::atomic<bool> _visualProgressRecognizeCliProgress{ true };
     std::atomic<bool> _visualProgressReplaceRecognizedOutput{ false };
     std::atomic<bool> _visualProgressFaulted{ false };
     std::atomic<bool> _visualProgressRendererReady{ false };
     std::atomic<bool> _visualProgressUpdateQueued{ false };
+    std::atomic<bool> _visualProgressActivityActive{ false };
+    std::atomic<bool> _visualProgressElementLoaded{ false };
+    std::atomic<uint16_t> _visualProgressActivePaneCount{ 0 };
     bool _visualProgressHostWindowVisible{ true };
     bool _visualProgressHostWindowFocused{ false };
+    bool _visualProgressTabVisible{ false };
+    bool _visualProgressApplicationAnimationsEnabled{ true };
+    bool _visualProgressSoftwareRendering{ false };
+    winTerm::VisualProgress::PerformanceMode _visualProgressPerformanceMode{ winTerm::VisualProgress::PerformanceMode::Automatic };
     winTerm::VisualProgress::ProgressStateMachine _visualProgressState;
     winTerm::VisualProgress::ProgressUpdateMailbox _visualProgressMailbox;
+    winTerm::VisualProgress::VisualProgressAccessibilityPolicy _visualProgressAccessibility;
     std::shared_ptr<winTerm::VisualProgress::RainbowArcRenderer> _visualProgressRenderer;
 
     bool _IsLeaf() const noexcept;
@@ -342,6 +363,8 @@ private:
     void _setPaneContent(winrt::TerminalApp::IPaneContent content);
     void _AttachLeafVisual();
     void _SetVisualProgressEnabled(bool enabled);
+    void _CopyVisualProgressConfigurationTo(const std::shared_ptr<Pane>& pane) const;
+    void _RehydrateVisualProgressState();
     void _CreateVisualProgressOverlay();
     void _DestroyVisualProgressOverlay() noexcept;
     void _UpdateVisualProgressFromTaskbar();
@@ -352,6 +375,13 @@ private:
     void _ScheduleVisualProgressUpdate();
     void _RefreshVisualProgressRenderer() noexcept;
     void _ApplyVisualProgressSnapshot(const winTerm::VisualProgress::ProgressSnapshot& snapshot) noexcept;
+    void _ApplyVisualProgressAccessibility(const winTerm::VisualProgress::ProgressSnapshot& snapshot) noexcept;
+    void _SetVisualProgressActivity(bool active) noexcept;
+    void _SetVisualProgressElementLoaded(bool loaded) noexcept;
+    bool _IsVisualProgressPresented() const noexcept;
+    void _RefreshVisualProgressPresentation() noexcept;
+    void _OnVisualProgressRendererFault() noexcept;
+    bool _HandleVisualProgressRendererFault() noexcept;
     void _DisableVisualProgressOnUI() noexcept;
     void _UpdatePaneHeader();
     winrt::hstring _PaneHeaderTitle() const;

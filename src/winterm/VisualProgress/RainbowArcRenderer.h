@@ -4,6 +4,7 @@
 #pragma once
 
 #include "RainbowArcVisualConstants.h"
+#include "VisualProgressPerformanceGovernor.h"
 #include "VisualProgressRenderModel.h"
 
 #include <winrt/Windows.Foundation.h>
@@ -24,6 +25,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -49,7 +51,11 @@ namespace winTerm::VisualProgress
     class RainbowArcRenderer final : public std::enable_shared_from_this<RainbowArcRenderer>
     {
     public:
-        static std::shared_ptr<RainbowArcRenderer> TryCreate(const winrt::Windows::UI::Xaml::Controls::Grid& host) noexcept
+        using FaultCallback = std::function<void()>;
+
+        static std::shared_ptr<RainbowArcRenderer> TryCreate(
+            const winrt::Windows::UI::Xaml::Controls::Grid& host,
+            FaultCallback faultCallback = {}) noexcept
         {
             if (!host)
             {
@@ -58,13 +64,17 @@ namespace winTerm::VisualProgress
 
             try
             {
-                auto renderer = std::shared_ptr<RainbowArcRenderer>{ new RainbowArcRenderer{} };
+                auto renderer = std::shared_ptr<RainbowArcRenderer>{ new RainbowArcRenderer{ std::move(faultCallback) } };
                 if (!renderer->_initialize(host))
                 {
                     return nullptr;
                 }
                 renderer->_subscribeEvents();
                 renderer->RefreshEnvironment();
+                if (renderer->Faulted())
+                {
+                    return nullptr;
+                }
                 return renderer;
             }
             catch (...)
@@ -93,6 +103,7 @@ namespace winTerm::VisualProgress
             _snapshot = snapshot;
             _refreshRuntimeEnvironment();
             const auto now = _now();
+            _applyPerformanceDecision(_evaluatePerformancePolicy());
             auto plan = _renderState.Apply(snapshot, _environment, now);
             _applyWithDegradation(plan, true);
         }
@@ -105,7 +116,9 @@ namespace winTerm::VisualProgress
             }
 
             _environment.paneActive = active;
-            const auto plan = _renderState.RefreshEnvironment(_environment, _now());
+            const auto now = _now();
+            _applyPerformanceDecision(_evaluatePerformancePolicy());
+            const auto plan = _renderState.RefreshEnvironment(_environment, now);
             _applyWithDegradation(plan, false);
         }
 
@@ -122,7 +135,66 @@ namespace winTerm::VisualProgress
 
             _environment.windowVisible = visible;
             _environment.windowFocused = focused;
-            const auto plan = _renderState.RefreshEnvironment(_environment, _now());
+            const auto now = _now();
+            _applyPerformanceDecision(_evaluatePerformancePolicy());
+            const auto plan = _renderState.RefreshEnvironment(_environment, now);
+            _applyWithDegradation(plan, false);
+        }
+
+        void SetPerformanceMode(const PerformanceMode mode) noexcept
+        {
+            if (_closed || _faulted || _performanceInputs.mode == mode)
+            {
+                return;
+            }
+
+            _performanceInputs.mode = mode;
+            _refreshPerformancePolicy();
+        }
+
+        void SetApplicationAnimationsEnabled(const bool enabled) noexcept
+        {
+            if (_closed || _faulted || _applicationAnimationsEnabled == enabled)
+            {
+                return;
+            }
+
+            _applicationAnimationsEnabled = enabled;
+            _refreshPerformancePolicy();
+        }
+
+        void SetRuntimeEnvironment(const PerformanceRuntimeEnvironment& environment) noexcept
+        {
+            if (_closed || _faulted)
+            {
+                return;
+            }
+
+            _performanceRuntimeEnvironment = environment;
+            _refreshPerformancePolicy();
+        }
+
+        // Sampling is scheduled by a window-level owner. The renderer neither
+        // creates a timer nor queues probes; it only consumes timestamped
+        // observations through this deterministic governor entry point.
+        void ObserveDispatchLatency(const std::chrono::milliseconds latency,
+                                    const PerformanceTimestamp observedAt) noexcept
+        {
+            if (_closed || _faulted)
+            {
+                return;
+            }
+
+            _refreshRuntimeEnvironment();
+            _synchronizePerformanceInputs();
+            const auto decision = _performanceGovernor.ObserveDispatchLatency(_performanceInputs, latency, observedAt);
+            if (!decision.observationAccepted)
+            {
+                return;
+            }
+
+            _applyPerformanceDecision(decision);
+            const auto plan = _renderState.RefreshEnvironment(_environment, observedAt);
             _applyWithDegradation(plan, false);
         }
 
@@ -134,7 +206,9 @@ namespace winTerm::VisualProgress
             }
 
             _refreshRuntimeEnvironment();
-            const auto plan = _renderState.RefreshEnvironment(_environment, _now());
+            const auto now = _now();
+            _applyPerformanceDecision(_evaluatePerformancePolicy());
+            const auto plan = _renderState.RefreshEnvironment(_environment, now);
             _applyWithDegradation(plan, false);
         }
 
@@ -145,6 +219,7 @@ namespace winTerm::VisualProgress
                 return;
             }
             _closed = true;
+            _faultCallback = {};
 
             try
             {
@@ -188,6 +263,16 @@ namespace winTerm::VisualProgress
             return _renderState.Tier();
         }
 
+        RenderTier InitializedCapabilityTier() const noexcept
+        {
+            return _initializedCapabilityTier;
+        }
+
+        RenderTier AvailableCapabilityTier() const noexcept
+        {
+            return _availableCapabilityTier;
+        }
+
         bool UsesStaticFallback() const noexcept
         {
             return _environment.UsesStaticFallback() || _renderState.Tier() >= RenderTier::StaticGradient;
@@ -221,8 +306,9 @@ namespace winTerm::VisualProgress
             bool ambient{};
         };
 
-        RainbowArcRenderer() noexcept :
-            _sparkPool{ _sharedSparkBudget }
+        explicit RainbowArcRenderer(FaultCallback faultCallback) noexcept :
+            _sparkPool{ _sharedSparkBudget },
+            _faultCallback{ std::move(faultCallback) }
         {
             // Visible is a safe presentation default. Focus deliberately
             // starts false so no continuous work or sparks begin before the
@@ -261,6 +347,13 @@ namespace winTerm::VisualProgress
             return left.A == right.A && left.R == right.R && left.G == right.G && left.B == right.B;
         }
 
+        void _recordInitializedCapability(const RenderTier tier) noexcept
+        {
+            _initializedCapabilityTier = tier;
+            _availableCapabilityTier = tier;
+            _renderState.Tier(tier);
+        }
+
         bool _initialize(const WUXC::Grid& host) noexcept
         {
             _host = host;
@@ -275,12 +368,11 @@ namespace winTerm::VisualProgress
             }
             catch (...)
             {
-                _renderState.Tier(RenderTier::Disabled);
-                _faulted = true;
+                _markFaulted();
                 return false;
             }
 
-            _renderState.Tier(RenderTier::Solid);
+            _recordInitializedCapability(RenderTier::Solid);
 
             try
             {
@@ -301,36 +393,36 @@ namespace winTerm::VisualProgress
             {
                 _releaseCompositionHandles();
                 _showFallback(true);
-                return true;
+                return _finishInitialization();
             }
 
             try
             {
                 _initializeGradientStage();
-                _renderState.Tier(RenderTier::StaticGradient);
+                _recordInitializedCapability(RenderTier::StaticGradient);
             }
             catch (...)
             {
                 _renderState.Tier(RenderTier::Solid);
                 _detachCompositionForFallback();
-                return true;
+                return _finishInitialization();
             }
 
             try
             {
                 _initializeHeadStage();
-                _renderState.Tier(RenderTier::NoSparks);
+                _recordInitializedCapability(RenderTier::NoSparks);
             }
             catch (...)
             {
                 _renderState.Tier(RenderTier::StaticGradient);
-                return true;
+                return _finishInitialization();
             }
 
             try
             {
                 _initializeSparkStage();
-                _renderState.Tier(RenderTier::Full);
+                _recordInitializedCapability(RenderTier::Full);
             }
             catch (...)
             {
@@ -338,9 +430,13 @@ namespace winTerm::VisualProgress
                 _renderState.Tier(RenderTier::NoSparks);
             }
 
+            return _finishInitialization();
+        }
+
+        bool _finishInitialization() noexcept
+        {
             _updateGeometry();
-            _showFallback(false);
-            return true;
+            return !_faulted;
         }
 
         void _initializeSolidFallback()
@@ -376,7 +472,7 @@ namespace winTerm::VisualProgress
 
             _host.Children().Append(_fallbackTrack);
             _host.Children().Append(_fallbackFill);
-            _showFallback(true);
+            _showFallbackChecked(true);
         }
 
         void _initializeCompositionBase()
@@ -791,13 +887,14 @@ namespace winTerm::VisualProgress
             {
                 if (_uiSettings)
                 {
-                    _environment.animationsEnabled = _uiSettings.AnimationsEnabled();
+                    _osAnimationsEnabled = _uiSettings.AnimationsEnabled();
                 }
             }
             catch (...)
             {
-                _environment.animationsEnabled = false;
+                _osAnimationsEnabled = false;
             }
+            _environment.animationsEnabled = _osAnimationsEnabled && _applicationAnimationsEnabled;
 
             try
             {
@@ -811,8 +908,70 @@ namespace winTerm::VisualProgress
                 _environment.highContrast = true;
             }
 
-            _environment.rendererAvailable = _renderState.Tier() != RenderTier::Disabled;
+            _environment.rendererAvailable = _availableCapabilityTier != RenderTier::Disabled;
             _updatePalette();
+            _synchronizePerformanceInputs();
+        }
+
+        void _synchronizePerformanceInputs() noexcept
+        {
+            const auto localProgressVisible = _snapshot.visible && _snapshot.mode != ProgressMode::Hidden;
+            const auto localProgressActive = localProgressVisible &&
+                                             (_snapshot.status == ProgressStatus::Running ||
+                                              _snapshot.status == ProgressStatus::Waiting);
+
+            _performanceInputs.featureEnabled = _environment.featureEnabled && _performanceRuntimeEnvironment.featureEnabled;
+            _performanceInputs.emergencyDisabled = _performanceRuntimeEnvironment.emergencyDisabled;
+            _performanceInputs.osAnimationsEnabled = _osAnimationsEnabled;
+            _performanceInputs.applicationAnimationsEnabled = _applicationAnimationsEnabled;
+            _performanceInputs.highContrast = _environment.highContrast;
+            _performanceInputs.windowVisible = _environment.windowVisible;
+            _performanceInputs.windowMinimized = _performanceRuntimeEnvironment.windowMinimized;
+            _performanceInputs.windowFocused = _environment.windowFocused;
+            _performanceInputs.paneVisible = _environment.hostLoaded &&
+                                             _environment.tabVisible &&
+                                             _environment.paneVisible;
+            _performanceInputs.paneActive = _environment.paneActive;
+            _performanceInputs.progressVisible = localProgressVisible;
+            _performanceInputs.progressActive = localProgressActive;
+            // The TerminalPage coordinator owns the authoritative presented
+            // count. A hidden or unloaded pane may retain a semantic snapshot,
+            // but it must not keep adaptive state alive after the window count
+            // reaches zero.
+            _performanceInputs.visibleActiveProgressCount = _performanceRuntimeEnvironment.visibleActiveProgressCount;
+            _performanceInputs.softwareRendering = _performanceRuntimeEnvironment.softwareRendering;
+            _performanceInputs.remoteSession = _performanceRuntimeEnvironment.remoteSession;
+            _performanceInputs.effectsFast = _performanceRuntimeEnvironment.effectsFast;
+            _performanceInputs.energySaver = _performanceRuntimeEnvironment.energySaver;
+            _performanceInputs.capabilityCeiling = _availableCapabilityTier;
+        }
+
+        PerformanceGovernorDecision _evaluatePerformancePolicy() noexcept
+        {
+            _synchronizePerformanceInputs();
+            return _performanceGovernor.Evaluate(_performanceInputs);
+        }
+
+        void _applyPerformanceDecision(const PerformanceGovernorDecision& decision) noexcept
+        {
+            _renderState.Tier(decision.tier);
+            if (!decision.continuousAnimation)
+            {
+                _stopContinuousAnimations();
+            }
+            if (!decision.sparks)
+            {
+                _releaseAllSparks();
+            }
+        }
+
+        void _refreshPerformancePolicy() noexcept
+        {
+            _refreshRuntimeEnvironment();
+            const auto now = _now();
+            _applyPerformanceDecision(_evaluatePerformancePolicy());
+            const auto plan = _renderState.RefreshEnvironment(_environment, now);
+            _applyWithDegradation(plan, false);
         }
 
         void _updatePalette() noexcept
@@ -902,60 +1061,69 @@ namespace winTerm::VisualProgress
 
         void _updateGeometry() noexcept
         {
-            try
+            for (uint8_t attempt = 0; attempt < 5 && !_closed && !_faulted; ++attempt)
             {
-                const auto previousTrackWidth = _trackWidth;
-                const auto previousTrackY = _trackY;
-                const auto width = std::max(0.0f, static_cast<float>(_host.ActualWidth()));
-                const auto height = std::max(0.0f, static_cast<float>(_host.ActualHeight()));
-                _trackWidth = std::max(0.0f, width - (2.0f * RainbowArcVisualConstants::HorizontalInset));
-                _trackY = std::max(0.0f, height - RainbowArcVisualConstants::BottomInset - RainbowArcVisualConstants::TrackHeight);
-                _headY = _trackY + (RainbowArcVisualConstants::TrackHeight / 2.0f);
-                _drawable = _trackWidth >= RainbowArcVisualConstants::MinimumDrawableTrackWidth && height >= RainbowArcVisualConstants::TrackHeight;
-
-                if (_root)
+                try
                 {
-                    _root.Size({ width, height });
-                    _trackVisual.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                    _trackVisual.Offset({ RainbowArcVisualConstants::HorizontalInset, _trackY, 0.0f });
-                    _trackGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                    _trackGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
+                    const auto previousTrackWidth = _trackWidth;
+                    const auto previousTrackY = _trackY;
+                    const auto width = std::max(0.0f, static_cast<float>(_host.ActualWidth()));
+                    const auto height = std::max(0.0f, static_cast<float>(_host.ActualHeight()));
+                    _trackWidth = std::max(0.0f, width - (2.0f * RainbowArcVisualConstants::HorizontalInset));
+                    _trackY = std::max(0.0f, height - RainbowArcVisualConstants::BottomInset - RainbowArcVisualConstants::TrackHeight);
+                    _headY = _trackY + (RainbowArcVisualConstants::TrackHeight / 2.0f);
+                    _drawable = _trackWidth >= RainbowArcVisualConstants::MinimumDrawableTrackWidth && height >= RainbowArcVisualConstants::TrackHeight;
 
-                    _fillBoundary.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                    _fillBoundary.Offset({ RainbowArcVisualConstants::HorizontalInset, _trackY, 0.0f });
-                    _solidFillVisual.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                    _solidFillGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                    _solidFillGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
-
-                    if (_rainbowFillVisual)
+                    if (_root)
                     {
-                        _rainbowFillVisual.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                        _rainbowFillGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                        _rainbowFillGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
-                        _cometContainer.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                        _cometContainer.Offset({ RainbowArcVisualConstants::HorizontalInset, _trackY, 0.0f });
-                        _cometClipGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
-                        _cometClipGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
-                        _cometTail.Size({ _trackWidth * RainbowArcVisualConstants::IndeterminateTailFraction, RainbowArcVisualConstants::TrackHeight });
-                        _successSweep.Size({ std::max(2.0f, _trackWidth * RainbowArcVisualConstants::SuccessSweepWidthFraction), RainbowArcVisualConstants::TrackHeight });
+                        _root.Size({ width, height });
+                        _trackVisual.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                        _trackVisual.Offset({ RainbowArcVisualConstants::HorizontalInset, _trackY, 0.0f });
+                        _trackGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                        _trackGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
+
+                        _fillBoundary.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                        _fillBoundary.Offset({ RainbowArcVisualConstants::HorizontalInset, _trackY, 0.0f });
+                        _solidFillVisual.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                        _solidFillGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                        _solidFillGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
+
+                        if (_rainbowFillVisual)
+                        {
+                            _rainbowFillVisual.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                            _rainbowFillGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                            _rainbowFillGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
+                            _cometContainer.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                            _cometContainer.Offset({ RainbowArcVisualConstants::HorizontalInset, _trackY, 0.0f });
+                            _cometClipGeometry.Size({ _trackWidth, RainbowArcVisualConstants::TrackHeight });
+                            _cometClipGeometry.CornerRadius({ RainbowArcVisualConstants::TrackCornerRadius, RainbowArcVisualConstants::TrackCornerRadius });
+                            _cometTail.Size({ _trackWidth * RainbowArcVisualConstants::IndeterminateTailFraction, RainbowArcVisualConstants::TrackHeight });
+                            _successSweep.Size({ std::max(2.0f, _trackWidth * RainbowArcVisualConstants::SuccessSweepWidthFraction), RainbowArcVisualConstants::TrackHeight });
+                        }
+                    }
+
+                    if (std::fabs(previousTrackWidth - _trackWidth) > 0.01f ||
+                        std::fabs(previousTrackY - _trackY) > 0.01f)
+                    {
+                        _restartGeometryAnimations();
+                    }
+
+                    _updateFallbackChecked(_renderState.CurrentProgress(_now()), _snapshot.mode, _snapshot.status);
+                    _showFallbackChecked(_renderState.Tier() == RenderTier::Solid ||
+                                         !_root ||
+                                         _environment.UsesStaticFallback());
+                    return;
+                }
+                catch (...)
+                {
+                    _drawable = false;
+                    if (!_degradeAfterFailure(_now()))
+                    {
+                        return;
                     }
                 }
-
-                if (std::fabs(previousTrackWidth - _trackWidth) > 0.01f ||
-                    std::fabs(previousTrackY - _trackY) > 0.01f)
-                {
-                    _restartGeometryAnimations();
-                }
-
-                _updateFallback(_renderState.CurrentProgress(_now()), _snapshot.mode, _snapshot.status);
-                _showFallback(_renderState.Tier() == RenderTier::Solid ||
-                              !_root ||
-                              _environment.UsesStaticFallback());
             }
-            catch (...)
-            {
-                _drawable = false;
-            }
+            _markFaulted();
         }
 
         void _restartGeometryAnimations() noexcept
@@ -995,31 +1163,91 @@ namespace winTerm::VisualProgress
                 }
                 catch (...)
                 {
-                    _stopAllAnimations();
-                    _releaseAllSparks();
-                    const auto next = NextLowerRenderTier(_renderState.Tier());
-                    _renderState.Tier(next);
-                    _environment.rendererAvailable = next != RenderTier::Disabled;
-                    if (next == RenderTier::Solid)
+                    const auto now = _now();
+                    if (!_degradeAfterFailure(now))
                     {
-                        _detachCompositionForFallback();
-                    }
-                    else if (next == RenderTier::Disabled)
-                    {
-                        _faulted = true;
-                        _showFallback(false);
                         return;
                     }
-                    plan = _renderState.RefreshEnvironment(_environment, _now());
+                    plan = _renderState.RefreshEnvironment(_environment, now);
+                }
+            }
+            _markFaulted();
+        }
+
+        bool _degradeAfterFailure(const RenderTimestamp now) noexcept
+        {
+            _stopAllAnimations();
+            _releaseAllSparks();
+            const auto next = NextLowerRenderTier(_renderState.Tier());
+            _availableCapabilityTier = MostRestrictiveRenderTier(_availableCapabilityTier, next);
+            _environment.rendererAvailable = _availableCapabilityTier != RenderTier::Disabled;
+            _synchronizePerformanceInputs();
+            _applyPerformanceDecision(_performanceGovernor.ObserveHardFailure(_performanceInputs, now));
+            if (_availableCapabilityTier == RenderTier::Solid)
+            {
+                _detachCompositionForFallback();
+            }
+            else if (_availableCapabilityTier == RenderTier::Disabled)
+            {
+                _markFaulted();
+                return false;
+            }
+            return true;
+        }
+
+        void _markFaulted() noexcept
+        {
+            if (_faulted)
+            {
+                return;
+            }
+
+            _faulted = true;
+            _availableCapabilityTier = RenderTier::Disabled;
+            _environment.rendererAvailable = false;
+            _renderState.Tier(RenderTier::Disabled);
+            _stopAllAnimations();
+            _releaseAllSparks();
+            _showFallback(false);
+            try
+            {
+                if (_host)
+                {
+                    WUXH::ElementCompositionPreview::SetElementChildVisual(_host, WUC::Visual{ nullptr });
+                }
+            }
+            catch (...)
+            {
+            }
+            _releaseCompositionHandles();
+            _removeFallbackVisuals();
+
+            [[maybe_unused]] auto keepAlive = weak_from_this().lock();
+            auto callback = std::move(_faultCallback);
+            _faultCallback = {};
+            if (callback)
+            {
+                try
+                {
+                    callback();
+                }
+                catch (...)
+                {
+                    // Fault reporting is advisory and must remain fail-open.
                 }
             }
         }
 
         void _render(const RenderTransitionPlan& plan, const bool semanticUpdate)
         {
-            if (!_host || _renderState.Tier() == RenderTier::Disabled)
+            if (!_host)
             {
                 throw winrt::hresult_error{ winrt::hresult{ static_cast<int32_t>(0x80004005u) } };
+            }
+            if (plan.tier == RenderTier::Disabled || _renderState.Tier() == RenderTier::Disabled)
+            {
+                _pauseForIneligibleHost();
+                return;
             }
 
             // A terminal presentation owns its final hide. Theme, focus,
@@ -1054,13 +1282,13 @@ namespace winTerm::VisualProgress
 
             if (_renderState.Tier() == RenderTier::Solid || !_root || _environment.UsesStaticFallback())
             {
-                _showFallback(true);
-                _updateFallback(plan.targetProgress, plan.mode, plan.status);
+                _showFallbackChecked(true);
+                _updateFallbackChecked(plan.targetProgress, plan.mode, plan.status);
                 _releaseAllSparks();
                 return;
             }
 
-            _showFallback(false);
+            _showFallbackChecked(false);
             _root.IsVisible(true);
             _root.Opacity(1.0f);
             _clearTerminalBatch();
@@ -1853,59 +2081,69 @@ namespace winTerm::VisualProgress
         {
             try
             {
-                if (_fallbackTrack)
-                {
-                    _fallbackTrack.Visibility(visible && _drawable ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
-                }
-                if (_fallbackFill)
-                {
-                    _fallbackFill.Visibility(visible && _drawable ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
-                }
-                if (_root)
-                {
-                    _root.IsVisible(!visible && _drawable);
-                }
+                _showFallbackChecked(visible);
             }
             catch (...)
             {
             }
         }
 
+        void _showFallbackChecked(const bool visible)
+        {
+            if (!_fallbackTrack || !_fallbackFill)
+            {
+                throw winrt::hresult_error{ winrt::hresult{ static_cast<int32_t>(0x80004005u) } };
+            }
+
+            _fallbackTrack.Visibility(visible && _drawable ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
+            _fallbackFill.Visibility(visible && _drawable ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
+            if (_root)
+            {
+                _root.IsVisible(!visible && _drawable);
+            }
+        }
+
         void _updateFallback(const float progress, const ProgressMode mode, const ProgressStatus status) noexcept
         {
-            if (!_fallbackFill || !_fallbackTrack)
-            {
-                return;
-            }
             try
             {
-                auto width = std::clamp(progress, 0.0f, 1.0f) * _trackWidth;
-                auto left = RainbowArcVisualConstants::HorizontalInset;
-                if (mode == ProgressMode::Indeterminate)
-                {
-                    width = _trackWidth * RainbowArcVisualConstants::IndeterminateTailFraction;
-                    left += (_trackWidth - width) / 2.0f;
-                }
-                else if (mode == ProgressMode::Hidden)
-                {
-                    width = 0.0f;
-                }
-                _fallbackFill.Width(width);
-                _fallbackFill.Margin(WUX::ThicknessHelper::FromLengths(
-                    left,
-                    0.0,
-                    0.0,
-                    RainbowArcVisualConstants::BottomInset));
-                const auto errorWithoutProgress = status == ProgressStatus::Error &&
-                                                  mode == ProgressMode::Determinate &&
-                                                  progress <= 0.0001f;
-                _fallbackTrackBrush.Color(errorWithoutProgress ? _statusColor(status) : _trackColor);
-                _fallbackFillBrush.Color(_statusColor(status));
-                _fallbackFill.Visibility(width > 0.0f ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
+                _updateFallbackChecked(progress, mode, status);
             }
             catch (...)
             {
             }
+        }
+
+        void _updateFallbackChecked(const float progress, const ProgressMode mode, const ProgressStatus status)
+        {
+            if (!_fallbackFill || !_fallbackTrack || !_fallbackTrackBrush || !_fallbackFillBrush)
+            {
+                throw winrt::hresult_error{ winrt::hresult{ static_cast<int32_t>(0x80004005u) } };
+            }
+
+            auto width = std::clamp(progress, 0.0f, 1.0f) * _trackWidth;
+            auto left = RainbowArcVisualConstants::HorizontalInset;
+            if (mode == ProgressMode::Indeterminate)
+            {
+                width = _trackWidth * RainbowArcVisualConstants::IndeterminateTailFraction;
+                left += (_trackWidth - width) / 2.0f;
+            }
+            else if (mode == ProgressMode::Hidden)
+            {
+                width = 0.0f;
+            }
+            _fallbackFill.Width(width);
+            _fallbackFill.Margin(WUX::ThicknessHelper::FromLengths(
+                left,
+                0.0,
+                0.0,
+                RainbowArcVisualConstants::BottomInset));
+            const auto errorWithoutProgress = status == ProgressStatus::Error &&
+                                              mode == ProgressMode::Determinate &&
+                                              progress <= 0.0001f;
+            _fallbackTrackBrush.Color(errorWithoutProgress ? _statusColor(status) : _trackColor);
+            _fallbackFillBrush.Color(_statusColor(status));
+            _fallbackFill.Visibility(width > 0.0f ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
         }
 
         WU::Color _statusColor(const ProgressStatus status) const noexcept
@@ -2032,8 +2270,14 @@ namespace winTerm::VisualProgress
         SparkPool _sparkPool;
         std::array<SparkVisual, RainbowArcVisualConstants::SparkPoolCapacityPerPane> _sparks{};
         VisualProgressRenderState _renderState{};
+        VisualProgressPerformanceGovernor _performanceGovernor{};
+        PerformanceGovernorInputs _performanceInputs{};
+        PerformanceRuntimeEnvironment _performanceRuntimeEnvironment{};
         RenderEnvironment _environment{};
         ProgressSnapshot _snapshot{};
+        FaultCallback _faultCallback;
+        RenderTier _initializedCapabilityTier{ RenderTier::Disabled };
+        RenderTier _availableCapabilityTier{ RenderTier::Disabled };
 
         WUXC::Grid _host{ nullptr };
         WUXC::Border _fallbackTrack{ nullptr };
@@ -2133,6 +2377,8 @@ namespace winTerm::VisualProgress
         bool _indeterminateRunning{};
         bool _waitingRunning{};
         bool _ambientSparksRunning{};
+        bool _osAnimationsEnabled{ true };
+        bool _applicationAnimationsEnabled{ true };
         bool _faulted{};
         bool _closed{};
     };

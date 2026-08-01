@@ -178,5 +178,38 @@
             <ToggleSwitch IsOn="{x:Bind ViewModel.EnableUnfocusedAcrylic, Mode=TwoWay}"
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
         </local:SettingContainer>
+
+        <TextBlock x:Uid="Globals_VisualProgressHeader"
+                   Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+        <local:SettingContainer x:Name="VisualProgressEnabled"
+                                x:Uid="Globals_VisualProgressEnabled">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.VisualProgressEnabled, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="VisualProgressRecognizeCliProgress"
+                                x:Uid="Globals_VisualProgressRecognizeCliProgress">
+            <ToggleSwitch IsEnabled="{x:Bind ViewModel.VisualProgressEnabled, Mode=OneWay}"
+                          IsOn="{x:Bind ViewModel.VisualProgressRecognizeCliProgress, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="VisualProgressPerformanceMode"
+                                x:Uid="Globals_VisualProgressPerformanceMode">
+            <ComboBox AutomationProperties.AccessibilityView="Content"
+                      IsEnabled="{x:Bind ViewModel.VisualProgressEnabled, Mode=OneWay}"
+                      ItemTemplate="{StaticResource EnumComboBoxTemplate}"
+                      ItemsSource="{x:Bind ViewModel.VisualProgressPerformanceModeList, Mode=OneWay}"
+                      SelectedItem="{x:Bind ViewModel.CurrentVisualProgressPerformanceMode, Mode=TwoWay}"
+                      Style="{StaticResource ComboBoxSettingStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="VisualProgressReplaceRecognizedOutput"
+                                x:Uid="Globals_VisualProgressReplaceRecognizedOutput">
+            <ToggleSwitch IsEnabled="{x:Bind ViewModel.VisualProgressReplacementAvailable, Mode=OneWay}"
+                          IsOn="{x:Bind ViewModel.VisualProgressReplaceRecognizedOutput, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingContainer>
     </StackPanel>
 </Page>

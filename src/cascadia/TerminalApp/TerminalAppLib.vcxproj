@@ -110,6 +110,7 @@
       <DependentUpon>TerminalPage.xaml</DependentUpon>
       <SubType>Code</SubType>
     </ClInclude>
+    <ClInclude Include="VisualProgressWindowCoordinator.h" />
     <ClInclude Include="TerminalTabStatus.h">
       <DependentUpon>TerminalTabStatus.idl</DependentUpon>
       <SubType>Code</SubType>

@@ -10,6 +10,7 @@ using namespace winrt;
 using namespace winrt::Windows::UI::Xaml;
 using namespace winrt::Windows::UI::Xaml::Navigation;
 using namespace winrt::Windows::UI::Xaml::Controls;
+using namespace winrt::Windows::UI::Xaml::Data;
 using namespace winrt::Microsoft::Terminal::Settings::Model;
 using namespace winrt::Windows::Foundation::Collections;
 
@@ -29,7 +30,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         INITIALIZE_BINDABLE_ENUM_SETTING(NewTabPosition, NewTabPosition, NewTabPosition, L"Globals_NewTabPosition", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(TabWidthMode, TabViewWidthMode, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode, L"Globals_TabWidthMode", L"Content");
         INITIALIZE_BINDABLE_ENUM_SETTING(ApplicationUIDensity, ApplicationUIDensity, Model::ApplicationUIDensity, L"Globals_ApplicationUIDensity", L"Content");
+        INITIALIZE_BINDABLE_ENUM_SETTING(VisualProgressPerformanceMode, VisualProgressPerformanceMode, Model::VisualProgressPerformanceMode, L"Globals_VisualProgressPerformanceMode", L"Content");
         _UpdateThemeList();
+
+        PropertyChanged([this](auto&&, const PropertyChangedEventArgs& args) {
+            const auto viewModelProperty{ args.PropertyName() };
+            if (viewModelProperty == L"VisualProgressEnabled" || viewModelProperty == L"VisualProgressRecognizeCliProgress")
+            {
+                _NotifyChanges(L"VisualProgressReplacementAvailable");
+            }
+        });
     }
 
     // Function Description:
@@ -110,6 +120,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     void GlobalAppearanceViewModel::InvertedDisableAnimations(bool value)
     {
         _GlobalSettings.DisableAnimations(!value);
+    }
+
+    bool GlobalAppearanceViewModel::VisualProgressReplacementAvailable()
+    {
+        return VisualProgressEnabled() && VisualProgressRecognizeCliProgress();
     }
 
     void GlobalAppearanceViewModel::ShowTitlebarToggled(const winrt::Windows::Foundation::IInspectable& /* sender */, const RoutedEventArgs& /* args */)
