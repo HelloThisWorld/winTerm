@@ -29,7 +29,7 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `1.1.3`. See the
+The current source version is `1.2.0`. See the
 [latest official Release](https://github.com/HelloThisWorld/winTerm/releases/latest)
 for the complete published asset list and checksums.
 
@@ -39,7 +39,7 @@ Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
 See [installation guidance](docs/user/installation.md) and the
-[1.1.3 release notes](docs/releases/1.1.3.md).
+[1.2.0 release notes](docs/releases/1.2.0.md).
 
 ## Core features
 
@@ -55,6 +55,9 @@ See [installation guidance](docs/user/installation.md) and the
   blue-grey dividers, and mint focus/resize feedback;
 - configurable pane resizing and Application UI settings, keyboard resize
   commands, High Contrast-aware divider feedback, and screen-reader labels;
+- per-pane Visual Progress with a Rainbow Arc Weld overlay for standard OSC
+  progress, shell lifecycle state, and bounded local recognition of common CLI
+  progress formats, with adaptive rendering and accessible state announcements;
 - independent `%LOCALAPPDATA%\winTerm` data and `winterm.exe` command
   registration without replacing Windows Terminal or `wt.exe`;
 - PowerShell, CMD, dynamic WSL profile discovery, themes, private fonts,
@@ -84,8 +87,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.1.3 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.1.3 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.2.0 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.2.0 -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build
@@ -96,8 +99,9 @@ stage, release allowlist, or primary user installation flow.
 
 winTerm does not collect command text, terminal output, clipboard content,
 workspace contents, working directories, or usage analytics. Crash upload is
-off and opt-in. See [PRIVACY.md](PRIVACY.md), [SECURITY.md](SECURITY.md), and
-[SUPPORT.md](SUPPORT.md).
+off and opt-in. Visual Progress recognition is local, bounded, and in-memory;
+it does not upload or persist terminal content. See [PRIVACY.md](PRIVACY.md),
+[SECURITY.md](SECURITY.md), and [SUPPORT.md](SUPPORT.md).
 
 ## Code signing policy
 

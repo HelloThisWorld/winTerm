@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.2.0 - 2026-08-01
+
+### Added
+
+- Added stable per-pane Visual Progress with the Rainbow Arc Weld overlay for
+  determinate, indeterminate, waiting, success, error, and cancelled states.
+- Added bounded, local-only CLI progress recognition for Docker, BuildKit, pip,
+  Git, curl, wget, npm, pnpm, yarn, nvm, Maven, Gradle, and a conservative
+  generic fallback. Explicit OSC 9;4 progress retains highest precedence.
+- Added **Settings → Appearance → Visual progress** controls. Visual Progress
+  and CLI recognition default on, performance defaults to Automatic, and
+  recognized-output replacement remains off by default.
+- Added accessible ProgressBar semantics, real determinate values, nonnumeric
+  indeterminate state, localized status text, and throttled active-pane-only
+  announcements that never expose command, provider, or path content.
+
+### Changed
+
+- Added an adaptive rendering governor with Full, Balanced, and Minimal user
+  modes; Automatic mode bounds effects by active progress count, UI dispatch
+  latency, Reduced Motion, High Contrast, remote/software rendering, energy
+  state, window visibility, and focus.
+- Updated application, package, PowerShell module, About, executable resources,
+  Workspace fallbacks, and release metadata to `1.2.0`, package `1.2.0.0`, with
+  intended tag `v1.2.0`. Existing workspace, docking, shell, theme, and update
+  schema/protocol versions remain unchanged.
+
+### Distribution
+
+- Prepares the x64 Setup EXE and Portable ZIP release flows with checksums,
+  SPDX and CycloneDX SBOMs, third-party notices, and release metadata.
+- The Setup EXE is not Authenticode-signed; Windows may display Unknown
+  Publisher or SmartScreen, so download it from the official Release and verify
+  it with `SHA256SUMS.txt`.
+
 ## 1.1.3 - 2026-07-26
 
 ### Changed

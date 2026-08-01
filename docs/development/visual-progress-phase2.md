@@ -1,6 +1,10 @@
 # Visual Progress Phase 2
 
-Phase 2 extends the [Phase 1 progress foundation](visual-progress-phase1.md) with the Rainbow Arc Weld renderer and bounded CLI progress recognition. This remains a developer preview: it is not a released or stable v1.2.0 feature, the application version remains 1.1.3, and this work does not create a tag or release.
+Phase 2 extended the [Phase 1 progress foundation](visual-progress-phase1.md)
+with the Rainbow Arc Weld renderer and bounded CLI progress recognition. That
+architecture now underlies the stable Visual Progress contract prepared for
+winTerm application version 1.2.0 by Phase 3. This document retains the detailed
+design and provider history; it does not itself create a tag or GitHub Release.
 
 ## Architecture
 
@@ -84,11 +88,51 @@ Rendering is decorative and degrades independently for each affected pane:
 
 Composition or GPU failure never changes PTY, input, output, selection, copy and paste, or pane-management behavior. Normalized UI publication is coalesced to approximately 10–20 updates per second even if a CLI writes more frequently.
 
+### Adaptive performance governor
+
+One coordinator is owned by each terminal window (`TerminalPage`). Only while
+that window has eligible visible, active running or waiting progress, it posts
+at most one low-priority UI-dispatch probe approximately once per second. The
+coordinator stops and invalidates pending generations when the window becomes
+idle or hidden or when it closes; there is no permanent per-pane sampler.
+
+Automatic mode caps the renderer at Full for one active progress indicator,
+NoSparks for two or three, and StaticGradient for four or more. The explicit
+Full, Balanced, and Minimal settings respectively permit the full tier, cap at
+NoSparks, and cap at StaticGradient. Reduced Motion, software rendering, remote
+sessions, and constrained energy state cap at StaticGradient; High Contrast
+uses Solid; a runtime effects limitation caps at NoSparks. The cheapest
+applicable cap always wins.
+
+Dispatch latency of at least 100 milliseconds for three consecutive samples
+degrades one tier. Latency at or below 40 milliseconds for 15 consecutive
+samples may recover one tier after a ten-second cooldown. Intermediate samples
+reset the corresponding streak, idle state resets sampling history, and a hard
+renderer failure disables the decorative overlay immediately without affecting
+terminal behavior. These thresholds and the active-count caps provide stable
+hysteresis instead of oscillating on individual samples.
+
 ### Reduced Motion and High Contrast
 
 When Windows disables animation, the renderer uses the Phase 1 static behavior. Determinate values update directly, indeterminate state remains nonnumeric, and there is no moving rainbow, comet, interpolation, breathing, success sweep, or spark emission. Solid and static status treatments use separate dark- and light-surface palettes selected from the XAML host theme, with system background luminance as a fallback when the theme is default. This keeps running, waiting, success, and error states legible on light backgrounds as well as dark ones.
 
 High Contrast uses a clear system-compatible solid track and fill. It does not depend on rainbow hue or glow to communicate progress. High Contrast also disables sparks and continuous decorative motion. These fallbacks take precedence over the full renderer tier.
+
+### Accessibility
+
+The structural overlay exposes UI Automation `ProgressBar` semantics with the
+localized name **Command progress**. Determinate progress exposes only its real
+0–100 value. Indeterminate progress remains nonnumeric, and running, waiting,
+success, error, cancelled, and hidden states use localized status text. The
+accessible surface never includes a command, provider, package, image, path,
+URL, username, or hostname.
+
+Announcements are limited to the active visible pane: start once, approximate
+25/50/75/100-percent milestones, the waiting transition once, and one terminal
+success, error, or cancellation. Nonterminal announcements have a minimum
+four-second interval, and duplicate, background, inactive, and hidden updates
+are suppressed. This announcement policy is independent of decorative motion,
+so Reduced Motion and High Contrast preserve the same semantic state.
 
 ## Bounded CLI recognition
 
@@ -123,20 +167,27 @@ Maven Resolver output is not always prefixed with `[INFO]`. Anchored `Downloadin
 
 The Generic fallback recognizes anchored real percentages or counts, transfer speed plus ETA even when no total is available, transient single-character `|`, `/`, `-`, or `\` spinners, and repeated carriage-return records with the same structural shape. A repeated transient shape must be observed again before it produces indeterminate progress. Generic recognition is always overlay-only, never suppresses output, and cannot replace an active high-confidence built-in provider. When the next complete record no longer resembles progress, a structural hidden update clears the Generic overlay immediately without retaining or logging that record.
 
-## Safe transient replacement preview
+## Stable settings and safe transient replacement
 
-The JSON-only preview setting is:
+The stable settings and defaults are:
 
 ```json
 {
   "visualProgress.enabled": true,
+  "visualProgress.recognizeCliProgress": true,
+  "visualProgress.performanceMode": "automatic",
   "visualProgress.replaceRecognizedOutput": false
 }
 ```
 
 `visualProgress.replaceRecognizedOutput` defaults to `false`. While it is false, every provider is overlay-only and the original output is unchanged.
 
-`visualProgress.enabled` also retains its Phase 1 developer-preview default of `false`. Phase 2 adds no polished Settings page for either option.
+The controls are available under **Settings → Appearance → Visual progress**
+and apply to open panes without restarting. Turning off the master setting
+disables recognition, performance mode, and replacement controls without
+changing their saved values. Turning off CLI recognition disables replacement
+without changing its saved preference. The performance setting accepts
+`automatic`, `full`, `balanced`, and `minimal`.
 
 When it is true, only high-confidence, immediately recognized, single-line transient progress from **pip, Git, curl, or wget** is eligible for replacement. The known provider must own the record; the record must be a carriage-return, erase-line, spinner, or equivalent temporary frame; parser state must be healthy and within bounds; the pane must be in a compatible normal terminal mode; and the progress system and renderer must be enabled. Replacement is disallowed if removing a frame could disturb later cursor addressing.
 
@@ -154,7 +205,9 @@ Recognition is local and in-memory. WinTerm does not upload or persist terminal 
 
 ## Manual demo
 
-Enable `visualProgress.enabled`, restart winTerm, and run the synthetic demo in a winTerm pane:
+Confirm **Show visual progress** is enabled under
+**Settings → Appearance → Visual progress**, then run the synthetic demo in a
+winTerm pane:
 
 ```powershell
 .\scripts\winterm\invoke-visual-progress-smoke.ps1
@@ -162,7 +215,11 @@ Enable `visualProgress.enabled`, restart winTerm, and run the synthetic demo in 
 
 The script uses only PowerShell output and OSC sequences. It requires no Docker, Node, Python, Maven, Gradle, provider CLI, network access, or download. It exercises determinate values at 0, 1, 50, 99, and 100 percent; a real regression; indeterminate, waiting, success, error, cancellation, and clear; and sanitized carriage-return samples for every built-in provider and the generic fallback.
 
-For replacement preview testing, first run with `visualProgress.replaceRecognizedOutput` false and confirm every synthetic line remains visible. Then set it to true, restart, and confirm only eligible pip, Git, curl, and wget transient frames can disappear. All summaries and every overlay-only provider sample must remain visible.
+For replacement testing, first run with
+`visualProgress.replaceRecognizedOutput` false and confirm every synthetic line
+remains visible. Then set it to true and confirm only eligible pip, Git, curl,
+and wget transient frames can disappear. All summaries and every overlay-only
+provider sample must remain visible.
 
 For pane eligibility, split the window, run the demo or bounded soak in both panes, and move focus between them. Confirm that only the active pane emits sparks, inactive panes retain a simplified presentation, and both panes keep independent values. Move to another tab and minimize or deactivate the window to confirm hidden and unfocused animation pauses or simplifies.
 
@@ -194,10 +251,23 @@ After a Release build with tests, run the compiled coverage:
 
 The ordinary test suite uses deterministic or injected timing for animation-state tests. It does not depend on wall-clock sleeps, and the longer bounded soak remains opt-in.
 
-## Known limitations and Phase 3 hand-off
+## Stable v1.2.0 status and known limitations
 
-Phase 2 has no polished Settings UI, labels, speed or ETA text, command names, notifications, history, persistence, or arbitrary external providers. Recognition intentionally rejects unsupported variants and preserves their output. Docker and BuildKit replacement remains disabled. npm/pnpm/yarn, nvm, Maven, and Gradle are overlay-only. Maven and Gradle do not expose a fabricated overall percentage.
+Phase 3 adds the polished Settings UI, final defaults, adaptive governor, and
+accessibility contract for 1.2.0. Visual Progress intentionally has no speed or
+ETA text, command names, notifications, history, persistence, or arbitrary
+external providers. Recognition rejects unsupported variants and preserves
+their output. Docker and BuildKit replacement remains disabled.
+npm/pnpm/yarn, nvm, Maven, and Gradle are overlay-only. Maven and Gradle do not
+expose a fabricated overall percentage.
 
-Visual appearance, DPI, theme transitions, device-loss degradation, multi-window budget behavior, and active/background sparks still require packaged-application manual QA. The default shared 24-spark budget is global; a later host may inject a narrower per-window service without weakening the global cap.
+Visual appearance, DPI, theme transitions, device-loss degradation,
+multi-window budget behavior, active/background sparks, UI Automation output,
+and the long bounded soak still require packaged-application manual QA before
+publication. The shared 24-spark hard cap remains global, while the adaptive
+policy is coordinated once per terminal window.
 
-Phase 3 owns the complete adaptive performance-governor tuning, polished settings, final defaults, accessibility polish, long soak validation, release documentation, version bump, installer and portable validation, and v1.2.0 release preparation. Until then, the current source version and public release version remain 1.1.3.
+The current source, module, and release metadata are 1.2.0 with intended tag
+`v1.2.0`. The previous public release remains current until the release branch
+passes review and validation, merges, and the formal tag-triggered workflow
+publishes and publicly re-verifies the Setup and Portable assets.
