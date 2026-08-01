@@ -935,4 +935,50 @@
   <data name="InvalidRegex" xml:space="preserve">
     <value>An invalid regular expression was found.</value>
   </data>
+  <data name="VisualProgress_AccessibleName" xml:space="preserve">
+    <value>Command progress</value>
+    <comment>Accessible name for the non-focusable progress indicator shown in a terminal pane.</comment>
+  </data>
+  <data name="VisualProgress_StatusRunning" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="VisualProgress_StatusWaiting" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="VisualProgress_StatusSuccess" xml:space="preserve">
+    <value>Completed successfully</value>
+  </data>
+  <data name="VisualProgress_StatusError" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="VisualProgress_StatusCancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="VisualProgress_AnnouncementStarted" xml:space="preserve">
+    <value>Command progress started</value>
+  </data>
+  <data name="VisualProgress_Announcement25" xml:space="preserve">
+    <value>Command progress 25 percent</value>
+  </data>
+  <data name="VisualProgress_Announcement50" xml:space="preserve">
+    <value>Command progress 50 percent</value>
+  </data>
+  <data name="VisualProgress_Announcement75" xml:space="preserve">
+    <value>Command progress 75 percent</value>
+  </data>
+  <data name="VisualProgress_Announcement100" xml:space="preserve">
+    <value>Command progress 100 percent</value>
+  </data>
+  <data name="VisualProgress_AnnouncementWaiting" xml:space="preserve">
+    <value>Command progress is waiting</value>
+  </data>
+  <data name="VisualProgress_AnnouncementSuccess" xml:space="preserve">
+    <value>Command completed</value>
+  </data>
+  <data name="VisualProgress_AnnouncementError" xml:space="preserve">
+    <value>Command failed</value>
+  </data>
+  <data name="VisualProgress_AnnouncementCancelled" xml:space="preserve">
+    <value>Command progress cancelled</value>
+  </data>
 </root>

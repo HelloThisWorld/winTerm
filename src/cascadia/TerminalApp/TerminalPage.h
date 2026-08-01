@@ -34,6 +34,11 @@ namespace winrt::Microsoft::Terminal::Settings
     struct TerminalSettingsCreateResult;
 }
 
+namespace winTerm::VisualProgress
+{
+    class VisualProgressWindowCoordinator;
+}
+
 namespace winrt::TerminalApp::implementation
 {
     struct TerminalSettingsCache;
@@ -373,6 +378,10 @@ namespace winrt::TerminalApp::implementation
 
         std::shared_ptr<ThrottledFunc<>> _adjustProcessPriorityThrottled;
         void _adjustProcessPriority() const;
+
+        std::shared_ptr<winTerm::VisualProgress::VisualProgressWindowCoordinator> _visualProgressWindowCoordinator;
+        void _RefreshVisualProgressGovernor();
+        void _ObserveVisualProgressDispatchLatency(std::chrono::milliseconds latency);
 
         template<typename F>
         bool _ApplyToActiveControls(F f) const

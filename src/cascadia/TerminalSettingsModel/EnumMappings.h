@@ -30,6 +30,7 @@ namespace winrt::Microsoft::Terminal::Settings::Model::implementation
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, NewTabPosition> NewTabPosition();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, PaneResizeSnapPreset> PaneResizeSnapPreset();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, ApplicationUIDensity> ApplicationUIDensity();
+        static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, VisualProgressPerformanceMode> VisualProgressPerformanceMode();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::UI::Xaml::Controls::TabViewWidthMode> TabViewWidthMode();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, winrt::Microsoft::Terminal::Control::DefaultInputScope> DefaultInputScope();
         static winrt::Windows::Foundation::Collections::IMap<winrt::hstring, FirstWindowPreference> FirstWindowPreference();

@@ -275,6 +275,16 @@ JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::ApplicationUIDen
     };
 };
 
+JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::VisualProgressPerformanceMode)
+{
+    JSON_MAPPINGS(4) = {
+        pair_type{ "automatic", ValueType::Automatic },
+        pair_type{ "full", ValueType::Full },
+        pair_type{ "balanced", ValueType::Balanced },
+        pair_type{ "minimal", ValueType::Minimal },
+    };
+};
+
 JSON_ENUM_MAPPER(::winrt::Microsoft::Terminal::Settings::Model::FirstWindowPreference)
 {
     JSON_MAPPINGS(4) = {

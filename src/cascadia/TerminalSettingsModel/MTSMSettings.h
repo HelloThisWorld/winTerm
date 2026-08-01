@@ -79,17 +79,19 @@ Author(s):
     X(bool, AllowHeadless, "compatibility.allowHeadless", false)                                                                                                                                      \
     X(hstring, SearchWebDefaultQueryUrl, "searchWebDefaultQueryUrl", L"https://www.bing.com/search?q=%22%s%22")                                                                                       \
     X(bool, ShowTabsFullscreen, "showTabsFullscreen", false)                                                                                                                                          \
-    X(bool, PaneResizeSnapping, "winterm.paneResizing.enableSnapping", true)                                                                                                                         \
-    X(Model::PaneResizeSnapPreset, PaneResizeSnapPoints, "winterm.paneResizing.snapPoints", Model::PaneResizeSnapPreset::CommonRatios)                                                             \
-    X(hstring, PaneResizeCustomRatios, "winterm.paneResizing.customRatios", L"")                                                                                                                     \
-    X(double, PaneResizeSnapThreshold, "winterm.paneResizing.snapThreshold", 8.0)                                                                                                                    \
-    X(bool, PaneResizeShowIndicator, "winterm.paneResizing.showIndicator", true)                                                                                                                     \
-    X(bool, PaneResizeAltDisablesSnapping, "winterm.paneResizing.altDisablesSnapping", true)                                                                                                        \
-    X(Model::ApplicationUIDensity, ApplicationUIDensity, "winterm.applicationUI.density", Model::ApplicationUIDensity::Compact)                                                                     \
-    X(bool, ShowPaneHeaders, "winterm.applicationUI.showPaneHeaders", true)                                                                                                                          \
-    X(bool, ShowPaneProfileIcon, "winterm.applicationUI.showPaneProfileIcon", true)                                                                                                                  \
-    X(bool, ShowPaneActiveStatus, "winterm.applicationUI.showPaneActiveStatus", true)                                                                                                                  \
-    X(bool, VisualProgressEnabled, "visualProgress.enabled", false)                                                                                                                                     \
+    X(bool, PaneResizeSnapping, "winterm.paneResizing.enableSnapping", true)                                                                                                                          \
+    X(Model::PaneResizeSnapPreset, PaneResizeSnapPoints, "winterm.paneResizing.snapPoints", Model::PaneResizeSnapPreset::CommonRatios)                                                                \
+    X(hstring, PaneResizeCustomRatios, "winterm.paneResizing.customRatios", L"")                                                                                                                      \
+    X(double, PaneResizeSnapThreshold, "winterm.paneResizing.snapThreshold", 8.0)                                                                                                                     \
+    X(bool, PaneResizeShowIndicator, "winterm.paneResizing.showIndicator", true)                                                                                                                      \
+    X(bool, PaneResizeAltDisablesSnapping, "winterm.paneResizing.altDisablesSnapping", true)                                                                                                          \
+    X(Model::ApplicationUIDensity, ApplicationUIDensity, "winterm.applicationUI.density", Model::ApplicationUIDensity::Compact)                                                                       \
+    X(bool, ShowPaneHeaders, "winterm.applicationUI.showPaneHeaders", true)                                                                                                                           \
+    X(bool, ShowPaneProfileIcon, "winterm.applicationUI.showPaneProfileIcon", true)                                                                                                                   \
+    X(bool, ShowPaneActiveStatus, "winterm.applicationUI.showPaneActiveStatus", true)                                                                                                                 \
+    X(bool, VisualProgressEnabled, "visualProgress.enabled", true)                                                                                                                                    \
+    X(bool, VisualProgressRecognizeCliProgress, "visualProgress.recognizeCliProgress", true)                                                                                                          \
+    X(Model::VisualProgressPerformanceMode, VisualProgressPerformanceMode, "visualProgress.performanceMode", Model::VisualProgressPerformanceMode::Automatic)                                         \
     X(bool, VisualProgressReplaceRecognizedOutput, "visualProgress.replaceRecognizedOutput", false)
 
 // Also add these settings to:

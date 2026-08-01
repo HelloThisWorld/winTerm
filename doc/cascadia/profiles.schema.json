@@ -2445,6 +2445,32 @@
           "description": "When set to `true`, visual animations will be disabled across the application.",
           "type": "boolean"
         },
+        "visualProgress.enabled": {
+          "default": true,
+          "description": "When set to true, the terminal displays visual indicators for reported and recognized progress.",
+          "type": "boolean"
+        },
+        "visualProgress.recognizeCliProgress": {
+          "default": true,
+          "description": "When set to true, supported command-line progress output is recognized for the visual progress indicator. Explicit progress reported by shells and applications is unaffected.",
+          "type": "boolean"
+        },
+        "visualProgress.performanceMode": {
+          "default": "automatic",
+          "description": "Controls the visual effects used by progress indicators. Automatic adapts to current conditions, Full enables all effects, Balanced reduces effects, and Minimal uses a non-animated indicator.",
+          "enum": [
+            "automatic",
+            "full",
+            "balanced",
+            "minimal"
+          ],
+          "type": "string"
+        },
+        "visualProgress.replaceRecognizedOutput": {
+          "default": false,
+          "description": "When set to true, recognized command-line progress records are replaced in visible terminal output by the visual indicator. Logs, warnings, errors, prompts, and summaries remain visible.",
+          "type": "boolean"
+        },
         "warning.largePaste": {
           "default": true,
           "description": "When set to true, trying to paste text with more than 5 KiB of characters will display a warning asking you whether to continue or not with the paste.",

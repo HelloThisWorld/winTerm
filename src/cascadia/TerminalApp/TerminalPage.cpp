@@ -25,6 +25,7 @@
 #include "SnippetsPaneContent.h"
 #include "TabRowControl.h"
 #include "TerminalSettingsCache.h"
+#include "VisualProgressWindowCoordinator.h"
 #include "../../winterm/Design/DesignTokens.h"
 
 #include "LaunchPositionRequest.g.cpp"
@@ -2136,7 +2137,90 @@ namespace winrt::TerminalApp::implementation
         // progress indicator on the taskbar
         hostingTab.TaskbarProgressChanged({ get_weak(), &TerminalPage::_SetTaskbarProgressHandler });
 
+        hostingTab.VisualProgressActivityChanged([weakThis]() {
+            if (const auto page = weakThis.get())
+            {
+                page->_RefreshVisualProgressGovernor();
+            }
+        });
+
         hostingTab.RestartTerminalRequested({ get_weak(), &TerminalPage::_restartPaneConnection });
+    }
+
+    void TerminalPage::_RefreshVisualProgressGovernor()
+    {
+        uint16_t activeProgressCount{};
+        bool accessibilityTickNeeded{};
+        std::shared_ptr<Pane> rootPane;
+        const auto focusedTab = _GetFocusedTabImpl();
+        for (const auto& tab : _tabs)
+        {
+            if (const auto tabImpl = _GetTabImpl(tab))
+            {
+                const auto tabFocused = focusedTab && tabImpl.get() == focusedTab.get();
+                const auto tabRoot = tabImpl->GetRootPane();
+                tabRoot->SetVisualProgressTabVisible(tabFocused);
+                if (!tabFocused)
+                {
+                    tabRoot->WalkTree([](const auto& pane) {
+                        pane->SetVisualProgressActivePaneCount(0);
+                    });
+                }
+            }
+        }
+
+        if (focusedTab)
+        {
+            rootPane = focusedTab->GetRootPane();
+            rootPane->WalkTree([&](const auto& pane) {
+                if (pane->IsVisualProgressGovernorEligible() && activeProgressCount != UINT16_MAX)
+                {
+                    ++activeProgressCount;
+                }
+                accessibilityTickNeeded = accessibilityTickNeeded || pane->NeedsVisualProgressAccessibilityTick();
+            });
+            rootPane->WalkTree([&](const auto& pane) {
+                pane->SetVisualProgressActivePaneCount(activeProgressCount);
+            });
+        }
+
+        const auto samplerEligible = _visible &&
+                                     _activated &&
+                                     (activeProgressCount != 0 || accessibilityTickNeeded);
+        if (!_visualProgressWindowCoordinator && samplerEligible)
+        {
+            const auto weakThis = get_weak();
+            _visualProgressWindowCoordinator = winTerm::VisualProgress::VisualProgressWindowCoordinator::TryCreate(
+                _tabContent.Dispatcher(),
+                [weakThis](const std::chrono::milliseconds latency) {
+                    if (const auto page = weakThis.get())
+                    {
+                        page->_ObserveVisualProgressDispatchLatency(latency);
+                    }
+                });
+        }
+        if (_visualProgressWindowCoordinator)
+        {
+            _visualProgressWindowCoordinator->SetEligible(samplerEligible);
+        }
+    }
+
+    void TerminalPage::_ObserveVisualProgressDispatchLatency(const std::chrono::milliseconds latency)
+    {
+        if (!_visible || !_activated)
+        {
+            _RefreshVisualProgressGovernor();
+            return;
+        }
+
+        if (const auto tab = _GetFocusedTabImpl())
+        {
+            tab->GetRootPane()->WalkTree([&](const auto& pane) {
+                pane->ObserveVisualProgressDispatchLatency(latency);
+                pane->TickVisualProgressAccessibility();
+            });
+        }
+        _RefreshVisualProgressGovernor();
     }
 
     // Method Description:
@@ -2822,6 +2906,13 @@ namespace winrt::TerminalApp::implementation
         {
             return;
         }
+
+        // Apply current global settings before the pane is attached. A pane
+        // created after a live settings change must not retain constructor
+        // defaults until the next settings-file reload.
+        newPane->WalkTree([&](const auto& pane) {
+            pane->UpdateSettings(_settings);
+        });
         const auto contentWidth = static_cast<float>(_tabContent.ActualWidth());
         const auto contentHeight = static_cast<float>(_tabContent.ActualHeight());
         const winrt::Windows::Foundation::Size availableSpace{ contentWidth, contentHeight };
@@ -4042,6 +4133,7 @@ namespace winrt::TerminalApp::implementation
 
         // The user may have changed the "show title in titlebar" setting.
         TitleChanged.raise(*this, nullptr);
+        _RefreshVisualProgressGovernor();
     }
 
     void TerminalPage::_updateAllTabCloseButtons()
@@ -4179,6 +4271,7 @@ namespace winrt::TerminalApp::implementation
                 });
             }
         }
+        _RefreshVisualProgressGovernor();
     }
 
     // Method Description:
@@ -5400,6 +5493,7 @@ namespace winrt::TerminalApp::implementation
                 tabImpl->GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated);
             }
         }
+        _RefreshVisualProgressGovernor();
 
         _adjustProcessPriorityThrottled->Run();
 

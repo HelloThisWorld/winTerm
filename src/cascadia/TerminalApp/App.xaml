@@ -77,6 +77,24 @@
                     <!--  Shadow that can be used by any control.  -->
                     <ThemeShadow x:Name="SharedShadow" />
 
+                    <!--
+                        The Visual Progress renderer supplies the pixels. This
+                        non-focusable ProgressBar contributes only standard UI
+                        Automation progress semantics.
+                    -->
+                    <Style x:Key="VisualProgressSemanticProgressBarStyle"
+                           TargetType="ProgressBar">
+                        <Setter Property="IsHitTestVisible" Value="False" />
+                        <Setter Property="IsTabStop" Value="False" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ProgressBar">
+                                    <Grid Background="{x:Null}" />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+
                     <!--  Colored button which changes on hover/press  -->
                     <Style x:Key="ColorButtonStyle"
                            TargetType="Button">

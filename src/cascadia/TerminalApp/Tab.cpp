@@ -1477,6 +1477,13 @@ namespace winrt::TerminalApp::implementation
                     });
                 }
             });
+
+        auto visualProgressActivityChangedToken = pane->VisualProgressActivityChanged([weakThis]() {
+            if (const auto tab = weakThis.get())
+            {
+                tab->VisualProgressActivityChanged.raise();
+            }
+        });
         // Add a Closed event handler to the Pane. If the pane closes out from
         // underneath us, and it's zoomed, we want to be able to make sure to
         // update our state accordingly to un-zoom that pane. See GH#7252.
@@ -1523,6 +1530,7 @@ namespace winrt::TerminalApp::implementation
                                          lostFocusToken,
                                          closedToken,
                                          paneResizeCommittedToken,
+                                         visualProgressActivityChangedToken,
                                          detachedToken](std::shared_ptr<Pane> /*sender*/) {
             // Make sure we do this at most once
             if (auto pane{ weakPane.lock() })
@@ -1532,6 +1540,7 @@ namespace winrt::TerminalApp::implementation
                 pane->LostFocus(lostFocusToken);
                 pane->Closed(closedToken);
                 pane->PaneResizeCommitted(paneResizeCommittedToken);
+                pane->VisualProgressActivityChanged(visualProgressActivityChangedToken);
                 if (auto tab{ weakThis.get() })
                 {
                     tab->_DetachEventHandlersFromContent(pane->Id().value());
