@@ -19,6 +19,8 @@
 #include "SelectionColor.g.h"
 #include "CommandHistoryContext.g.h"
 
+#include "../../winterm/CommandTimeline/CommandTimelineModel.h"
+
 #include "../../audio/midi/MidiAudio.hpp"
 #include "../../buffer/out/search.h"
 #include "../../cascadia/TerminalCore/Terminal.hpp"
@@ -171,6 +173,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const size_t ShellIntegrationState() const noexcept;
         const int64_t ShellIntegrationExitCode() const noexcept;
         const uint64_t VisualProgressProviderState() const noexcept;
+        winTerm::CommandTimeline::CommandTimelineSnapshot CommandTimelineSnapshot();
+        void CommandTimelineViewState(const winTerm::CommandTimeline::CommandTimelineViewState& state);
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;
@@ -342,6 +346,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                             const int bufferSize);
         void _terminalTaskbarProgressChanged();
         void _terminalShellIntegrationChanged();
+        void _terminalCommandTimelineBufferChanged();
+        void _ensureCommandTimelineBootstrap();
         void _terminalShowWindowChanged(bool showOrHide);
         void _terminalPlayMidiNote(const int noteNumber,
                                    const int velocity,
@@ -440,6 +446,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::mutex _visualProgressRecognitionMutex;
         std::mutex _visualProgressSuppressionMutex;
         std::unique_ptr<winTerm::VisualProgress::RecognitionEngine> _visualProgressRecognition;
+        std::unique_ptr<winTerm::CommandTimeline::CommandTimelineIndex> _commandTimelineIndex;
+        winTerm::CommandTimeline::CommandTimelineViewState _commandTimelineViewState;
         std::atomic<uint64_t> _visualProgressProviderState{};
         std::atomic<uint64_t> _visualProgressProviderGeneration{};
         std::atomic<uint32_t> _visualProgressProviderSequence{};

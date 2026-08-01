@@ -59,6 +59,10 @@ try
         const auto viewportDelta = position.y - _GetMutableViewport().Origin().y;
         _mutableViewport = Viewport::FromDimensions(position, viewSize);
         _PreserveUserScrollOffset(viewportDelta);
+        if (_pfnCommandTimelineBufferChanged)
+        {
+            _pfnCommandTimelineBufferChanged();
+        }
         _NotifyScrollEvent();
     }
 }
@@ -410,6 +414,10 @@ void Terminal::NotifyBufferRotation(const int delta)
 
     const auto oldScrollOffset = _scrollOffset;
     _PreserveUserScrollOffset(delta);
+    if (_pfnCommandTimelineBufferChanged)
+    {
+        _pfnCommandTimelineBufferChanged();
+    }
     if (_scrollOffset != oldScrollOffset || AlwaysNotifyOnBufferRotation())
     {
         _NotifyScrollEvent();

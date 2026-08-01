@@ -455,6 +455,11 @@ try
 
     _mainBuffer.swap(newTextBuffer);
 
+    if (_pfnCommandTimelineBufferChanged)
+    {
+        _pfnCommandTimelineBufferChanged();
+    }
+
     // GH#3494: Maintain scrollbar position during resize
     // Make sure that we don't scroll past the mutableViewport at the bottom of the buffer
     auto newVisibleTop = std::min(positionInfo.visibleViewportTop, _mutableViewport.Top());
@@ -1179,6 +1184,11 @@ void Microsoft::Terminal::Core::Terminal::ShellIntegrationChangedCallback(std::f
     _pfnShellIntegrationChanged.swap(pfn);
 }
 
+void Microsoft::Terminal::Core::Terminal::CommandTimelineBufferChangedCallback(std::function<void()> pfn) noexcept
+{
+    _pfnCommandTimelineBufferChanged.swap(pfn);
+}
+
 // Method Description:
 // - Propagates an incoming set window visibility call from the PTY up into our window control layers
 // Arguments:
@@ -1491,6 +1501,11 @@ void Terminal::ClearMark()
     }
     _activeBuffer().ClearMarksInRange(start, end);
 
+    if (_pfnCommandTimelineBufferChanged)
+    {
+        _pfnCommandTimelineBufferChanged();
+    }
+
     // Tell the control that the scrollbar has somehow changed. Used as a
     // workaround to force the control to redraw any scrollbar marks
     _NotifyScrollEvent();
@@ -1498,6 +1513,10 @@ void Terminal::ClearMark()
 void Terminal::ClearAllMarks()
 {
     _activeBuffer().ClearAllMarks();
+    if (_pfnCommandTimelineBufferChanged)
+    {
+        _pfnCommandTimelineBufferChanged();
+    }
     // Tell the control that the scrollbar has somehow changed. Used as a
     // workaround to force the control to redraw any scrollbar marks
     _NotifyScrollEvent();
@@ -1514,6 +1533,51 @@ std::vector<MarkExtents> Terminal::GetMarkExtents() const
     // We want to return _no_ marks when we're in the alt buffer, to effectively
     // hide them.
     return _inAltBuffer() ? std::vector<MarkExtents>{} : _activeBuffer().GetMarkExtents();
+}
+
+Terminal::CommandTimelineNativeSnapshot Terminal::BuildCommandTimelineNativeSnapshot()
+{
+    CommandTimelineNativeSnapshot snapshot;
+    const auto marks = _mainBuffer->GetMarkExtents();
+    snapshot.marks.reserve(marks.size());
+    for (const auto& mark : marks)
+    {
+        const auto identity = _mainBuffer->EnsureCommandTimelineMarkIdentity(mark.start.y);
+        snapshot.marks.emplace_back(CommandTimelineNativeMark{
+            .identity = identity,
+            .commandText = mark.HasCommand() ? _mainBuffer->CommandForMark(mark) : std::wstring{},
+            .hasCommand = mark.HasCommand(),
+            .hasOutput = mark.HasOutput(),
+            .exitCode = mark.data.exitCode,
+        });
+    }
+    snapshot.revision = _mainBuffer->GetCommandTimelineMarkRevision();
+    return snapshot;
+}
+
+uint64_t Terminal::GetCurrentCommandTimelineMarkIdentity() const noexcept
+{
+    return _inAltBuffer() ? 0 : _mainBuffer->GetCurrentCommandTimelineMarkIdentity();
+}
+
+uint64_t Terminal::GetCommandTimelineMarkRevision() const noexcept
+{
+    return _mainBuffer->GetCommandTimelineMarkRevision();
+}
+
+std::wstring Terminal::CurrentCommandTimelineCommand() const
+{
+    return _inAltBuffer() ? std::wstring{} : _mainBuffer->CurrentCommandTimelineCommand();
+}
+
+std::vector<uint64_t> Terminal::ConsumeInvalidatedCommandTimelineMarkIdentities()
+{
+    return _mainBuffer->ConsumeInvalidatedCommandTimelineMarkIdentities();
+}
+
+std::optional<std::vector<uint64_t>> Terminal::ConsumeReflowCommandTimelineMarkIdentities()
+{
+    return _mainBuffer->ConsumeReflowCommandTimelineMarkIdentities();
 }
 
 til::color Terminal::GetColorForMark(const ScrollbarData& markData) const

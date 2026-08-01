@@ -1,65 +1,58 @@
 # Current development progress
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 ## Repository state
 
-- Branch: `codex/release-v1.2.0-visual-progress`
-- Starting commit: `f4534bcfa49bc7328945279c8a392ba39fd5cf45`
+- Branch: `feature/command-timeline-v1.3.0`
+- Starting commit: `59020ff093ce8061d228d3aa3248f57a3b3301ef`
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application and PowerShell module version: `1.2.0`
-- Package version: `1.2.0.0`
-- Intended tag: `v1.2.0`
-- Release channel: stable
-- Supported release target: Windows 11 x64
+- Engineering application and PowerShell module version: `1.2.1`
+- Engineering package version: `1.2.1.0`
+- Intended checkpoint tag: `v1.2.1`
+- Final Command Timeline release target: `v1.3.0`
+- Current public Latest: `v1.2.0`
+- Supported target: Windows 11 x64
 
-No tag or GitHub Release is created by this preparation branch. Publication
-remains gated on review, merge, tagging the exact merged default-branch commit,
-and the tag-triggered formal Release workflow.
+`v1.2.1` is a development checkpoint, not a distributable release. The README
+and GitHub Latest continue to identify v1.2.0 as the public Visual Progress
+release. Checkpoint tags v1.2.1 through v1.2.4 run quick validation only and are
+explicitly excluded from full build, installer packaging, asset publication,
+and GitHub Release jobs.
 
 ## Implemented in the working tree
 
-- Promoted Visual Progress from its Phase 2 preview to the stable 1.2.0 feature
-  contract. Per-pane determinate, indeterminate, waiting, success, error, and
-  cancelled state use the Rainbow Arc Weld overlay without consuming terminal
-  rows, changing the viewport, or blocking PTY output.
-- Preserved precedence as explicit OSC 9;4 progress, then a high-confidence
-  built-in CLI provider, then generic OSC 133 shell lifecycle, then hidden.
-- Enabled Visual Progress and bounded CLI recognition by default. Added the
-  polished **Settings → Appearance → Visual progress** controls with Automatic,
-  Full, Balanced, and Minimal performance modes. Recognized-output replacement
-  remains off by default and keeps its conservative fail-open allowlist.
-- Added a window-scoped, approximately one-second UI-dispatch sampler and an
-  adaptive governor. Automatic mode caps effects by active progress count and
-  degrades or recovers with consecutive latency samples and cooldown hysteresis;
-  hidden, minimized, inactive, reduced-motion, High Contrast, remote,
-  software-rendered, and constrained environments take cheaper safe tiers.
-- Added ProgressBar UI Automation semantics with real 0–100 values only for
-  determinate progress, localized nonnumeric state for indeterminate progress,
-  and throttled start/milestone/waiting/terminal announcements for the active
-  visible pane. Accessibility text contains no command, provider, or path data.
-- Kept CLI recognition local, bounded, and in-memory. The authoritative
-  `WINTERM_DISABLE_VISUAL_PROGRESS=1` override disables recognition, rendering,
-  animation, and replacement while preserving all original output.
-- Updated application, package, module, About, executable resource, Workspace
-  fallback, release-note, changelog, and verification surfaces for 1.2.0. The
-  README download entry continues to use GitHub's `/releases/latest` route.
-- Kept workspace schema 2, docking model 1, shell protocol 1, theme schema 1,
-  update-manifest schema 1, pinned upstream revision, dependencies, product
-  identity, and signing policy unchanged.
+- Added the Command Timeline Phase 1 data layer with a pane-owned index, view
+  state, bounded command-text cache, and stable IDs composed from the pane
+  session ID plus a monotonically increasing sequence.
+- Extended native scrollbar mark metadata with an internal-only identity. The
+  identity follows existing TextBuffer row copying and reflow and is never
+  emitted into terminal text, OSC payloads, settings, workspaces, telemetry, or
+  persistent storage.
+- Reused the existing OSC 133 `StartPrompt`, `StartCommand`, `StartOutput`, and
+  `EndCurrentCommand` lifecycle. Updates are incremental and idempotent;
+  trustworthy completion codes alone map to success or failure.
+- Added cold bootstrap through the existing native mark extents API and a
+  pane-scoped mark revision seam. Warm reads with an unchanged revision return
+  the cached index without rescanning the TextBuffer.
+- Added explicit pruning for clear, circular-buffer eviction, and reflow loss.
+  Reflow reports surviving native identities during its existing traversal, so
+  resize preserves command IDs without a second full mark scan.
+- Added deterministic model tests and a real native OSC component test covering
+  stable identity, pane isolation, lifecycle ordering, capability, pruning,
+  reflow, cache privacy, view-state ownership, and repeatable cleanup.
+- Kept Phase 1 data-only: no pane handle, Timeline overlay, settings surface,
+  input behavior, installer, website, or public release change was added.
 
 ## Validation state
 
-The branch is prepared for source validation, feature tests, x64 Debug and
-Release builds, relevant upstream tests, a bounded manual/soak matrix, and
-unpackaged Setup/Portable lifecycle validation. Those results must be recorded
-from actual runs; this document does not claim they passed merely because the
-implementation and release metadata are present.
+The focused x64 Debug Command Timeline target builds successfully, and all 12
+deterministic unit/component tests pass. Repository Smoke/static validation,
+version consistency, checkpoint guard checks, and YAML parsing also pass. The
+annotated checkpoint tag must point to this verified commit; the tag-triggered
+quick workflow remains the remote confirmation gate.
 
-The formal Release workflow remains the publication gate. It must build and
-attest the exact tagged commit, publish the eight-file asset allowlist, then
-publicly re-download and verify the Setup EXE, Portable ZIP, checksums, notices,
-both SBOM formats, release metadata, and release notes. The planned Setup EXE
-is not Authenticode-signed, so its notes disclose possible Unknown Publisher or
-SmartScreen warnings and direct users to `SHA256SUMS.txt`.
+The existing public v1.2.0 Visual Progress feature and its release notes remain
+the stable user-facing milestone. The Command Timeline work is not public
+release documentation and does not change the `/releases/latest` route.

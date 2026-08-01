@@ -6,6 +6,8 @@
 
 #include <til/hash.h>
 
+#include <unordered_set>
+
 #include "UTextAdapter.h"
 #include "../../types/inc/CodepointWidthDetector.hpp"
 #include "../renderer/base/renderer.hpp"
@@ -720,6 +722,10 @@ void TextBuffer::IncrementCircularBuffer(const TextAttribute& fillAttributes)
     _PruneHyperlinks();
 
     // Second, clean out the old "first row" as it will become the "last row" of the buffer after the circle is performed.
+    if (const auto& mark = GetRowByOffset(0).GetScrollbarData(); mark.has_value())
+    {
+        _invalidateCommandTimelineMark(mark->commandTimelineMarkId);
+    }
     GetMutableRowByOffset(0).Reset(fillAttributes);
     {
         // Now proceed to increment.
@@ -731,6 +737,10 @@ void TextBuffer::IncrementCircularBuffer(const TextAttribute& fillAttributes)
         {
             _firstRow = 0;
         }
+    }
+    if (_currentCommandTimelineMarkRow > 0)
+    {
+        --_currentCommandTimelineMarkRow;
     }
 }
 
@@ -991,6 +1001,7 @@ void TextBuffer::ClearScrollback(const til::CoordType newFirstRow, const til::Co
     // The new viewport should keep 0 rows? Then just reset everything.
     if (rowsToKeep <= 0)
     {
+        ClearAllMarks();
         _decommit();
         return;
     }
@@ -1006,6 +1017,10 @@ void TextBuffer::ClearScrollback(const til::CoordType newFirstRow, const til::Co
     const auto startAbsolute = _firstRow + newFirstRow;
     _firstRow = 0;
     ScrollRows(startAbsolute, rowsToKeep, -startAbsolute);
+    if (_currentCommandTimelineMarkIdentity != 0)
+    {
+        _currentCommandTimelineMarkRow = std::max(0, _currentCommandTimelineMarkRow - newFirstRow);
+    }
 
     const auto end = _estimateOffsetOfLastCommittedRow();
     for (auto y = rowsToKeep; y <= end; ++y)
@@ -2998,11 +3013,25 @@ void TextBuffer::Reflow(TextBuffer& oldBuffer, TextBuffer& newBuffer, const View
     const auto oldHeight = std::max(lastRowWithText, oldCursorPos.y) + 1;
     const auto newHeight = newBuffer.GetSize().Height();
     const auto newWidthU16 = gsl::narrow_cast<uint16_t>(newWidth);
+    std::vector<uint64_t> commandTimelineMarkByPhysicalRow(gsl::narrow_cast<size_t>(newHeight), 0);
+    std::unordered_set<uint64_t> encounteredCommandTimelineMarks;
+
+    const auto clearCommandTimelineMarkSlot = [&](const til::CoordType row) {
+        commandTimelineMarkByPhysicalRow[gsl::narrow_cast<size_t>(row % newHeight)] = 0;
+    };
+    const auto setCommandTimelineMarkSlot = [&](const til::CoordType row, const std::optional<ScrollbarData>& data) {
+        const auto identity = data.has_value() ? data->commandTimelineMarkId : 0;
+        commandTimelineMarkByPhysicalRow[gsl::narrow_cast<size_t>(row % newHeight)] = identity;
+    };
 
     // Copy oldBuffer into newBuffer until oldBuffer has been fully consumed.
     for (; oldY < oldHeight && newY < newYLimit; ++oldY)
     {
         const auto& oldRow = oldBuffer.GetRowByOffset(oldY);
+        if (const auto& data = oldRow.GetScrollbarData(); data.has_value() && data->commandTimelineMarkId != 0)
+        {
+            encounteredCommandTimelineMarks.emplace(data->commandTimelineMarkId);
+        }
 
         // A pair of double height rows should optimally wrap as a union (i.e. after wrapping there should be 4 lines).
         // But for this initial implementation I chose the alternative approach: Just truncate them.
@@ -3023,9 +3052,11 @@ void TextBuffer::Reflow(TextBuffer& oldBuffer, TextBuffer& newBuffer, const View
             if (newY >= newHeight)
             {
                 newRow.Reset(newBuffer._initialAttributes);
+                clearCommandTimelineMarkSlot(newY);
             }
 
             newRow.CopyFrom(oldRow);
+            setCommandTimelineMarkSlot(newY, oldRow.GetScrollbarData());
             newRow.SetWrapForced(false);
 
             if (oldY == oldCursorPos.y)
@@ -3060,18 +3091,6 @@ void TextBuffer::Reflow(TextBuffer& oldBuffer, TextBuffer& newBuffer, const View
             oldRowLimit = std::max(oldRowLimit, oldCursorPos.x + 1);
         }
 
-        // Immediately copy this mark over to our new row. The positions of the
-        // marks themselves will be preserved, since they're just text
-        // attributes. But the "bookmark" needs to get moved to the new row too.
-        // * If a row wraps as it reflows, that's fine - we want to leave the
-        //   mark on the row it started on.
-        // * If the second row of a wrapped row had a mark, and it de-flows onto a
-        //   single row, that's fine! The mark was on that logical row.
-        if (oldRow.GetScrollbarData().has_value())
-        {
-            newBuffer.GetMutableRowByOffset(newY).SetScrollbarData(oldRow.GetScrollbarData());
-        }
-
         til::CoordType oldX = 0;
 
         // Copy oldRow into newBuffer until oldRow has been fully consumed.
@@ -3102,9 +3121,18 @@ void TextBuffer::Reflow(TextBuffer& oldBuffer, TextBuffer& newBuffer, const View
                     break;
                 }
                 newBuffer.GetMutableRowByOffset(newY).Reset(newBuffer._initialAttributes);
+                clearCommandTimelineMarkSlot(newY);
             }
 
             auto& newRow = newBuffer.GetMutableRowByOffset(newY);
+
+            // Copy the stable mark identity after any cyclic-row reset. This
+            // piggybacks on reflow and avoids a second buffer-wide mark scan.
+            if (oldX == 0 && oldRow.GetScrollbarData().has_value())
+            {
+                newRow.SetScrollbarData(oldRow.GetScrollbarData());
+                setCommandTimelineMarkSlot(newY, oldRow.GetScrollbarData());
+            }
 
             RowCopyTextFromState state{
                 .source = oldRow,
@@ -3180,6 +3208,10 @@ void TextBuffer::Reflow(TextBuffer& oldBuffer, TextBuffer& newBuffer, const View
     for (; oldY < initializedRowsEnd && newY < newHeight; oldY++, newY++)
     {
         auto& oldRow = oldBuffer.GetRowByOffset(oldY);
+        if (const auto& data = oldRow.GetScrollbarData(); data.has_value() && data->commandTimelineMarkId != 0)
+        {
+            encounteredCommandTimelineMarks.emplace(data->commandTimelineMarkId);
+        }
         auto& newRow = newBuffer.GetMutableRowByOffset(newY);
         auto& newAttr = newRow.Attributes();
         newAttr = oldRow.Attributes();
@@ -3201,6 +3233,40 @@ void TextBuffer::Reflow(TextBuffer& oldBuffer, TextBuffer& newBuffer, const View
 
     newBuffer.CopyProperties(oldBuffer);
     newBuffer.CopyHyperlinkMaps(oldBuffer);
+    newBuffer._nextCommandTimelineMarkIdentity = oldBuffer._nextCommandTimelineMarkIdentity;
+    newBuffer._commandTimelineMarkRevision = oldBuffer._commandTimelineMarkRevision;
+    newBuffer._reflowCommandTimelineMarkIdentities.clear();
+    newBuffer._hasCommandTimelineReflowResult = true;
+    std::unordered_set<uint64_t> survivingCommandTimelineMarks;
+    for (const auto identity : commandTimelineMarkByPhysicalRow)
+    {
+        if (identity != 0 && survivingCommandTimelineMarks.emplace(identity).second)
+        {
+            newBuffer._reflowCommandTimelineMarkIdentities.emplace_back(identity);
+        }
+    }
+    newBuffer._currentCommandTimelineMarkIdentity =
+        survivingCommandTimelineMarks.contains(oldBuffer._currentCommandTimelineMarkIdentity) ?
+            oldBuffer._currentCommandTimelineMarkIdentity :
+            0;
+    newBuffer._currentCommandTimelineMarkRow = -1;
+    if (newBuffer._currentCommandTimelineMarkIdentity != 0)
+    {
+        for (size_t physicalRow = 0; physicalRow < commandTimelineMarkByPhysicalRow.size(); ++physicalRow)
+        {
+            if (commandTimelineMarkByPhysicalRow[physicalRow] == newBuffer._currentCommandTimelineMarkIdentity)
+            {
+                newBuffer._currentCommandTimelineMarkRow = gsl::narrow_cast<til::CoordType>(
+                    (physicalRow + gsl::narrow_cast<size_t>(newHeight) - gsl::narrow_cast<size_t>(newBuffer._firstRow)) %
+                    gsl::narrow_cast<size_t>(newHeight));
+                break;
+            }
+        }
+    }
+    if (survivingCommandTimelineMarks.size() != encounteredCommandTimelineMarks.size())
+    {
+        ++newBuffer._commandTimelineMarkRevision;
+    }
 
     assert(newCursorPos.x >= 0 && newCursorPos.x < newWidth);
     assert(newCursorPos.y >= 0 && newCursorPos.y < newHeight);
@@ -3448,6 +3514,69 @@ std::vector<MarkExtents> TextBuffer::GetMarkExtents(size_t limit) const
     return marks;
 }
 
+std::wstring TextBuffer::CommandForMark(const MarkExtents& mark) const
+{
+    return _commandForRow(mark.start.y, til::coalesce_value(mark.commandEnd, mark.end).y);
+}
+
+std::wstring TextBuffer::CurrentCommandTimelineCommand() const
+{
+    if (_currentCommandTimelineMarkIdentity == 0 || _currentCommandTimelineMarkRow < 0)
+    {
+        return {};
+    }
+    return _commandForRow(_currentCommandTimelineMarkRow,
+                          _estimateOffsetOfLastCommittedRow(),
+                          true);
+}
+
+uint64_t TextBuffer::EnsureCommandTimelineMarkIdentity(const til::CoordType rowOffset)
+{
+    auto& row = GetMutableRowByOffset(rowOffset);
+    auto data = row.GetScrollbarData();
+    if (!data.has_value() || data->category == MarkCategory::Default)
+    {
+        return 0;
+    }
+    if (data->commandTimelineMarkId == 0)
+    {
+        data->commandTimelineMarkId = _nextCommandTimelineMarkIdentity++;
+        row.SetScrollbarData(data);
+        ++_commandTimelineMarkRevision;
+    }
+    else
+    {
+        _nextCommandTimelineMarkIdentity = std::max(_nextCommandTimelineMarkIdentity,
+                                                    data->commandTimelineMarkId + 1);
+    }
+    return data->commandTimelineMarkId;
+}
+
+uint64_t TextBuffer::GetCurrentCommandTimelineMarkIdentity() const noexcept
+{
+    return _currentCommandTimelineMarkIdentity;
+}
+
+uint64_t TextBuffer::GetCommandTimelineMarkRevision() const noexcept
+{
+    return _commandTimelineMarkRevision;
+}
+
+std::vector<uint64_t> TextBuffer::ConsumeInvalidatedCommandTimelineMarkIdentities()
+{
+    return std::exchange(_invalidatedCommandTimelineMarkIdentities, {});
+}
+
+std::optional<std::vector<uint64_t>> TextBuffer::ConsumeReflowCommandTimelineMarkIdentities()
+{
+    if (!_hasCommandTimelineReflowResult)
+    {
+        return std::nullopt;
+    }
+    _hasCommandTimelineReflowResult = false;
+    return std::exchange(_reflowCommandTimelineMarkIdentities, {});
+}
+
 // Remove all marks between `start` & `end`, inclusive.
 void TextBuffer::ClearMarksInRange(
     const til::point start,
@@ -3460,6 +3589,10 @@ void TextBuffer::ClearMarksInRange(
     {
         auto& row = GetMutableRowByOffset(y);
         auto& runs = row.Attributes().runs();
+        if (const auto& mark = row.GetScrollbarData(); mark.has_value())
+        {
+            _invalidateCommandTimelineMark(mark->commandTimelineMarkId);
+        }
         row.SetScrollbarData(std::nullopt);
         for (auto& [attr, length] : runs)
         {
@@ -3685,7 +3818,18 @@ void TextBuffer::StartPrompt()
 {
     const auto currentRowOffset = GetCursor().GetPosition().y;
     auto& currentRow = GetMutableRowByOffset(currentRowOffset);
-    currentRow.StartPrompt();
+    const auto duplicate = _currentAttributes.GetMarkAttributes() == MarkKind::Prompt &&
+                           currentRow.GetScrollbarData().has_value() &&
+                           currentRow.GetScrollbarData()->commandTimelineMarkId == _currentCommandTimelineMarkIdentity &&
+                           _currentCommandTimelineMarkIdentity != 0;
+    if (!duplicate)
+    {
+        _startCommandTimelinePromptMark(currentRowOffset);
+    }
+    else
+    {
+        currentRow.StartPrompt();
+    }
 
     _currentAttributes.SetMarkAttributes(MarkKind::Prompt);
 }
@@ -3701,6 +3845,8 @@ bool TextBuffer::_createPromptMarkIfNeeded()
     if (!mostRecentMarks.empty())
     {
         const auto& mostRecentMark = til::at(mostRecentMarks, 0);
+        _currentCommandTimelineMarkIdentity = EnsureCommandTimelineMarkIdentity(mostRecentMark.start.y);
+        _currentCommandTimelineMarkRow = mostRecentMark.start.y;
         if (!mostRecentMark.HasOutput())
         {
             // The most recent command mark _didn't_ have output yet. Great!
@@ -3730,21 +3876,28 @@ bool TextBuffer::_createPromptMarkIfNeeded()
     //   --> add a new mark to this row, set all the attrs in this row
     //   to be Prompt, and set the current attrs to Output.
 
-    auto& row = GetMutableRowByOffset(GetCursor().GetPosition().y);
-    row.StartPrompt();
+    _startCommandTimelinePromptMark(GetCursor().GetPosition().y);
     return true;
 }
 
 bool TextBuffer::StartCommand()
 {
     const auto createdMark = _createPromptMarkIfNeeded();
-    _currentAttributes.SetMarkAttributes(MarkKind::Command);
+    if (_currentAttributes.GetMarkAttributes() != MarkKind::Command)
+    {
+        _currentAttributes.SetMarkAttributes(MarkKind::Command);
+        ++_commandTimelineMarkRevision;
+    }
     return createdMark;
 }
 bool TextBuffer::StartOutput()
 {
     const auto createdMark = _createPromptMarkIfNeeded();
-    _currentAttributes.SetMarkAttributes(MarkKind::Output);
+    if (_currentAttributes.GetMarkAttributes() != MarkKind::Output)
+    {
+        _currentAttributes.SetMarkAttributes(MarkKind::Output);
+        ++_commandTimelineMarkRevision;
+    }
     return createdMark;
 }
 
@@ -3752,6 +3905,7 @@ bool TextBuffer::StartOutput()
 // the exit code on that row's scroll mark.
 void TextBuffer::EndCurrentCommand(std::optional<unsigned int> error)
 {
+    const auto previousMarkKind = _currentAttributes.GetMarkAttributes();
     _currentAttributes.SetMarkAttributes(MarkKind::None);
 
     for (auto y = GetCursor().GetPosition().y; y >= 0; y--)
@@ -3760,9 +3914,56 @@ void TextBuffer::EndCurrentCommand(std::optional<unsigned int> error)
         auto& rowPromptData = currRow.GetScrollbarData();
         if (rowPromptData.has_value())
         {
+            const auto previousExitCode = rowPromptData->exitCode;
+            const auto previousCategory = rowPromptData->category;
+            _currentCommandTimelineMarkIdentity = EnsureCommandTimelineMarkIdentity(y);
+            _currentCommandTimelineMarkRow = y;
             currRow.EndOutput(error);
+            if (previousMarkKind != MarkKind::None ||
+                previousExitCode != rowPromptData->exitCode ||
+                previousCategory != rowPromptData->category)
+            {
+                ++_commandTimelineMarkRevision;
+            }
             return;
         }
+    }
+}
+
+uint64_t TextBuffer::_startCommandTimelinePromptMark(const til::CoordType rowOffset)
+{
+    auto& row = GetMutableRowByOffset(rowOffset);
+    if (const auto& existing = row.GetScrollbarData(); existing.has_value())
+    {
+        _invalidateCommandTimelineMark(existing->commandTimelineMarkId);
+    }
+
+    ScrollbarData mark{ MarkCategory::Prompt };
+    mark.commandTimelineMarkId = _nextCommandTimelineMarkIdentity++;
+    row.SetScrollbarData(std::move(mark));
+    _currentCommandTimelineMarkIdentity = row.GetScrollbarData()->commandTimelineMarkId;
+    _currentCommandTimelineMarkRow = rowOffset;
+    ++_commandTimelineMarkRevision;
+    return _currentCommandTimelineMarkIdentity;
+}
+
+void TextBuffer::_invalidateCommandTimelineMark(const uint64_t identity)
+{
+    if (identity == 0)
+    {
+        return;
+    }
+    if (std::find(_invalidatedCommandTimelineMarkIdentities.begin(),
+                  _invalidatedCommandTimelineMarkIdentities.end(),
+                  identity) == _invalidatedCommandTimelineMarkIdentities.end())
+    {
+        _invalidatedCommandTimelineMarkIdentities.emplace_back(identity);
+        ++_commandTimelineMarkRevision;
+    }
+    if (_currentCommandTimelineMarkIdentity == identity)
+    {
+        _currentCommandTimelineMarkIdentity = 0;
+        _currentCommandTimelineMarkRow = -1;
     }
 }
 

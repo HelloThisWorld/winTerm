@@ -63,6 +63,21 @@ public:
     {
     };
 
+    struct CommandTimelineNativeMark
+    {
+        uint64_t identity{};
+        std::wstring commandText;
+        bool hasCommand{ false };
+        bool hasOutput{ false };
+        std::optional<uint32_t> exitCode;
+    };
+
+    struct CommandTimelineNativeSnapshot
+    {
+        uint64_t revision{};
+        std::vector<CommandTimelineNativeMark> marks;
+    };
+
     static constexpr bool IsInputKey(WORD vkey)
     {
         return vkey != VK_CONTROL &&
@@ -123,6 +138,12 @@ public:
     std::vector<ScrollMark> GetMarkRows() const;
     std::vector<MarkExtents> GetMarkExtents() const;
     void AddMarkFromUI(ScrollbarData mark, til::CoordType y);
+    CommandTimelineNativeSnapshot BuildCommandTimelineNativeSnapshot();
+    uint64_t GetCurrentCommandTimelineMarkIdentity() const noexcept;
+    uint64_t GetCommandTimelineMarkRevision() const noexcept;
+    std::wstring CurrentCommandTimelineCommand() const;
+    std::vector<uint64_t> ConsumeInvalidatedCommandTimelineMarkIdentities();
+    std::optional<std::vector<uint64_t>> ConsumeReflowCommandTimelineMarkIdentities();
 
     til::property<bool> AlwaysNotifyOnBufferRotation;
 
@@ -230,6 +251,7 @@ public:
     void SetScrollPositionChangedCallback(std::function<void(const int, const int, const int)> pfn) noexcept;
     void TaskbarProgressChangedCallback(std::function<void()> pfn) noexcept;
     void ShellIntegrationChangedCallback(std::function<void()> pfn) noexcept;
+    void CommandTimelineBufferChangedCallback(std::function<void()> pfn) noexcept;
     void SetShowWindowCallback(std::function<void(bool)> pfn) noexcept;
     void SetPlayMidiNoteCallback(std::function<void(const int, const int, const std::chrono::microseconds)> pfn) noexcept;
     void CompletionsChangedCallback(std::function<void(std::wstring_view, unsigned int)> pfn) noexcept;
@@ -344,6 +366,7 @@ private:
     std::function<void(const int, const int, const int)> _pfnScrollPositionChanged;
     std::function<void()> _pfnTaskbarProgressChanged;
     std::function<void()> _pfnShellIntegrationChanged;
+    std::function<void()> _pfnCommandTimelineBufferChanged;
     std::function<void(bool)> _pfnShowWindowChanged;
     std::function<void(const int, const int, const std::chrono::microseconds)> _pfnPlayMidiNote;
     std::function<void(std::wstring_view, unsigned int)> _pfnCompletionsChanged;

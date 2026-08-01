@@ -99,6 +99,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _hasUnfocusedAppearance = static_cast<bool>(unfocusedAppearance);
         _unfocusedAppearance = _hasUnfocusedAppearance ? unfocusedAppearance : settings;
         _terminal = std::make_shared<::Microsoft::Terminal::Core::Terminal>();
+        auto commandTimelineSessionId = connection ? connection.SessionId() : winrt::guid{};
+        if (commandTimelineSessionId == winrt::guid{})
+        {
+            commandTimelineSessionId = ::Microsoft::Console::Utils::CreateGuid();
+        }
+        _commandTimelineIndex = std::make_unique<winTerm::CommandTimeline::CommandTimelineIndex>(commandTimelineSessionId);
+        const auto commandline = settings.Commandline();
+        _commandTimelineIndex->SetCapabilityFallback(
+            winTerm::CommandTimeline::InferCapabilityFallbackFromCommandline(
+                std::wstring_view{ commandline.c_str(), commandline.size() }));
         const auto lock = _terminal->LockForWriting();
 
         _setupDispatcherAndCallbacks();
@@ -130,6 +140,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         auto pfnTerminalShellIntegrationChanged = [this] { _terminalShellIntegrationChanged(); };
         _terminal->ShellIntegrationChangedCallback(pfnTerminalShellIntegrationChanged);
+
+        auto pfnTerminalCommandTimelineBufferChanged = [this] { _terminalCommandTimelineBufferChanged(); };
+        _terminal->CommandTimelineBufferChangedCallback(pfnTerminalCommandTimelineBufferChanged);
 
         auto pfnShowWindowChanged = [this](auto&& PH1) { _terminalShowWindowChanged(std::forward<decltype(PH1)>(PH1)); };
         _terminal->SetShowWindowCallback(pfnShowWindowChanged);
@@ -1628,6 +1641,31 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return _visualProgressProviderState.load(std::memory_order_acquire);
     }
 
+    winTerm::CommandTimeline::CommandTimelineSnapshot ControlCore::CommandTimelineSnapshot()
+    {
+        const auto lock = _terminal->LockForWriting();
+        _ensureCommandTimelineBootstrap();
+        return {
+            .paneSessionId = _commandTimelineIndex->PaneSessionId(),
+            .entries = _commandTimelineIndex->Entries(),
+            .viewState = _commandTimelineViewState,
+            .capability = _commandTimelineIndex->Capability(),
+            .revision = _commandTimelineIndex->Revision(),
+            .nativeRevision = _commandTimelineIndex->NativeRevision(),
+            .bootstrapScanCount = _commandTimelineIndex->BootstrapScanCount(),
+            .closed = _commandTimelineIndex->IsClosed(),
+        };
+    }
+
+    void ControlCore::CommandTimelineViewState(const winTerm::CommandTimeline::CommandTimelineViewState& state)
+    {
+        const auto lock = _terminal->LockForWriting();
+        if (!_commandTimelineIndex->IsClosed())
+        {
+            _commandTimelineViewState = state;
+        }
+    }
+
     int ControlCore::ScrollOffset()
     {
         const auto lock = _terminal->LockForReading();
@@ -1726,6 +1764,48 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
     void ControlCore::_terminalShellIntegrationChanged()
     {
+        _terminalCommandTimelineBufferChanged();
+        _ensureCommandTimelineBootstrap();
+
+        const auto nativeMarkId = _terminal->GetCurrentCommandTimelineMarkIdentity();
+        const auto shellIntegrationState = static_cast<ShellIntegrationMarkKind>(_terminal->GetShellIntegrationState());
+        if (nativeMarkId != 0)
+        {
+            auto kind = winTerm::CommandTimeline::LifecycleEventKind::Prompt;
+            switch (shellIntegrationState)
+            {
+            case ShellIntegrationMarkKind::Prompt:
+                kind = winTerm::CommandTimeline::LifecycleEventKind::Prompt;
+                break;
+            case ShellIntegrationMarkKind::CommandStart:
+                kind = winTerm::CommandTimeline::LifecycleEventKind::CommandStart;
+                break;
+            case ShellIntegrationMarkKind::CommandExecuted:
+                kind = winTerm::CommandTimeline::LifecycleEventKind::OutputStart;
+                break;
+            case ShellIntegrationMarkKind::CommandFinished:
+                kind = winTerm::CommandTimeline::LifecycleEventKind::CommandFinished;
+                break;
+            }
+
+            const auto exitCode = _terminal->GetShellIntegrationExitCode();
+            const auto trustedExitCode = shellIntegrationState == ShellIntegrationMarkKind::CommandFinished && exitCode >= 0 ?
+                                             std::optional<uint32_t>{ gsl::narrow_cast<uint32_t>(exitCode) } :
+                                             std::nullopt;
+            const auto commandText = shellIntegrationState == ShellIntegrationMarkKind::CommandExecuted ||
+                                             shellIntegrationState == ShellIntegrationMarkKind::CommandFinished ?
+                                         _terminal->CurrentCommandTimelineCommand() :
+                                         std::wstring{};
+            _commandTimelineIndex->ProcessLifecycle({
+                .kind = kind,
+                .nativeMarkId = nativeMarkId,
+                .nativeRevision = _terminal->GetCommandTimelineMarkRevision(),
+                .commandText = commandText,
+                .trustedExitCode = trustedExitCode,
+                .timestamp = std::chrono::system_clock::now(),
+            });
+        }
+
         // OSC 133 prompt is the per-pane ownership boundary. Defer parser
         // cleanup to the next output callback so this terminal callback never
         // waits on the recognition mutex while the terminal lock is held.
@@ -1738,6 +1818,50 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             _visualProgressProviderState.store(0, std::memory_order_release);
         }
         ShellIntegrationChanged.raise(*this, nullptr);
+    }
+
+    void ControlCore::_terminalCommandTimelineBufferChanged()
+    {
+        const auto invalidated = _terminal->ConsumeInvalidatedCommandTimelineMarkIdentities();
+        const auto reflow = _terminal->ConsumeReflowCommandTimelineMarkIdentities();
+        if (!_commandTimelineIndex->IsBootstrapped())
+        {
+            return;
+        }
+
+        const auto nativeRevision = _terminal->GetCommandTimelineMarkRevision();
+        _commandTimelineIndex->InvalidateNativeMarks(invalidated, nativeRevision);
+        if (reflow.has_value())
+        {
+            _commandTimelineIndex->ReconcileReflow(*reflow, nativeRevision);
+        }
+    }
+
+    void ControlCore::_ensureCommandTimelineBootstrap()
+    {
+        if (_commandTimelineIndex->IsBootstrapped() || _commandTimelineIndex->IsClosed())
+        {
+            return;
+        }
+
+        _commandTimelineIndex->Access(_terminal->GetCommandTimelineMarkRevision(), [this]() {
+            const auto native = _terminal->BuildCommandTimelineNativeSnapshot();
+            winTerm::CommandTimeline::NativeBootstrapSnapshot snapshot;
+            snapshot.nativeRevision = native.revision;
+            snapshot.marks.reserve(native.marks.size());
+            for (const auto& mark : native.marks)
+            {
+                snapshot.marks.emplace_back(winTerm::CommandTimeline::NativeMarkSnapshot{
+                    .nativeMarkId = mark.identity,
+                    .commandText = mark.commandText,
+                    .hasCommand = mark.hasCommand,
+                    .hasOutput = mark.hasOutput,
+                    .nativeRangeValid = true,
+                    .trustedExitCode = mark.exitCode,
+                });
+            }
+            return snapshot;
+        });
     }
 
     void ControlCore::_terminalShowWindowChanged(bool showOrHide)
@@ -1919,6 +2043,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         _closeConnection();
         ConfigureVisualProgressRecognition(false, false);
+        if (_commandTimelineIndex)
+        {
+            _commandTimelineIndex->Close();
+        }
+        _commandTimelineViewState.Reset();
     }
 
     void ControlCore::PersistTo(HANDLE handle) const

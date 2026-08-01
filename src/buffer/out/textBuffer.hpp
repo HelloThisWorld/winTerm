@@ -304,6 +304,13 @@ public:
     // Mark handling
     std::vector<ScrollMark> GetMarkRows() const;
     std::vector<MarkExtents> GetMarkExtents(size_t limit = SIZE_T_MAX) const;
+    std::wstring CommandForMark(const MarkExtents& mark) const;
+    std::wstring CurrentCommandTimelineCommand() const;
+    uint64_t EnsureCommandTimelineMarkIdentity(til::CoordType row);
+    uint64_t GetCurrentCommandTimelineMarkIdentity() const noexcept;
+    uint64_t GetCommandTimelineMarkRevision() const noexcept;
+    std::vector<uint64_t> ConsumeInvalidatedCommandTimelineMarkIdentities();
+    std::optional<std::vector<uint64_t>> ConsumeReflowCommandTimelineMarkIdentities();
     void ClearMarksInRange(const til::point start, const til::point end);
     void ClearAllMarks();
     std::wstring CurrentCommand() const;
@@ -339,6 +346,8 @@ private:
     std::wstring _commandForRow(const til::CoordType rowOffset, const til::CoordType bottomInclusive, const bool clipAtCursor = false) const;
     MarkExtents _scrollMarkExtentForRow(const til::CoordType rowOffset, const til::CoordType bottomInclusive) const;
     bool _createPromptMarkIfNeeded();
+    uint64_t _startCommandTimelinePromptMark(til::CoordType row);
+    void _invalidateCommandTimelineMark(uint64_t identity);
 
     std::tuple<til::CoordType, til::CoordType, bool> _RowCopyHelper(const CopyRequest& req, const til::CoordType iRow, const ROW& row) const;
 
@@ -412,6 +421,14 @@ private:
     TextAttribute _currentAttributes;
     til::CoordType _firstRow = 0; // indexes top row (not necessarily 0)
     uint64_t _lastMutationId = 0;
+
+    uint64_t _nextCommandTimelineMarkIdentity = 1;
+    uint64_t _currentCommandTimelineMarkIdentity = 0;
+    til::CoordType _currentCommandTimelineMarkRow = -1;
+    uint64_t _commandTimelineMarkRevision = 0;
+    std::vector<uint64_t> _invalidatedCommandTimelineMarkIdentities;
+    std::vector<uint64_t> _reflowCommandTimelineMarkIdentities;
+    bool _hasCommandTimelineReflowResult{ false };
 
     Cursor _cursor;
     bool _isActiveBuffer = false;
