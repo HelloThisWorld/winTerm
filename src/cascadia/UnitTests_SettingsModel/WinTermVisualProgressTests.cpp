@@ -5,8 +5,13 @@
 
 #include "../TerminalSettingsModel/GlobalAppSettings.h"
 #include "../../winterm/VisualProgress/ProgressRecognition.h"
+#include "../../winterm/VisualProgress/VisualProgressAccessibility.h"
 #include "../../winterm/VisualProgress/VisualProgressModel.h"
+#include "../../winterm/VisualProgress/VisualProgressPerformanceGovernor.h"
 #include "../../winterm/VisualProgress/VisualProgressRenderModel.h"
+#include "../../winterm/VisualProgress/VisualProgressSamplerState.h"
+
+#include <thread>
 
 using namespace WEX::TestExecution;
 using namespace winTerm::VisualProgress;
@@ -55,7 +60,11 @@ namespace SettingsModelUnitTests
         TEST_METHOD(FeatureReloadDisablesAndReenablesCleanly);
         TEST_METHOD(MailboxCoalescesRapidUpdatesAndReleasesOnClose);
         TEST_METHOD(UnexpectedEventsFailOpen);
-        TEST_METHOD(SettingSerializesAndMissingSettingDefaultsOff);
+        TEST_METHOD(SettingsUseStableDefaultsAndRoundTrip);
+        TEST_METHOD(GovernorAppliesModesAndEnvironmentCaps);
+        TEST_METHOD(GovernorHysteresisIsBoundedAndDeterministic);
+        TEST_METHOD(AccessibilitySemanticsAndAnnouncementsAreBounded);
+        TEST_METHOD(Phase3StressCoverageRemainsBounded);
     };
 
     void WinTermVisualProgressTests::MapEveryTaskbarState()
@@ -1905,22 +1914,540 @@ namespace SettingsModelUnitTests
         VERIFY_IS_FALSE(state.Current().visible);
     }
 
-    void WinTermVisualProgressTests::SettingSerializesAndMissingSettingDefaultsOff()
+    void WinTermVisualProgressTests::SettingsUseStableDefaultsAndRoundTrip()
     {
-        Json::Value enabledJson{ Json::objectValue };
-        enabledJson["visualProgress.enabled"] = true;
-        enabledJson["visualProgress.replaceRecognizedOutput"] = true;
-        const auto enabled = winrt::Microsoft::Terminal::Settings::Model::implementation::GlobalAppSettings::FromJson(enabledJson);
-        VERIFY_IS_TRUE(enabled->VisualProgressEnabled());
-        VERIFY_IS_TRUE(enabled->VisualProgressReplaceRecognizedOutput());
-        VERIFY_IS_TRUE(enabled->ToJson()["visualProgress.enabled"].asBool());
-        VERIFY_IS_TRUE(enabled->ToJson()["visualProgress.replaceRecognizedOutput"].asBool());
+        Json::Value missing{ Json::objectValue };
+        const auto defaults = winrt::Microsoft::Terminal::Settings::Model::implementation::GlobalAppSettings::FromJson(missing);
+        VERIFY_IS_TRUE(defaults->VisualProgressEnabled());
+        VERIFY_IS_TRUE(defaults->VisualProgressRecognizeCliProgress());
+        VERIFY_ARE_EQUAL(
+            static_cast<int>(VisualProgressPerformanceMode::Automatic),
+            static_cast<int>(defaults->VisualProgressPerformanceMode()));
+        VERIFY_IS_FALSE(defaults->VisualProgressReplaceRecognizedOutput());
+        VERIFY_IS_FALSE(defaults->ToJson().isMember("visualProgress.enabled"));
+        VERIFY_IS_FALSE(defaults->ToJson().isMember("visualProgress.recognizeCliProgress"));
+        VERIFY_IS_FALSE(defaults->ToJson().isMember("visualProgress.performanceMode"));
+        VERIFY_IS_FALSE(defaults->ToJson().isMember("visualProgress.replaceRecognizedOutput"));
 
-        Json::Value legacyJson{ Json::objectValue };
-        const auto migrated = winrt::Microsoft::Terminal::Settings::Model::implementation::GlobalAppSettings::FromJson(legacyJson);
-        VERIFY_IS_FALSE(migrated->VisualProgressEnabled());
-        VERIFY_IS_FALSE(migrated->VisualProgressReplaceRecognizedOutput());
-        VERIFY_IS_FALSE(migrated->ToJson().isMember("visualProgress.enabled"));
-        VERIFY_IS_FALSE(migrated->ToJson().isMember("visualProgress.replaceRecognizedOutput"));
+        Json::Value explicitValues{ Json::objectValue };
+        explicitValues["visualProgress.enabled"] = false;
+        explicitValues["visualProgress.recognizeCliProgress"] = false;
+        explicitValues["visualProgress.performanceMode"] = "balanced";
+        explicitValues["visualProgress.replaceRecognizedOutput"] = true;
+        const auto explicitSettings = winrt::Microsoft::Terminal::Settings::Model::implementation::GlobalAppSettings::FromJson(explicitValues);
+        VERIFY_IS_FALSE(explicitSettings->VisualProgressEnabled());
+        VERIFY_IS_FALSE(explicitSettings->VisualProgressRecognizeCliProgress());
+        VERIFY_ARE_EQUAL(
+            static_cast<int>(VisualProgressPerformanceMode::Balanced),
+            static_cast<int>(explicitSettings->VisualProgressPerformanceMode()));
+        VERIFY_IS_TRUE(explicitSettings->VisualProgressReplaceRecognizedOutput());
+        const auto serialized = explicitSettings->ToJson();
+        VERIFY_IS_FALSE(serialized["visualProgress.enabled"].asBool());
+        VERIFY_IS_FALSE(serialized["visualProgress.recognizeCliProgress"].asBool());
+        VERIFY_ARE_EQUAL(std::string{ "balanced" }, serialized["visualProgress.performanceMode"].asString());
+        VERIFY_IS_TRUE(serialized["visualProgress.replaceRecognizedOutput"].asBool());
+
+        struct ModeFixture
+        {
+            const char* jsonValue;
+            VisualProgressPerformanceMode expected;
+        };
+        for (const auto& fixture : {
+                 ModeFixture{ "automatic", VisualProgressPerformanceMode::Automatic },
+                 ModeFixture{ "full", VisualProgressPerformanceMode::Full },
+                 ModeFixture{ "balanced", VisualProgressPerformanceMode::Balanced },
+                 ModeFixture{ "minimal", VisualProgressPerformanceMode::Minimal },
+             })
+        {
+            Json::Value json{ Json::objectValue };
+            json["visualProgress.performanceMode"] = fixture.jsonValue;
+            const auto settings = winrt::Microsoft::Terminal::Settings::Model::implementation::GlobalAppSettings::FromJson(json);
+            VERIFY_ARE_EQUAL(static_cast<int>(fixture.expected), static_cast<int>(settings->VisualProgressPerformanceMode()));
+            VERIFY_ARE_EQUAL(std::string{ fixture.jsonValue }, settings->ToJson()["visualProgress.performanceMode"].asString());
+        }
+
+        Json::Value invalid{ Json::objectValue };
+        invalid["visualProgress.performanceMode"] = "maximum";
+        VERIFY_THROWS(
+            winrt::Microsoft::Terminal::Settings::Model::implementation::GlobalAppSettings::FromJson(invalid),
+            std::exception);
+    }
+
+    void WinTermVisualProgressTests::GovernorAppliesModesAndEnvironmentCaps()
+    {
+        PerformanceGovernorInputs inputs;
+        inputs.progressVisible = true;
+        inputs.progressActive = true;
+        inputs.visibleActiveProgressCount = 1;
+
+        VisualProgressPerformanceGovernor governor;
+        auto decision = governor.Evaluate(inputs);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Full), static_cast<int>(decision.tier));
+        VERIFY_IS_TRUE(decision.continuousAnimation);
+        VERIFY_IS_TRUE(decision.sparks);
+        VERIFY_IS_TRUE(decision.shouldSample);
+
+        inputs.visibleActiveProgressCount = 2;
+        decision = governor.Evaluate(inputs);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::NoSparks), static_cast<int>(decision.tier));
+        VERIFY_IS_FALSE(decision.sparks);
+        inputs.visibleActiveProgressCount = 4;
+        decision = governor.Evaluate(inputs);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(decision.tier));
+        VERIFY_IS_FALSE(decision.continuousAnimation);
+
+        inputs.visibleActiveProgressCount = 1;
+        inputs.mode = PerformanceMode::Balanced;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::NoSparks), static_cast<int>(governor.Evaluate(inputs).tier));
+        inputs.mode = PerformanceMode::Minimal;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(governor.Evaluate(inputs).tier));
+
+        inputs.mode = PerformanceMode::Full;
+        inputs.highContrast = true;
+        decision = governor.Evaluate(inputs);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Solid), static_cast<int>(decision.tier));
+        VERIFY_IS_FALSE(decision.continuousAnimation);
+        VERIFY_IS_FALSE(decision.sparks);
+
+        inputs.highContrast = false;
+        inputs.osAnimationsEnabled = false;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(governor.Evaluate(inputs).tier));
+        inputs.osAnimationsEnabled = true;
+        inputs.applicationAnimationsEnabled = false;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(governor.Evaluate(inputs).tier));
+        inputs.applicationAnimationsEnabled = true;
+        inputs.softwareRendering = true;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(governor.Evaluate(inputs).tier));
+        inputs.softwareRendering = false;
+        inputs.remoteSession = true;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(governor.Evaluate(inputs).tier));
+        inputs.remoteSession = false;
+        inputs.energySaver = true;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(governor.Evaluate(inputs).tier));
+        inputs.energySaver = false;
+        inputs.effectsFast = false;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::NoSparks), static_cast<int>(governor.Evaluate(inputs).tier));
+
+        inputs.effectsFast = true;
+        inputs.paneActive = false;
+        decision = governor.Evaluate(inputs);
+        VERIFY_IS_FALSE(decision.continuousAnimation);
+        VERIFY_IS_FALSE(decision.sparks);
+        VERIFY_IS_FALSE(decision.shouldSample);
+        inputs.paneActive = true;
+        inputs.windowFocused = false;
+        decision = governor.Evaluate(inputs);
+        VERIFY_IS_FALSE(decision.continuousAnimation);
+        VERIFY_IS_FALSE(decision.sparks);
+        VERIFY_IS_FALSE(decision.shouldSample);
+
+        inputs.windowFocused = true;
+        inputs.windowVisible = false;
+        decision = governor.Evaluate(inputs);
+        VERIFY_IS_FALSE(decision.present);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Disabled), static_cast<int>(decision.tier));
+        VERIFY_IS_FALSE(decision.shouldSample);
+        inputs.windowVisible = true;
+        inputs.windowMinimized = true;
+        VERIFY_IS_FALSE(governor.Evaluate(inputs).shouldSample);
+        inputs.windowMinimized = false;
+        inputs.featureEnabled = false;
+        VERIFY_IS_FALSE(governor.Evaluate(inputs).present);
+        inputs.featureEnabled = true;
+        inputs.emergencyDisabled = true;
+        VERIFY_IS_FALSE(governor.Evaluate(inputs).present);
+    }
+
+    void WinTermVisualProgressTests::GovernorHysteresisIsBoundedAndDeterministic()
+    {
+        PerformanceGovernorInputs inputs;
+        inputs.progressVisible = true;
+        inputs.progressActive = true;
+        inputs.visibleActiveProgressCount = 1;
+
+        VisualProgressPerformanceGovernor governor;
+        auto decision = governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 1000 });
+        VERIFY_IS_TRUE(decision.observationAccepted);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Full), static_cast<int>(decision.tier));
+        decision = governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 1500 });
+        VERIFY_IS_FALSE(decision.observationAccepted);
+        decision = governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 2000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Full), static_cast<int>(decision.tier));
+        decision = governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 3000 });
+        VERIFY_IS_TRUE(decision.tierChanged);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::NoSparks), static_cast<int>(decision.tier));
+
+        governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 4000 });
+        governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 5000 });
+        decision = governor.ObserveDispatchLatency(inputs, std::chrono::milliseconds{ 100 }, PerformanceTimestamp{ 6000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(decision.tier));
+
+        for (uint64_t sample = 1; sample <= 15; ++sample)
+        {
+            decision = governor.ObserveDispatchLatency(
+                inputs,
+                std::chrono::milliseconds{ 40 },
+                PerformanceTimestamp{ 6000 + (sample * 1000) });
+        }
+        VERIFY_IS_TRUE(decision.tierChanged);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::NoSparks), static_cast<int>(decision.tier));
+
+        decision = governor.ObserveHardFailure(inputs, PerformanceTimestamp{ 22000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(decision.tier));
+        VERIFY_IS_TRUE(decision.tierChanged);
+
+        // Dispatch latency alone may reduce Automatic through Solid, but it
+        // must never enter the hard-failure-only Disabled tier and strand the
+        // sampler. Sustained healthy observations can therefore recover it.
+        VisualProgressPerformanceGovernor latencyFloor;
+        for (uint64_t sample = 1; sample <= 12; ++sample)
+        {
+            decision = latencyFloor.ObserveDispatchLatency(
+                inputs,
+                std::chrono::milliseconds{ 100 },
+                PerformanceTimestamp{ sample * 1000 });
+        }
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Solid), static_cast<int>(latencyFloor.AdaptiveTier()));
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Solid), static_cast<int>(decision.tier));
+        VERIFY_IS_TRUE(decision.shouldSample);
+
+        for (uint64_t sample = 1; sample <= 15; ++sample)
+        {
+            decision = latencyFloor.ObserveDispatchLatency(
+                inputs,
+                std::chrono::milliseconds{ 40 },
+                PerformanceTimestamp{ 22000 + (sample * 1000) });
+        }
+        VERIFY_IS_TRUE(decision.tierChanged);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::StaticGradient), static_cast<int>(latencyFloor.AdaptiveTier()));
+
+        inputs.visibleActiveProgressCount = 0;
+        decision = governor.Evaluate(inputs);
+        VERIFY_IS_FALSE(decision.shouldSample);
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Full), static_cast<int>(governor.AdaptiveTier()));
+
+        VisualProgressPerformanceGovernor independentWindow;
+        inputs.visibleActiveProgressCount = 1;
+        VERIFY_ARE_EQUAL(static_cast<int>(RenderTier::Full), static_cast<int>(independentWindow.Evaluate(inputs).tier));
+    }
+
+    void WinTermVisualProgressTests::AccessibilitySemanticsAndAnnouncementsAreBounded()
+    {
+        VisualProgressAccessibilityPolicy policy;
+        auto update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Running, 0, true, ProgressSource::Taskbar, 1 },
+            true,
+            true,
+            AccessibilityTimestamp{ 0 });
+        VERIFY_IS_TRUE(update.semantics.visible);
+        VERIFY_IS_TRUE(update.semantics.hasNumericValue);
+        VERIFY_ARE_EQUAL(uint8_t{ 0 }, update.semantics.value);
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Started), static_cast<int>(update.announcement));
+
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Running, 25, true, ProgressSource::Taskbar, 2 },
+            true,
+            true,
+            AccessibilityTimestamp{ 1000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Running, 30, true, ProgressSource::Taskbar, 3 },
+            true,
+            true,
+            AccessibilityTimestamp{ 4000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Progress25), static_cast<int>(update.announcement));
+
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Waiting, 50, true, ProgressSource::Taskbar, 4 },
+            true,
+            true,
+            AccessibilityTimestamp{ 5000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Waiting, 50, true, ProgressSource::Taskbar, 5 },
+            true,
+            true,
+            AccessibilityTimestamp{ 8000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Waiting), static_cast<int>(update.announcement));
+
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Success, 100, true, ProgressSource::Taskbar, 6 },
+            true,
+            true,
+            AccessibilityTimestamp{ 8001 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Success), static_cast<int>(update.announcement));
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Success, 100, true, ProgressSource::Taskbar, 7 },
+            true,
+            true,
+            AccessibilityTimestamp{ 8002 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+
+        policy.Reset();
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Running, 0, true, ProgressSource::ShellIntegration, 1 },
+            true,
+            true,
+            AccessibilityTimestamp{ 0 });
+        VERIFY_IS_TRUE(update.semantics.IsIndeterminate());
+        VERIFY_IS_FALSE(update.semantics.hasNumericValue);
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Error, 0, true, ProgressSource::ShellIntegration, 2 },
+            true,
+            true,
+            AccessibilityTimestamp{ 1 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Error), static_cast<int>(update.announcement));
+
+        policy.Reset();
+        policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Running, 25, true, ProgressSource::Provider, 1 },
+            true,
+            false,
+            AccessibilityTimestamp{ 0 });
+        update = policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Running, 25, true, ProgressSource::Provider, 2 },
+            true,
+            true,
+            AccessibilityTimestamp{ 5000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+        update = policy.Apply(
+            { ProgressMode::Hidden, ProgressStatus::Cancelled, 0, false, ProgressSource::None, 3 },
+            true,
+            true,
+            AccessibilityTimestamp{ 6000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+
+        policy.Reset();
+        policy.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Running, 10, true, ProgressSource::Taskbar, 1 },
+            true,
+            true,
+            AccessibilityTimestamp{ 0 });
+        update = policy.Apply(
+            { ProgressMode::Hidden, ProgressStatus::Cancelled, 0, false, ProgressSource::None, 2 },
+            true,
+            true,
+            AccessibilityTimestamp{ 1 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Cancelled), static_cast<int>(update.announcement));
+
+        policy.Reset();
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Waiting, 0, true, ProgressSource::ShellIntegration, 1 },
+            true,
+            true,
+            AccessibilityTimestamp{ 0 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Started), static_cast<int>(update.announcement));
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Waiting, 0, true, ProgressSource::ShellIntegration, 2 },
+            true,
+            true,
+            AccessibilityTimestamp{ 4000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Waiting), static_cast<int>(update.announcement));
+
+        policy.Reset();
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Waiting, 0, true, ProgressSource::ShellIntegration, 1 },
+            true,
+            true,
+            AccessibilityTimestamp{ 0 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::Started), static_cast<int>(update.announcement));
+        VERIFY_IS_TRUE(policy.HasPendingAnnouncement());
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Running, 0, true, ProgressSource::ShellIntegration, 2 },
+            true,
+            true,
+            AccessibilityTimestamp{ 1000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+        VERIFY_IS_FALSE(policy.HasPendingAnnouncement());
+        update = policy.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Running, 0, true, ProgressSource::ShellIntegration, 3 },
+            true,
+            true,
+            AccessibilityTimestamp{ 4000 });
+        VERIFY_ARE_EQUAL(static_cast<int>(AccessibilityAnnouncement::None), static_cast<int>(update.announcement));
+    }
+
+    void WinTermVisualProgressTests::Phase3StressCoverageRemainsBounded()
+    {
+        ProgressStateMachine model;
+        model.SetEnabled(true);
+        bool modelHealthy = true;
+        for (uint64_t update = 0; update < 100000; ++update)
+        {
+            const auto snapshot = model.ApplyTaskbar(1, update % 101);
+            modelHealthy = modelHealthy && snapshot.has_value();
+        }
+        VERIFY_IS_TRUE(modelHealthy);
+        VERIFY_ARE_EQUAL(uint8_t{ 9 }, model.Current().value);
+
+        RecognitionEngine recognizer;
+        bool recognizedHealthy = true;
+        for (uint64_t record = 0; record < 100000; ++record)
+        {
+            const auto result = recognizer.Consume(
+                L"Receiving objects: 50% (50/100)\n",
+                record * RecognitionEngine::PublicationIntervalMilliseconds);
+            recognizedHealthy = recognizedHealthy && result.accepted && result.healthy && !result.overflow && !result.suppressInput;
+            if ((record + 1) % 1000 == 0)
+            {
+                recognizer.Reset();
+            }
+        }
+        VERIFY_IS_TRUE(recognizedHealthy);
+
+        std::array<ProgressStateMachine, 4> panes;
+        std::array<std::thread, 4> workers;
+        std::atomic<bool> concurrentHealthy{ true };
+        for (auto& pane : panes)
+        {
+            pane.SetEnabled(true);
+        }
+        for (size_t paneIndex = 0; paneIndex < panes.size(); ++paneIndex)
+        {
+            workers[paneIndex] = std::thread{ [&, paneIndex]() {
+                for (uint64_t update = 0; update < 25000; ++update)
+                {
+                    if (!panes[paneIndex].ApplyTaskbar(1, (update + paneIndex) % 101).has_value())
+                    {
+                        concurrentHealthy.store(false, std::memory_order_release);
+                    }
+                }
+            } };
+        }
+        for (auto& worker : workers)
+        {
+            worker.join();
+        }
+        VERIFY_IS_TRUE(concurrentHealthy.load(std::memory_order_acquire));
+
+        RenderEnvironment renderEnvironment;
+        renderEnvironment.hostLoaded = true;
+        renderEnvironment.tabVisible = true;
+        renderEnvironment.paneActive = true;
+        bool lifecycleHealthy = true;
+        bool providerLifecycleHealthy = true;
+        bool splitCloseRehydrationHealthy = true;
+        bool focusVisibilityHealthy = true;
+        bool repeatedTerminalStatesHealthy = true;
+        bool rendererRecoveryHealthy = true;
+        bool governorRecoveryHealthy = true;
+        bool samplerLifecycleHealthy = true;
+        for (uint32_t lifecycle = 0; lifecycle < 10000; ++lifecycle)
+        {
+            auto& pane = panes[lifecycle % panes.size()];
+            pane.SetEnabled(false);
+            lifecycleHealthy = lifecycleHealthy && !pane.ApplyTaskbar(1, 50).has_value();
+            pane.SetEnabled(true);
+
+            const ProviderProgress provider{
+                ProgressProvider::Git,
+                ProgressMode::Determinate,
+                ProgressStatus::Running,
+                static_cast<uint8_t>(lifecycle % 101),
+                ProviderConfidence::High,
+                true,
+                true,
+                true,
+                2,
+                lifecycle,
+            };
+            const auto claimed = pane.ApplyProvider(provider);
+            const auto released = pane.ApplyProvider({});
+            providerLifecycleHealthy = providerLifecycleHealthy &&
+                                       claimed.has_value() &&
+                                       claimed->source == ProgressSource::Provider &&
+                                       released.has_value() &&
+                                       !released->visible;
+
+            // Model the reset/reparent/rehydrate sequence used when a split
+            // child closes. Re-applying current sources in precedence order
+            // must restore the survivor without scanning scrollback.
+            pane.Reset();
+            pane.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1);
+            pane.ApplyTaskbar(0, 0);
+            const auto rehydrated = pane.ApplyProvider(provider);
+            splitCloseRehydrationHealthy = splitCloseRehydrationHealthy &&
+                                           rehydrated.has_value() &&
+                                           rehydrated->source == ProgressSource::Provider;
+            lifecycleHealthy = lifecycleHealthy && pane.ApplyTaskbar(1, lifecycle % 101).has_value();
+
+            VisualProgressRenderState renderer;
+            const auto running = renderer.Apply(
+                { ProgressMode::Determinate, ProgressStatus::Running, static_cast<uint8_t>(lifecycle % 101), true, ProgressSource::Taskbar, 1 },
+                renderEnvironment,
+                RenderTimestamp{ 0 });
+            renderEnvironment.windowFocused = false;
+            const auto unfocused = renderer.RefreshEnvironment(renderEnvironment, RenderTimestamp{ 250 });
+            renderEnvironment.windowFocused = true;
+            renderEnvironment.windowVisible = false;
+            const auto hidden = renderer.RefreshEnvironment(renderEnvironment, RenderTimestamp{ 500 });
+            renderEnvironment.windowVisible = true;
+            const auto refocused = renderer.RefreshEnvironment(renderEnvironment, RenderTimestamp{ 750 });
+            focusVisibilityHealthy = focusVisibilityHealthy &&
+                                     !unfocused.rainbowMoving &&
+                                     !hidden.visible &&
+                                     refocused.visible;
+
+            const auto terminalStatus = lifecycle % 2 == 0 ? ProgressStatus::Success : ProgressStatus::Error;
+            const auto terminal = renderer.Apply(
+                { ProgressMode::Determinate, terminalStatus, static_cast<uint8_t>(terminalStatus == ProgressStatus::Success ? 100 : lifecycle % 101), true, ProgressSource::Taskbar, 2 },
+                renderEnvironment,
+                RenderTimestamp{ 1000 });
+            repeatedTerminalStatesHealthy = repeatedTerminalStatesHealthy &&
+                                            running.visible &&
+                                            terminal.visible &&
+                                            terminal.releaseAfterTransition == (terminalStatus == ProgressStatus::Success);
+
+            // Degrading to Disabled simulates an exhausted device/render fault.
+            // A new pane lifecycle is the bounded recovery boundary.
+            while (renderer.Tier() != RenderTier::Disabled)
+            {
+                renderer.Degrade(RenderTimestamp{ 2000 });
+            }
+            VisualProgressRenderState recoveredRenderer;
+            const auto recovered = recoveredRenderer.Apply(
+                { ProgressMode::Determinate, ProgressStatus::Running, 50, true, ProgressSource::Taskbar, 1 },
+                renderEnvironment,
+                RenderTimestamp{ 3000 });
+            rendererRecoveryHealthy = rendererRecoveryHealthy &&
+                                      renderer.Tier() == RenderTier::Disabled &&
+                                      recovered.visible &&
+                                      recoveredRenderer.Tier() == RenderTier::Full;
+
+            PerformanceGovernorInputs inputs;
+            inputs.progressVisible = true;
+            inputs.progressActive = true;
+            inputs.visibleActiveProgressCount = static_cast<uint16_t>(panes.size());
+            VisualProgressPerformanceGovernor governor;
+            governor.ObserveHardFailure(inputs, PerformanceTimestamp{ 0 });
+            inputs.visibleActiveProgressCount = 0;
+            governor.Evaluate(inputs);
+            governorRecoveryHealthy = governorRecoveryHealthy && governor.AdaptiveTier() == RenderTier::Full;
+
+            VisualProgressSamplerState sampler;
+            uint64_t staleGeneration{};
+            samplerLifecycleHealthy = samplerLifecycleHealthy &&
+                                      sampler.Start() &&
+                                      sampler.TryBeginProbe(staleGeneration) &&
+                                      !sampler.TryBeginProbe(staleGeneration);
+            sampler.Stop();
+            samplerLifecycleHealthy = samplerLifecycleHealthy &&
+                                      !sampler.TryCompleteProbe(staleGeneration) &&
+                                      sampler.Start();
+            uint64_t currentGeneration{};
+            samplerLifecycleHealthy = samplerLifecycleHealthy &&
+                                      sampler.TryBeginProbe(currentGeneration) &&
+                                      sampler.TryCompleteProbe(currentGeneration) &&
+                                      sampler.Close() &&
+                                      !sampler.Start();
+        }
+        VERIFY_IS_TRUE(lifecycleHealthy);
+        VERIFY_IS_TRUE(providerLifecycleHealthy);
+        VERIFY_IS_TRUE(splitCloseRehydrationHealthy);
+        VERIFY_IS_TRUE(focusVisibilityHealthy);
+        VERIFY_IS_TRUE(repeatedTerminalStatesHealthy);
+        VERIFY_IS_TRUE(rendererRecoveryHealthy);
+        VERIFY_IS_TRUE(governorRecoveryHealthy);
+        VERIFY_IS_TRUE(samplerLifecycleHealthy);
     }
 }
