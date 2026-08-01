@@ -130,7 +130,10 @@ try
     Assert-Condition ($notes.Contains("# winTerm $Version")) 'Release notes contain the matching title'
     if ($metadata.signing -eq 'unsigned')
     {
-        Assert-Condition ($notes -match '(?i)unsigned|not code-signed') 'Release notes disclose the unsigned installer'
+        $signingSections = [regex]::Matches($notes, '(?im)^## Signing\s*$')
+        Assert-Condition ($signingSections.Count -eq 1) 'Release notes contain exactly one Signing section'
+        $unsignedDisclosures = [regex]::Matches($notes, '(?i)\bunsigned\b|not\s+(?:code|authenticode)[-\s]signed')
+        Assert-Condition ($unsignedDisclosures.Count -eq 1) 'Release notes contain exactly one unsigned-installer disclosure'
     }
 
     foreach ($sbomName in @('SBOM.spdx.json', 'SBOM.cyclonedx.json'))
