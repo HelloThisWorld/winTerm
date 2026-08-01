@@ -1334,6 +1334,24 @@ void Pane::SetActive()
     UpdateVisuals();
 }
 
+void Pane::SetVisualProgressHostWindowState(const bool visible, const bool focused) noexcept
+{
+    _visualProgressHostWindowVisible = visible;
+    _visualProgressHostWindowFocused = focused;
+
+    if (!_IsLeaf())
+    {
+        _firstChild->SetVisualProgressHostWindowState(visible, focused);
+        _secondChild->SetVisualProgressHostWindowState(visible, focused);
+        return;
+    }
+
+    if (_visualProgressRenderer)
+    {
+        _visualProgressRenderer->SetHostWindowState(visible, focused);
+    }
+}
+
 void Pane::SetPaneHeadersVisible(const bool visible)
 {
     _paneHeadersVisible = visible;
@@ -2305,6 +2323,9 @@ void Pane::_CreateVisualProgressOverlay()
             return;
         }
 
+        _visualProgressRenderer->SetHostWindowState(
+            _visualProgressHostWindowVisible,
+            _visualProgressHostWindowFocused);
         _visualProgressRenderer->SetPaneActive(_lastActive);
         _visualProgressRenderer->Apply(_visualProgressState.Current());
         if (_visualProgressRenderer->Faulted())
@@ -3677,6 +3698,12 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
     {
         std::swap(_firstChild, _secondChild);
     }
+    _firstChild->SetVisualProgressHostWindowState(
+        _visualProgressHostWindowVisible,
+        _visualProgressHostWindowFocused);
+    _secondChild->SetVisualProgressHostWindowState(
+        _visualProgressHostWindowVisible,
+        _visualProgressHostWindowFocused);
 
     _root.ColumnDefinitions().Clear();
     _root.RowDefinitions().Clear();

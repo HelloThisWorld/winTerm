@@ -35,6 +35,11 @@ namespace SettingsModelUnitTests
         TEST_METHOD(RecognitionRecoversAndIsolatesEngines);
         TEST_METHOD(RecognitionClassifiesAllProvidersOneCodeUnitAtATime);
         TEST_METHOD(RecognitionRejectsMalformedNumericAndInterruptedOutput);
+        TEST_METHOD(RecognitionPreservesHighConfidenceOwnershipAndClearsGeneric);
+        TEST_METHOD(RecognitionBootstrapsRichPipAndMavenResolver);
+        TEST_METHOD(RecognitionHandlesGenericIndeterminateShapes);
+        TEST_METHOD(RecognitionHandlesArbitraryProviderSplitsAndReset);
+        TEST_METHOD(RecognitionAppliesSuppressionSafetyMatrix);
         TEST_METHOD(RendererPlansRealValuesRegressionAndIndeterminateMode);
         TEST_METHOD(RendererHiddenIngressAndOwnershipBoundaries);
         TEST_METHOD(RendererPlansStatusAndAccessibilityFallbacks);
@@ -395,7 +400,7 @@ namespace SettingsModelUnitTests
 
         RecognitionEngine unrelatedDownload;
         primeCursor(unrelatedDownload);
-        const auto backupResult = unrelatedDownload.Consume(L"Downloading backup 50% 1MB/2MB 1MB/s eta 1s\r\x1b[2K", 50, replacement);
+        const auto backupResult = unrelatedDownload.Consume(L"Downloading backup.zip 50% 1MB/2MB 1MB/s eta 1s\r\x1b[2K", 50, replacement);
         VERIFY_IS_TRUE(backupResult.progress.has_value());
         if (backupResult.progress)
         {
@@ -939,6 +944,441 @@ namespace SettingsModelUnitTests
         VERIFY_IS_FALSE(interruptedNumber.Consume(L" files copied\n", 50).progress.has_value());
     }
 
+    void WinTermVisualProgressTests::RecognitionPreservesHighConfidenceOwnershipAndClearsGeneric()
+    {
+        RecognitionEngine owned;
+        const auto initial = owned.Consume(L"Receiving objects: 40% (40/100)\n", 0);
+        VERIFY_IS_TRUE(initial.progress.has_value());
+        if (initial.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Git), static_cast<int>(initial.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProviderConfidence::High), static_cast<int>(initial.progress->confidence));
+        }
+
+        const auto genericLooking = owned.Consume(L"42% (42/100) 1.0 MB/s ETA 00:05\n", 50);
+        VERIFY_IS_FALSE(genericLooking.progress.has_value());
+        VERIFY_IS_FALSE(genericLooking.suppressInput);
+
+        const auto continued = owned.Consume(L"Receiving objects: 60% (60/100)\n", 100);
+        VERIFY_IS_TRUE(continued.progress.has_value());
+        if (continued.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Git), static_cast<int>(continued.progress->provider));
+            VERIFY_ARE_EQUAL(uint8_t{ 60 }, continued.progress->value);
+        }
+
+        RecognitionEngine expiredOwnership;
+        const auto claimed = expiredOwnership.Consume(L"Receiving objects: 40% (40/100)\n", 0);
+        VERIFY_IS_TRUE(claimed.progress.has_value());
+        const auto ordinary = expiredOwnership.Consume(L"ordinary command output\n", 50);
+        VERIFY_IS_FALSE(ordinary.progress.has_value());
+        const auto laterGeneric = expiredOwnership.Consume(L"42% (42/100) 1.0 MB/s ETA 00:05\n", 100);
+        VERIFY_IS_TRUE(laterGeneric.progress.has_value());
+        if (laterGeneric.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(laterGeneric.progress->provider));
+            VERIFY_IS_FALSE(laterGeneric.progress->suppressible);
+        }
+        VERIFY_IS_FALSE(laterGeneric.suppressInput);
+
+        RecognitionOptions replacement;
+        replacement.replacementEnabled = true;
+        replacement.rendererEnabled = true;
+
+        RecognitionEngine staleCurl;
+        VERIFY_IS_TRUE(staleCurl.Consume(L"% Total    % Received\n", 0, replacement).progress.has_value());
+        VERIFY_IS_FALSE(staleCurl.Consume(L"ordinary command output\n", 50, replacement).progress.has_value());
+        const auto laterCurlShape = staleCurl.Consume(L"50  1024  50  512  0\r\x1b[2K", 100, replacement);
+        VERIFY_IS_FALSE(laterCurlShape.progress.has_value());
+        VERIFY_IS_FALSE(laterCurlShape.suppressInput);
+
+        RecognitionEngine staleWget;
+        VERIFY_IS_TRUE(staleWget.Consume(L"Saving to: 'demo.bin'\n", 0, replacement).progress.has_value());
+        VERIFY_IS_FALSE(staleWget.Consume(L"ordinary command output\n", 50, replacement).progress.has_value());
+        const auto laterWgetShape = staleWget.Consume(
+            L"demo.bin 50%[====>     ] 512K 1.0MB/s eta 1s\r\x1b[2K",
+            100,
+            replacement);
+        VERIFY_IS_FALSE(laterWgetShape.progress.has_value());
+        VERIFY_IS_FALSE(laterWgetShape.suppressInput);
+
+        RecognitionEngine generic;
+        const auto visible = generic.Consume(L"42% (42/100) 1.0 MB/s ETA 00:05\n", 0);
+        VERIFY_IS_TRUE(visible.progress.has_value());
+        if (visible.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(visible.progress->provider));
+            VERIFY_IS_TRUE(visible.progress->visible);
+        }
+
+        const auto cleared = generic.Consume(L"ordinary command output\n", 1);
+        VERIFY_IS_TRUE(cleared.progress.has_value());
+        if (cleared.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::None), static_cast<int>(cleared.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Hidden), static_cast<int>(cleared.progress->mode));
+            VERIFY_IS_FALSE(cleared.progress->visible);
+        }
+        VERIFY_IS_FALSE(cleared.suppressInput);
+    }
+
+    void WinTermVisualProgressTests::RecognitionBootstrapsRichPipAndMavenResolver()
+    {
+        RecognitionEngine pip;
+        const auto announcement = pip.Consume(
+            L"Downloading demo_package-1.0-py3-none-any.whl (2.0 MB)\n",
+            0);
+        VERIFY_IS_TRUE(announcement.progress.has_value());
+        if (announcement.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Pip), static_cast<int>(announcement.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(announcement.progress->mode));
+        }
+
+        const auto rich = pip.Consume(
+            L"\x2501\x2501\x2501\x2501 1.0/2.0 MB 4.0 MB/s eta 0:00:01\r\x1b[2K",
+            50);
+        VERIFY_IS_TRUE(rich.progress.has_value());
+        if (rich.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Pip), static_cast<int>(rich.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Determinate), static_cast<int>(rich.progress->mode));
+            VERIFY_ARE_EQUAL(uint8_t{ 50 }, rich.progress->value);
+            VERIFY_ARE_EQUAL(static_cast<int>(ProviderConfidence::High), static_cast<int>(rich.progress->confidence));
+        }
+        VERIFY_IS_FALSE(rich.suppressInput);
+
+        const auto summary = pip.Consume(L"Successfully installed demo-package\n", 100);
+        VERIFY_IS_FALSE(summary.progress.has_value());
+        VERIFY_IS_FALSE(summary.suppressInput);
+
+        RecognitionOptions replacement;
+        replacement.replacementEnabled = true;
+        replacement.rendererEnabled = true;
+
+        RecognitionEngine unrelatedArchive;
+        const auto unrelatedAnnouncement = unrelatedArchive.Consume(L"Downloading backup.zip (2.0 MB)\n", 0, replacement);
+        VERIFY_IS_FALSE(unrelatedAnnouncement.progress.has_value());
+        const auto unrelatedMeter = unrelatedArchive.Consume(
+            L"\x2501\x2501\x2501\x2501 1.0/2.0 MB 4.0 MB/s eta 0:00:01\r\x1b[2K",
+            50,
+            replacement);
+        VERIFY_IS_TRUE(unrelatedMeter.progress.has_value());
+        if (unrelatedMeter.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(unrelatedMeter.progress->provider));
+        }
+        VERIFY_IS_FALSE(unrelatedMeter.suppressInput);
+
+        RecognitionEngine archiveSubstring;
+        const auto substring = archiveSubstring.Consume(
+            L"Downloading backup.zipper 50% 1MB/2MB 1MB/s eta 1s\r\x1b[2K",
+            0,
+            replacement);
+        VERIFY_IS_TRUE(substring.progress.has_value());
+        if (substring.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(substring.progress->provider));
+        }
+        VERIFY_IS_FALSE(substring.suppressInput);
+
+        RecognitionEngine trustedSourceArchive;
+        const auto collecting = trustedSourceArchive.Consume(L"Collecting demo-package\n", 0, replacement);
+        VERIFY_IS_TRUE(collecting.progress.has_value());
+        const auto sourceAnnouncement = trustedSourceArchive.Consume(
+            L"Downloading demo-package.tar.gz (2.0 MB)\n",
+            50,
+            replacement);
+        // This announcement is structurally identical to the preceding
+        // indeterminate pip update, so publication may be coalesced.
+        if (sourceAnnouncement.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Pip), static_cast<int>(sourceAnnouncement.progress->provider));
+        }
+        VERIFY_IS_FALSE(sourceAnnouncement.suppressInput);
+        const auto sourceMeter = trustedSourceArchive.Consume(
+            L"\x2501\x2501\x2501\x2501 1.0/2.0 MB 4.0 MB/s eta 0:00:01\r\x1b[2K",
+            100,
+            replacement);
+        VERIFY_IS_TRUE(sourceMeter.progress.has_value());
+        if (sourceMeter.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Pip), static_cast<int>(sourceMeter.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProviderConfidence::High), static_cast<int>(sourceMeter.progress->confidence));
+        }
+
+        RecognitionEngine maven;
+        const auto download = maven.Consume(
+            L"Downloading from central: https://repo.example.invalid/artifact.jar\n",
+            0);
+        VERIFY_IS_TRUE(download.progress.has_value());
+        if (download.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Maven), static_cast<int>(download.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(download.progress->mode));
+        }
+
+        const auto resolver = maven.Consume(L"Progress (1): 512/1024 kB\r\x1b[2K", 50);
+        VERIFY_IS_TRUE(resolver.progress.has_value());
+        if (resolver.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Maven), static_cast<int>(resolver.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Determinate), static_cast<int>(resolver.progress->mode));
+            VERIFY_ARE_EQUAL(uint8_t{ 50 }, resolver.progress->value);
+            VERIFY_IS_FALSE(resolver.progress->suppressible);
+        }
+        VERIFY_IS_FALSE(resolver.suppressInput);
+
+        RecognitionEngine taggedMaven;
+        const auto taggedDownload = taggedMaven.Consume(
+            L"[INFO] Downloading from central: https://repo.example.invalid/artifact.jar\n",
+            0);
+        VERIFY_IS_TRUE(taggedDownload.progress.has_value());
+        if (taggedDownload.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Maven), static_cast<int>(taggedDownload.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(taggedDownload.progress->mode));
+        }
+
+        RecognitionEngine mavenStage;
+        const auto tests = mavenStage.Consume(L"[INFO] Tests run: 5/10\n", 0);
+        VERIFY_IS_TRUE(tests.progress.has_value());
+        if (tests.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Maven), static_cast<int>(tests.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(tests.progress->mode));
+        }
+    }
+
+    void WinTermVisualProgressTests::RecognitionHandlesGenericIndeterminateShapes()
+    {
+        RecognitionOptions replacement;
+        replacement.replacementEnabled = true;
+        replacement.rendererEnabled = true;
+
+        RecognitionEngine spinner;
+        spinner.Consume(L"\r", 0);
+        const auto spinnerResult = spinner.Consume(L"|\r\x1b[2K", 50, replacement);
+        VERIFY_IS_TRUE(spinnerResult.progress.has_value());
+        if (spinnerResult.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(spinnerResult.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(spinnerResult.progress->mode));
+            VERIFY_IS_FALSE(spinnerResult.progress->suppressible);
+        }
+        VERIFY_IS_FALSE(spinnerResult.suppressInput);
+
+        RecognitionEngine speedAndEta;
+        const auto transfer = speedAndEta.Consume(L"4.0 MB/s ETA 00:03\r\x1b[2K", 0, replacement);
+        VERIFY_IS_TRUE(transfer.progress.has_value());
+        if (transfer.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(transfer.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(transfer.progress->mode));
+            VERIFY_IS_FALSE(transfer.progress->suppressible);
+        }
+        VERIFY_IS_FALSE(transfer.suppressInput);
+
+        RecognitionEngine repeated;
+        const auto first = repeated.Consume(L"processed 1\r\x1b[2K", 0, replacement);
+        VERIFY_IS_FALSE(first.progress.has_value());
+        VERIFY_IS_FALSE(first.suppressInput);
+        const auto second = repeated.Consume(L"processed 2\r\x1b[2K", 50, replacement);
+        VERIFY_IS_TRUE(second.progress.has_value());
+        if (second.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Generic), static_cast<int>(second.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(second.progress->mode));
+            VERIFY_IS_FALSE(second.progress->suppressible);
+        }
+        VERIFY_IS_FALSE(second.suppressInput);
+
+        const auto clear = repeated.Consume(L"finished ordinary work\n", 51, replacement);
+        VERIFY_IS_TRUE(clear.progress.has_value());
+        if (clear.progress)
+        {
+            VERIFY_IS_FALSE(clear.progress->visible);
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::None), static_cast<int>(clear.progress->provider));
+        }
+        VERIFY_IS_FALSE(clear.suppressInput);
+    }
+
+    void WinTermVisualProgressTests::RecognitionHandlesArbitraryProviderSplitsAndReset()
+    {
+        struct Fixture
+        {
+            std::wstring_view stream;
+            ProgressProvider provider;
+        };
+
+        const std::array<Fixture, 13> fixtures{
+            Fixture{ L"demo-layer: Downloading 512B/1.0kB\n", ProgressProvider::DockerPull },
+            Fixture{ L"#7 [3/8] RUN build 50%\n", ProgressProvider::DockerBuildKit },
+            Fixture{ L"Downloading demo_package-1.0-py3-none-any.whl (2.0 MB)\n\x2501\x2501 1.0/2.0 MB 4.0 MB/s eta 0:00:01\n", ProgressProvider::Pip },
+            Fixture{ L"Receiving objects: 50% (50/100)\n", ProgressProvider::Git },
+            Fixture{ L"% Total    % Received\r\n50  1024  50  512  0\n", ProgressProvider::Curl },
+            Fixture{ L"Saving to: 'demo.bin'\ndemo.bin 50%[====>     ] 512K 1.0MB/s eta 1s\n", ProgressProvider::Wget },
+            Fixture{ L"npm fetch 50% (5/10)\n", ProgressProvider::Npm },
+            Fixture{ L"pnpm download 50% (5/10)\n", ProgressProvider::Pnpm },
+            Fixture{ L"yarn fetch 50% (5/10)\n", ProgressProvider::Yarn },
+            Fixture{ L"nvm downloading node.js 50%\n", ProgressProvider::Nvm },
+            Fixture{ L"Downloading from central: https://repo.example.invalid/artifact.jar\nProgress (1): 512/1024 kB\n", ProgressProvider::Maven },
+            Fixture{ L"75% EXECUTING\n", ProgressProvider::Gradle },
+            Fixture{ L"42% (42/100) 1.0 MB/s ETA 00:05\n", ProgressProvider::Generic },
+        };
+
+        const auto remember = [](std::optional<ProviderProgress>& latest, const RecognitionResult& result) {
+            if (result.progress)
+            {
+                latest = result.progress;
+            }
+        };
+
+        for (const auto& fixture : fixtures)
+        {
+            for (size_t split = 1; split < fixture.stream.size(); ++split)
+            {
+                RecognitionEngine engine;
+                std::optional<ProviderProgress> latest;
+                remember(latest, engine.Consume(fixture.stream.substr(0, split), 0));
+                remember(latest, engine.Consume(fixture.stream.substr(split), 50));
+                VERIFY_IS_TRUE(latest.has_value());
+                if (latest)
+                {
+                    VERIFY_ARE_EQUAL(static_cast<int>(fixture.provider), static_cast<int>(latest->provider));
+                }
+            }
+
+            RecognitionEngine reset;
+            reset.Consume(fixture.stream.substr(0, fixture.stream.size() / 2), 0);
+            VERIFY_IS_TRUE(reset.TryReset());
+            const auto afterReset = reset.Consume(fixture.stream, 50);
+            VERIFY_IS_TRUE(afterReset.progress.has_value());
+            if (afterReset.progress)
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(fixture.provider), static_cast<int>(afterReset.progress->provider));
+            }
+            VERIFY_IS_FALSE(afterReset.suppressInput);
+        }
+    }
+
+    void WinTermVisualProgressTests::RecognitionAppliesSuppressionSafetyMatrix()
+    {
+        struct Fixture
+        {
+            std::wstring_view prelude;
+            std::wstring_view transientRecord;
+            std::wstring_view newlineRecord;
+            ProgressProvider provider;
+            bool safelyReplaceable;
+        };
+
+        const std::array<Fixture, 13> fixtures{
+            Fixture{ {}, L"demo-layer: Downloading 512B/1.0kB\r\x1b[2K", L"demo-layer: Downloading 512B/1.0kB\n", ProgressProvider::DockerPull, false },
+            Fixture{ {}, L"#7 [3/8] RUN build 50%\r\x1b[2K", L"#7 [3/8] RUN build 50%\n", ProgressProvider::DockerBuildKit, false },
+            Fixture{ L"Downloading demo_package-1.0-py3-none-any.whl (2.0 MB)\n", L"\x2501\x2501 1.0/2.0 MB 4.0 MB/s eta 0:00:01\r\x1b[2K", L"\x2501\x2501 1.0/2.0 MB 4.0 MB/s eta 0:00:01\n", ProgressProvider::Pip, true },
+            Fixture{ {}, L"Receiving objects: 50% (50/100)\r\x1b[2K", L"Receiving objects: 50% (50/100)\n", ProgressProvider::Git, true },
+            Fixture{ L"% Total    % Received\r\n", L"50  1024  50  512  0\r\x1b[2K", L"50  1024  50  512  0\n", ProgressProvider::Curl, true },
+            Fixture{ L"Saving to: 'demo.bin'\n", L"demo.bin 50%[====>     ] 512K 1.0MB/s eta 1s\r\x1b[2K", L"demo.bin 50%[====>     ] 512K 1.0MB/s eta 1s\n", ProgressProvider::Wget, true },
+            Fixture{ {}, L"npm fetch 50% (5/10)\r\x1b[2K", L"npm fetch 50% (5/10)\n", ProgressProvider::Npm, false },
+            Fixture{ {}, L"pnpm download 50% (5/10)\r\x1b[2K", L"pnpm download 50% (5/10)\n", ProgressProvider::Pnpm, false },
+            Fixture{ {}, L"yarn fetch 50% (5/10)\r\x1b[2K", L"yarn fetch 50% (5/10)\n", ProgressProvider::Yarn, false },
+            Fixture{ {}, L"nvm downloading node.js 50%\r\x1b[2K", L"nvm downloading node.js 50%\n", ProgressProvider::Nvm, false },
+            Fixture{ L"Downloading from central: https://repo.example.invalid/artifact.jar\n", L"Progress (1): 512/1024 kB\r\x1b[2K", L"Progress (1): 512/1024 kB\n", ProgressProvider::Maven, false },
+            Fixture{ {}, L"75% EXECUTING\r\x1b[2K", L"75% EXECUTING\n", ProgressProvider::Gradle, false },
+            Fixture{ {}, L"42% (42/100) 1.0 MB/s ETA 00:05\r\x1b[2K", L"42% (42/100) 1.0 MB/s ETA 00:05\n", ProgressProvider::Generic, false },
+        };
+
+        RecognitionOptions replacement;
+        replacement.replacementEnabled = true;
+        replacement.rendererEnabled = true;
+
+        const auto prepare = [](RecognitionEngine& engine,
+                                const std::wstring_view prelude,
+                                uint64_t& timestamp) {
+            if (!prelude.empty())
+            {
+                engine.Consume(prelude, timestamp);
+                timestamp += RecognitionEngine::PublicationIntervalMilliseconds;
+            }
+            engine.Consume(L"\r", timestamp);
+            timestamp += RecognitionEngine::PublicationIntervalMilliseconds;
+        };
+
+        for (const auto& fixture : fixtures)
+        {
+            RecognitionEngine whole;
+            uint64_t timestamp{};
+            prepare(whole, fixture.prelude, timestamp);
+            const auto wholeResult = whole.Consume(fixture.transientRecord, timestamp, replacement);
+            VERIFY_IS_TRUE(wholeResult.progress.has_value());
+            if (wholeResult.progress)
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(fixture.provider), static_cast<int>(wholeResult.progress->provider));
+                VERIFY_ARE_EQUAL(fixture.safelyReplaceable, wholeResult.progress->suppressible);
+            }
+            VERIFY_ARE_EQUAL(fixture.safelyReplaceable, wholeResult.suppressInput);
+
+            RecognitionEngine newline;
+            timestamp = 0;
+            prepare(newline, fixture.prelude, timestamp);
+            const auto newlineResult = newline.Consume(fixture.newlineRecord, timestamp, replacement);
+            VERIFY_IS_TRUE(newlineResult.progress.has_value());
+            if (newlineResult.progress)
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(fixture.provider), static_cast<int>(newlineResult.progress->provider));
+                VERIFY_IS_FALSE(newlineResult.progress->suppressible);
+            }
+            VERIFY_IS_FALSE(newlineResult.suppressInput);
+
+            RecognitionEngine fragmented;
+            timestamp = 0;
+            prepare(fragmented, fixture.prelude, timestamp);
+            const auto split = fixture.transientRecord.size() / 2;
+            std::optional<ProviderProgress> fragmentedProgress;
+            const auto prefix = fragmented.Consume(fixture.transientRecord.substr(0, split), timestamp, replacement);
+            if (prefix.progress)
+            {
+                fragmentedProgress = prefix.progress;
+            }
+            const auto suffix = fragmented.Consume(
+                fixture.transientRecord.substr(split),
+                timestamp + RecognitionEngine::PublicationIntervalMilliseconds,
+                replacement);
+            if (suffix.progress)
+            {
+                fragmentedProgress = suffix.progress;
+            }
+            VERIFY_IS_TRUE(fragmentedProgress.has_value());
+            if (fragmentedProgress)
+            {
+                VERIFY_ARE_EQUAL(static_cast<int>(fixture.provider), static_cast<int>(fragmentedProgress->provider));
+            }
+            VERIFY_IS_FALSE(prefix.suppressInput);
+            VERIFY_IS_FALSE(suffix.suppressInput);
+
+            auto rendererUnavailable = replacement;
+            rendererUnavailable.rendererEnabled = false;
+            auto alternateScreen = replacement;
+            alternateScreen.normalScreen = false;
+            auto parserUnavailable = replacement;
+            parserUnavailable.parserHealthy = false;
+            for (const auto gated : { rendererUnavailable, alternateScreen, parserUnavailable })
+            {
+                RecognitionEngine gatedEngine;
+                timestamp = 0;
+                prepare(gatedEngine, fixture.prelude, timestamp);
+                const auto gatedResult = gatedEngine.Consume(fixture.transientRecord, timestamp, gated);
+                VERIFY_IS_TRUE(gatedResult.progress.has_value());
+                if (gatedResult.progress)
+                {
+                    VERIFY_ARE_EQUAL(static_cast<int>(fixture.provider), static_cast<int>(gatedResult.progress->provider));
+                }
+                VERIFY_IS_FALSE(gatedResult.suppressInput);
+            }
+        }
+    }
+
     void WinTermVisualProgressTests::RendererPlansRealValuesRegressionAndIndeterminateMode()
     {
         RenderEnvironment environment;
@@ -1112,6 +1552,7 @@ namespace SettingsModelUnitTests
             environment,
             RenderTimestamp{ 3000 });
         VERIFY_IS_TRUE(error.errorPulse);
+        VERIFY_IS_FALSE(error.errorWithoutProgress);
         VERIFY_IS_FALSE(error.sparksEligible);
         VERIFY_IS_FALSE(error.fadeOut);
         VERIFY_IS_FALSE(RequiresSparkWork(error, 0));
@@ -1125,6 +1566,31 @@ namespace SettingsModelUnitTests
         const auto errorActiveRefresh = renderer.RefreshEnvironment(environment, RenderTimestamp{ 3500 });
         VERIFY_IS_FALSE(errorActiveRefresh.errorPulse);
         VERIFY_IS_FALSE(RequiresSparkWork(errorActiveRefresh, 0));
+
+        VisualProgressRenderState unknownProgressError;
+        unknownProgressError.Apply(
+            { ProgressMode::Indeterminate, ProgressStatus::Running, 0, true, ProgressSource::Provider, 1 },
+            environment,
+            RenderTimestamp{ 0 });
+        const auto statusOnlyError = unknownProgressError.Apply(
+            { ProgressMode::Determinate, ProgressStatus::Error, 0, true, ProgressSource::Provider, 2 },
+            environment,
+            RenderTimestamp{ 100 });
+        VERIFY_ARE_EQUAL(0.0f, statusOnlyError.targetProgress);
+        VERIFY_IS_TRUE(statusOnlyError.errorWithoutProgress);
+        VERIFY_IS_TRUE(statusOnlyError.headVisible);
+        VERIFY_IS_TRUE(statusOnlyError.errorPulse);
+        environment.windowFocused = false;
+        const auto retainedStatusOnlyError = unknownProgressError.RefreshEnvironment(environment, RenderTimestamp{ 200 });
+        VERIFY_IS_TRUE(retainedStatusOnlyError.errorWithoutProgress);
+        VERIFY_IS_TRUE(retainedStatusOnlyError.headVisible);
+        VERIFY_IS_FALSE(retainedStatusOnlyError.errorPulse);
+        environment.windowFocused = true;
+
+        VERIFY_ARE_EQUAL(uint32_t{ 0xFF087A63u }, RainbowArcVisualConstants::LightRunningSolid);
+        VERIFY_ARE_EQUAL(uint32_t{ 0xFF8A5D00u }, RainbowArcVisualConstants::LightWaitingSolid);
+        VERIFY_ARE_EQUAL(uint32_t{ 0xFF087A42u }, RainbowArcVisualConstants::LightSuccessSolid);
+        VERIFY_ARE_EQUAL(uint32_t{ 0xFFB42318u }, RainbowArcVisualConstants::LightErrorSolid);
 
         environment.animationsEnabled = false;
         const auto reducedMotion = renderer.RefreshEnvironment(environment, RenderTimestamp{ 4000 });
@@ -1281,8 +1747,21 @@ namespace SettingsModelUnitTests
         VERIFY_IS_FALSE(RequiresSparkWork(background, 0));
 
         environment.paneActive = true;
+        environment.windowFocused = false;
+        const auto unfocused = renderer.RefreshEnvironment(environment, RenderTimestamp{ 1 });
+        VERIFY_IS_TRUE(unfocused.visible);
+        VERIFY_IS_FALSE(unfocused.rainbowMoving);
+        VERIFY_IS_FALSE(unfocused.sparksEligible);
+        VERIFY_IS_FALSE(RequiresSparkWork(unfocused, 0));
+
+        environment.windowFocused = true;
+        const auto refocused = renderer.RefreshEnvironment(environment, RenderTimestamp{ 2 });
+        VERIFY_IS_TRUE(refocused.visible);
+        VERIFY_IS_TRUE(refocused.rainbowMoving);
+        VERIFY_IS_TRUE(refocused.sparksEligible);
+
         environment.windowVisible = false;
-        const auto hidden = renderer.RefreshEnvironment(environment, RenderTimestamp{ 1 });
+        const auto hidden = renderer.RefreshEnvironment(environment, RenderTimestamp{ 3 });
         VERIFY_IS_FALSE(hidden.visible);
         VERIFY_IS_FALSE(hidden.sparksEligible);
         VERIFY_IS_FALSE(RequiresSparkWork(hidden, 0));
@@ -1290,7 +1769,7 @@ namespace SettingsModelUnitTests
 
         environment.windowVisible = true;
         environment.tabVisible = false;
-        const auto backgroundTab = renderer.RefreshEnvironment(environment, RenderTimestamp{ 2 });
+        const auto backgroundTab = renderer.RefreshEnvironment(environment, RenderTimestamp{ 4 });
         VERIFY_IS_FALSE(backgroundTab.visible);
         VERIFY_IS_FALSE(backgroundTab.sparksEligible);
         VERIFY_IS_FALSE(RequiresSparkWork(backgroundTab, 0));

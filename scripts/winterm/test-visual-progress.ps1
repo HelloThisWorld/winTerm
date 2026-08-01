@@ -152,6 +152,7 @@ try
         TestProject = 'src\cascadia\UnitTests_SettingsModel\SettingsModel.UnitTests.vcxproj'
         PaneCpp = 'src\cascadia\TerminalApp\Pane.cpp'
         PaneH = 'src\cascadia\TerminalApp\Pane.h'
+        TerminalPageCpp = 'src\cascadia\TerminalApp\TerminalPage.cpp'
         AppXaml = 'src\cascadia\TerminalApp\App.xaml'
         TerminalPaneContentCpp = 'src\cascadia\TerminalApp\TerminalPaneContent.cpp'
         TerminalPaneContentH = 'src\cascadia\TerminalApp\TerminalPaneContent.h'
@@ -254,7 +255,11 @@ try
         'MinimumSparkLifetime{ 120 }',
         'MaximumSparkLifetime{ 260 }',
         'SparkPoolCapacityPerPane{ 8 }',
-        'SparkCapacityPerWindowOrProcess{ 24 }'
+        'SparkCapacityPerWindowOrProcess{ 24 }',
+        'LightRunningSolid',
+        'LightWaitingSolid',
+        'LightSuccessSolid',
+        'LightErrorSolid'
     ))
     {
         Assert-Contains $constants $required 'Centralized Rainbow Arc visual constants'
@@ -288,6 +293,7 @@ try
         'successSweep',
         'finalSparkBurst',
         'errorPulse',
+        'errorWithoutProgress',
         'releaseAfterTransition',
         'class VisualProgressRenderState',
         'class SparkBudget',
@@ -308,6 +314,7 @@ try
         '_initializeGradientStage',
         '_initializeHeadStage',
         '_initializeSparkStage',
+        'SetHostWindowState',
         'CreateRoundedRectangleGeometry',
         'CreateInsetClip',
         '_rainbowFillVisual',
@@ -323,6 +330,9 @@ try
         '_sparkPool.Release',
         'CreateScopedBatch',
         '_applyWithDegradation',
+        '_restartGeometryAnimations',
+        '_showErrorWithoutProgress',
+        '_isLightTheme',
         'UsesStaticFallback',
         '_stopAllAnimations',
         '_releaseAllSparks',
@@ -336,6 +346,18 @@ try
     {
         throw 'The Rainbow Arc gradient brush must have one initializer call and one cached-brush factory definition.'
     }
+    foreach ($status in @('Running', 'Waiting', 'Success', 'Error'))
+    {
+        Assert-Matches $renderer "light\s*\?\s*RainbowArcVisualConstants::Light$($status)Solid\s*:\s*RainbowArcVisualConstants::$($status)Solid" "Light-surface $status fallback palette selection"
+    }
+    foreach ($forbidden in @(
+        'CoreWindow::GetForCurrentThread',
+        '_coreWindow.Visible'
+    ))
+    {
+        Assert-NotContains $renderer $forbidden 'Authoritative XAML-Islands host-window lifecycle boundary'
+    }
+    Assert-NotMatches $renderer '_coreWindow\s*\.\s*(?:VisibilityChanged|Activated)\s*\(' 'Authoritative XAML-Islands host-window lifecycle boundary'
 
     $paneVisualStart = $source.PaneCpp.IndexOf('void Pane::_SetVisualProgressEnabled', [System.StringComparison]::Ordinal)
     $paneVisualEnd = $source.PaneCpp.IndexOf('void Pane::_UpdatePaneHeader', $paneVisualStart, [System.StringComparison]::Ordinal)
@@ -390,6 +412,55 @@ try
     Assert-Matches $pane '(?s)const auto enabled = _visualProgressEnabled\.load\([^;]+&&\s*!_visualProgressFaulted\.load\([^;]+&&\s*_visualProgressRendererReady\.load\([^;]+;\s*terminalContent\.GetTermControl\(\)\.ConfigureVisualProgressRecognition\(\s*enabled,\s*enabled &&' 'Actual renderer-readiness suppression gate'
     Assert-NotContains $pane '_visualProgressOverlay.Height(6.0)' 'Centralized overlay geometry boundary'
     Assert-NotContains $pane '_visualProgressOverlay.RowDefinitions' 'Viewport-preserving overlay boundary'
+    foreach ($required in @(
+        'void SetVisualProgressHostWindowState(bool visible, bool focused) noexcept',
+        '_visualProgressHostWindowVisible',
+        '_visualProgressHostWindowFocused'
+    ))
+    {
+        Assert-Contains $source.PaneH $required 'Per-pane authoritative host-window state'
+    }
+    foreach ($required in @(
+        'void Pane::SetVisualProgressHostWindowState',
+        '_firstChild->SetVisualProgressHostWindowState',
+        '_secondChild->SetVisualProgressHostWindowState',
+        '_visualProgressRenderer->SetHostWindowState'
+    ))
+    {
+        Assert-Contains $pane $required 'Pane-tree host-window lifecycle propagation'
+    }
+
+    $splitStart = $pane.IndexOf('Pane::_Split(', [System.StringComparison]::Ordinal)
+    $splitEnd = $pane.IndexOf('Pane::_CreateMinSizeTree', $splitStart, [System.StringComparison]::Ordinal)
+    if ($splitStart -lt 0 -or $splitEnd -le $splitStart)
+    {
+        throw 'The Pane split boundary could not be isolated.'
+    }
+    $splitImplementation = $pane.Substring($splitStart, $splitEnd - $splitStart)
+    Assert-Contains $splitImplementation '_firstChild->SetVisualProgressHostWindowState' 'First split-child host-window state propagation'
+    Assert-Contains $splitImplementation '_secondChild->SetVisualProgressHostWindowState' 'Second split-child host-window state propagation'
+
+    $terminalPage = $source.TerminalPageCpp
+    $registerStart = $terminalPage.IndexOf('void TerminalPage::_RegisterTabEvents', [System.StringComparison]::Ordinal)
+    $registerEnd = $terminalPage.IndexOf('void TerminalPage::_UnZoomIfNeeded', $registerStart, [System.StringComparison]::Ordinal)
+    $visibilityStart = $terminalPage.IndexOf('void TerminalPage::WindowVisibilityChanged', [System.StringComparison]::Ordinal)
+    $visibilityEnd = $terminalPage.IndexOf('void TerminalPage::_Find', $visibilityStart, [System.StringComparison]::Ordinal)
+    $activationStart = $terminalPage.IndexOf('void TerminalPage::WindowActivated', [System.StringComparison]::Ordinal)
+    $activationEnd = $terminalPage.IndexOf('safe_void_coroutine TerminalPage::_ControlCompletionsChangedHandler', $activationStart, [System.StringComparison]::Ordinal)
+    if ($registerStart -lt 0 -or $registerEnd -le $registerStart -or
+        $visibilityStart -lt 0 -or $visibilityEnd -le $visibilityStart -or
+        $activationStart -lt 0 -or $activationEnd -le $activationStart)
+    {
+        throw 'The TerminalPage host-window lifecycle boundaries could not be isolated.'
+    }
+    $registerImplementation = $terminalPage.Substring($registerStart, $registerEnd - $registerStart)
+    $visibilityImplementation = $terminalPage.Substring($visibilityStart, $visibilityEnd - $visibilityStart)
+    $activationImplementation = $terminalPage.Substring($activationStart, $activationEnd - $activationStart)
+    Assert-Contains $registerImplementation 'GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated)' 'Initial tab host-window state propagation'
+    Assert-Contains $visibilityImplementation '_visible = showOrHide' 'Authoritative window visibility state'
+    Assert-Contains $visibilityImplementation 'GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated)' 'Window visibility propagation'
+    Assert-Contains $activationImplementation '_activated = activated' 'Authoritative window activation state'
+    Assert-Contains $activationImplementation 'GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated)' 'Window activation propagation'
 
     $recognition = $source.Recognition
     foreach ($required in @(
@@ -426,7 +497,18 @@ try
         'progress.provider != ProgressProvider::Generic',
         'class Utf8RecognitionAdapter final',
         'MaxChunkBytes',
-        'bool TryReset() noexcept'
+        'bool TryReset() noexcept',
+        '_findSharedUnitQuantityFraction',
+        '_hasTransferRateAndEta',
+        'pipSizedDownload',
+        'resolverTransfer',
+        'resolverProgress',
+        '_isSpinner',
+        '_genericTransientShape',
+        '_resetGenericHeuristics',
+        '_hasActiveHighConfidenceBuiltInClaim',
+        '_providerClear',
+        'pendingCandidate'
     ))
     {
         Assert-Contains $recognition $required 'Bounded fail-open recognition framework'
@@ -520,6 +602,11 @@ try
         'RecognitionHandlesFragmentationAndMalformedInput',
         'RecognitionSuppressesOnlySafeWholeChunks',
         'RecognitionBoundsStateAndCoalescesUpdates',
+        'RecognitionAppliesSuppressionSafetyMatrix',
+        'RecognitionPreservesHighConfidenceOwnershipAndClearsGeneric',
+        'RecognitionBootstrapsRichPipAndMavenResolver',
+        'RecognitionHandlesGenericIndeterminateShapes',
+        'RecognitionHandlesArbitraryProviderSplitsAndReset',
         'RendererPlansRealValuesRegressionAndIndeterminateMode',
         'RendererPlansStatusAndAccessibilityFallbacks',
         'RendererFailureAndCloseRemainPaneLocal',
@@ -541,6 +628,8 @@ try
         'rendererEnabled = false',
         'normalScreen = false',
         'parserHealthy = false',
+        'std::array<Fixture, 13>',
+        'split < fixture.stream.size()',
         'i < 10000',
         'uint8_t{ 8 }',
         'uint8_t{ 24 }',
@@ -607,9 +696,19 @@ try
         'Reduced Motion and High Contrast',
         'Bounded CLI recognition',
         'try-lock-and-drop behavior',
+        'XAML-Islands host',
+        'HWND-derived visible/focused pair',
+        'rebinds rainbow and comet movement',
+        'light-surface palettes',
+        'no meaningful progress value',
         'Docker Pull',
         'Docker BuildKit',
         'Generic fallback',
+        'Modern Rich pip',
+        'Maven Resolver output is not always prefixed',
+        'transfer speed plus ETA',
+        'cannot replace an active high-confidence built-in provider',
+        'clears the Generic overlay immediately',
         'visualProgress.replaceRecognizedOutput',
         'defaults to `false`',
         'pip, Git, curl, or wget',

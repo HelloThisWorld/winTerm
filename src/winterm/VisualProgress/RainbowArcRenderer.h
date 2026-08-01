@@ -11,7 +11,6 @@
 #include <winrt/Windows.Foundation.Numerics.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Composition.h>
-#include <winrt/Windows.UI.Core.h>
 #include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Windows.UI.Xaml.h>
 #include <winrt/Windows.UI.Xaml.Automation.h>
@@ -32,7 +31,6 @@ namespace winTerm::VisualProgress
 {
     namespace WU = winrt::Windows::UI;
     namespace WUC = winrt::Windows::UI::Composition;
-    namespace WUCore = winrt::Windows::UI::Core;
     namespace WUVM = winrt::Windows::UI::ViewManagement;
     namespace WUX = winrt::Windows::UI::Xaml;
     namespace WUXA = winrt::Windows::UI::Xaml::Automation;
@@ -111,6 +109,23 @@ namespace winTerm::VisualProgress
             _applyWithDegradation(plan, false);
         }
 
+        // XAML Islands do not expose meaningful top-level visibility or
+        // activation through CoreWindow. Pane feeds these values from the
+        // existing HWND lifecycle owned by TerminalPage instead.
+        void SetHostWindowState(const bool visible, const bool focused) noexcept
+        {
+            if (_closed || _faulted ||
+                (_environment.windowVisible == visible && _environment.windowFocused == focused))
+            {
+                return;
+            }
+
+            _environment.windowVisible = visible;
+            _environment.windowFocused = focused;
+            const auto plan = _renderState.RefreshEnvironment(_environment, _now());
+            _applyWithDegradation(plan, false);
+        }
+
         void RefreshEnvironment() noexcept
         {
             if (_closed || _faulted)
@@ -159,7 +174,6 @@ namespace winTerm::VisualProgress
 
             _releaseCompositionHandles();
             _host = nullptr;
-            _coreWindow = nullptr;
             _accessibilitySettings = nullptr;
             _uiSettings = nullptr;
         }
@@ -210,6 +224,11 @@ namespace winTerm::VisualProgress
         RainbowArcRenderer() noexcept :
             _sparkPool{ _sharedSparkBudget }
         {
+            // Visible is a safe presentation default. Focus deliberately
+            // starts false so no continuous work or sparks begin before the
+            // owning HWND publishes its authoritative state.
+            _environment.windowVisible = true;
+            _environment.windowFocused = false;
         }
 
         static RenderTimestamp _now() noexcept
@@ -235,6 +254,11 @@ namespace winTerm::VisualProgress
         {
             value.A = alpha;
             return value;
+        }
+
+        static bool _sameColor(const WU::Color& left, const WU::Color& right) noexcept
+        {
+            return left.A == right.A && left.R == right.R && left.G == right.G && left.B == right.B;
         }
 
         bool _initialize(const WUXC::Grid& host) noexcept
@@ -437,9 +461,9 @@ namespace winTerm::VisualProgress
             _outerBloomBrush = _createRadialBrush(_withAlpha(_color(RainbowArcVisualConstants::RainbowMagenta), 100), 0);
             _innerGlowBrush = _createRadialBrush(_withAlpha(_color(RainbowArcVisualConstants::RainbowCyan), 205), 0);
             _headTrailBrush = _createTrailBrush();
-            _errorOuterBloomBrush = _createRadialBrush(_withAlpha(_color(RainbowArcVisualConstants::ErrorSolid), 115), 0);
-            _errorInnerGlowBrush = _createRadialBrush(_withAlpha(_color(RainbowArcVisualConstants::ErrorSolid), 220), 0);
-            _errorTrailBrush = _createStatusTrailBrush(_color(RainbowArcVisualConstants::ErrorSolid));
+            _errorOuterBloomBrush = _createRadialBrush(_withAlpha(_errorColor, 115), 0);
+            _errorInnerGlowBrush = _createRadialBrush(_withAlpha(_errorColor, 220), 0);
+            _errorTrailBrush = _createStatusTrailBrush(_errorColor);
 
             _outerBloom = _compositor.CreateSpriteVisual();
             _outerBloom.Brush(_outerBloomBrush);
@@ -669,35 +693,6 @@ namespace winTerm::VisualProgress
 
             try
             {
-                _coreWindow = WUCore::CoreWindow::GetForCurrentThread();
-                if (_coreWindow)
-                {
-                    _environment.windowVisible = _coreWindow.Visible();
-                    _coreActivatedToken = _coreWindow.Activated([weak](auto&&, const WUCore::WindowActivatedEventArgs& args) {
-                        if (const auto self = weak.lock())
-                        {
-                            self->_environment.windowFocused = args.WindowActivationState() != WUCore::CoreWindowActivationState::Deactivated;
-                            self->RefreshEnvironment();
-                        }
-                    });
-                    _coreActivatedSubscribed = true;
-
-                    _coreVisibilityToken = _coreWindow.VisibilityChanged([weak](auto&&, const WUCore::VisibilityChangedEventArgs& args) {
-                        if (const auto self = weak.lock())
-                        {
-                            self->_environment.windowVisible = args.Visible();
-                            self->RefreshEnvironment();
-                        }
-                    });
-                    _coreVisibilitySubscribed = true;
-                }
-            }
-            catch (...)
-            {
-            }
-
-            try
-            {
                 if (_accessibilitySettings)
                 {
                     _highContrastToken = _accessibilitySettings.HighContrastChanged([weak](auto&&, auto&&) {
@@ -754,14 +749,6 @@ namespace winTerm::VisualProgress
                 {
                     _host.ActualThemeChanged(_themeChangedToken);
                 }
-                if (_coreActivatedSubscribed && _coreWindow)
-                {
-                    _coreWindow.Activated(_coreActivatedToken);
-                }
-                if (_coreVisibilitySubscribed && _coreWindow)
-                {
-                    _coreWindow.VisibilityChanged(_coreVisibilityToken);
-                }
                 if (_highContrastSubscribed && _accessibilitySettings)
                 {
                     _accessibilitySettings.HighContrastChanged(_highContrastToken);
@@ -778,8 +765,6 @@ namespace winTerm::VisualProgress
             _unloadedSubscribed = false;
             _sizeChangedSubscribed = false;
             _themeChangedSubscribed = false;
-            _coreActivatedSubscribed = false;
-            _coreVisibilitySubscribed = false;
             _highContrastSubscribed = false;
             _animationsSubscribed = false;
         }
@@ -826,17 +811,6 @@ namespace winTerm::VisualProgress
                 _environment.highContrast = true;
             }
 
-            try
-            {
-                if (_coreWindow)
-                {
-                    _environment.windowVisible = _coreWindow.Visible();
-                }
-            }
-            catch (...)
-            {
-            }
-
             _environment.rendererAvailable = _renderState.Tier() != RenderTier::Disabled;
             _updatePalette();
         }
@@ -847,23 +821,40 @@ namespace winTerm::VisualProgress
             {
                 WU::Color track;
                 WU::Color running;
+                WU::Color waiting;
+                WU::Color success;
+                WU::Color error;
                 WU::Color hot = _color(RainbowArcVisualConstants::WhiteHot);
                 if (_environment.highContrast && _uiSettings)
                 {
                     const auto foreground = _uiSettings.GetColorValue(WUVM::UIColorType::Foreground);
                     track = _withAlpha(foreground, 110);
                     running = foreground;
+                    waiting = foreground;
+                    success = foreground;
+                    error = foreground;
                     hot = foreground;
                 }
                 else
                 {
                     const auto light = _isLightTheme();
                     track = _color(light ? RainbowArcVisualConstants::LightTrack : RainbowArcVisualConstants::DarkTrack);
-                    running = _color(RainbowArcVisualConstants::RunningSolid);
+                    running = _color(light ? RainbowArcVisualConstants::LightRunningSolid : RainbowArcVisualConstants::RunningSolid);
+                    waiting = _color(light ? RainbowArcVisualConstants::LightWaitingSolid : RainbowArcVisualConstants::WaitingSolid);
+                    success = _color(light ? RainbowArcVisualConstants::LightSuccessSolid : RainbowArcVisualConstants::SuccessSolid);
+                    error = _color(light ? RainbowArcVisualConstants::LightErrorSolid : RainbowArcVisualConstants::ErrorSolid);
                 }
 
+                const auto errorColorChanged = !_sameColor(_errorColor, error);
+                if (errorColorChanged && _headRoot)
+                {
+                    _refreshErrorHeadBrushes(error);
+                }
                 _trackColor = track;
                 _runningColor = running;
+                _waitingColor = waiting;
+                _successColor = success;
+                _errorColor = error;
                 _hotColor = hot;
                 if (_trackBrush)
                 {
@@ -913,6 +904,8 @@ namespace winTerm::VisualProgress
         {
             try
             {
+                const auto previousTrackWidth = _trackWidth;
+                const auto previousTrackY = _trackY;
                 const auto width = std::max(0.0f, static_cast<float>(_host.ActualWidth()));
                 const auto height = std::max(0.0f, static_cast<float>(_host.ActualHeight()));
                 _trackWidth = std::max(0.0f, width - (2.0f * RainbowArcVisualConstants::HorizontalInset));
@@ -948,6 +941,12 @@ namespace winTerm::VisualProgress
                     }
                 }
 
+                if (std::fabs(previousTrackWidth - _trackWidth) > 0.01f ||
+                    std::fabs(previousTrackY - _trackY) > 0.01f)
+                {
+                    _restartGeometryAnimations();
+                }
+
                 _updateFallback(_renderState.CurrentProgress(_now()), _snapshot.mode, _snapshot.status);
                 _showFallback(_renderState.Tier() == RenderTier::Solid ||
                               !_root ||
@@ -957,6 +956,32 @@ namespace winTerm::VisualProgress
             {
                 _drawable = false;
             }
+        }
+
+        void _restartGeometryAnimations() noexcept
+        {
+            try
+            {
+                // Gradient motion is relative, but rebinding it here keeps all
+                // continuous geometry work on the same post-layout generation.
+                _setRainbowMovement(false);
+                if (_indeterminateRunning)
+                {
+                    if (_cometTail)
+                    {
+                        _cometTail.StopAnimation(L"Offset");
+                    }
+                    if (_headRoot)
+                    {
+                        _headRoot.StopAnimation(L"Offset");
+                        _headRoot.StopAnimation(L"Opacity");
+                    }
+                }
+            }
+            catch (...)
+            {
+            }
+            _indeterminateRunning = false;
         }
 
         void _applyWithDegradation(RenderTransitionPlan plan, const bool semanticUpdate) noexcept
@@ -1041,6 +1066,10 @@ namespace winTerm::VisualProgress
             _clearTerminalBatch();
             _stopStatusAnimations();
             _setErrorHeadTreatment(false);
+            if (_trackBrush)
+            {
+                _trackBrush.Color(_trackColor);
+            }
 
             if (terminalFade)
             {
@@ -1100,6 +1129,15 @@ namespace winTerm::VisualProgress
         {
             _stopContinuousAnimations();
             _releaseAllSparks();
+            if (plan.errorWithoutProgress)
+            {
+                _showSolidFill(0.0f, ProgressMode::Determinate, _statusColor(ProgressStatus::Error));
+                if (_trackBrush)
+                {
+                    _trackBrush.Color(_statusColor(ProgressStatus::Error));
+                }
+                return;
+            }
             if (_renderState.Tier() == RenderTier::StaticGradient && !_environment.highContrast && plan.status == ProgressStatus::Running)
             {
                 if (plan.mode == ProgressMode::Indeterminate)
@@ -1244,11 +1282,36 @@ namespace winTerm::VisualProgress
         {
             _stopContinuousAnimations();
             _releaseAllSparks();
-            _showSolidFill(plan.targetProgress, ProgressMode::Determinate, _statusColor(ProgressStatus::Error));
+            if (plan.errorWithoutProgress)
+            {
+                _showErrorWithoutProgress();
+            }
+            else
+            {
+                _showSolidFill(plan.targetProgress, ProgressMode::Determinate, _statusColor(ProgressStatus::Error));
+            }
             _setErrorHeadTreatment(true);
             if (plan.errorPulse && _headRoot && _headRoot.IsVisible())
             {
                 _headRoot.StartAnimation(L"Opacity", _errorPulseAnimation);
+            }
+        }
+
+        void _showErrorWithoutProgress()
+        {
+            // Preserve the real zero value: the track carries status while a
+            // head parked at the zero boundary supplies the one-shot pulse.
+            // No filled width is fabricated.
+            _showSolidFill(0.0f, ProgressMode::Determinate, _statusColor(ProgressStatus::Error));
+            if (_trackBrush)
+            {
+                _trackBrush.Color(_statusColor(ProgressStatus::Error));
+            }
+            if (_headRoot && _renderState.Tier() < RenderTier::StaticGradient)
+            {
+                _headRoot.Offset({ RainbowArcVisualConstants::HorizontalInset + RainbowArcVisualConstants::TrackCornerRadius, _headY, 0.0f });
+                _headRoot.IsVisible(true);
+                _headRoot.Opacity(1.0f);
             }
         }
 
@@ -1261,6 +1324,22 @@ namespace winTerm::VisualProgress
             _outerBloom.Brush(enabled ? _errorOuterBloomBrush : _outerBloomBrush);
             _innerGlow.Brush(enabled ? _errorInnerGlowBrush : _innerGlowBrush);
             _headTrail.Brush(enabled ? _errorTrailBrush : _headTrailBrush);
+        }
+
+        void _refreshErrorHeadBrushes(const WU::Color color)
+        {
+            // Rebuild only when the effective theme color changes. These
+            // brushes remain cached across progress updates and frames.
+            auto outer = _createRadialBrush(_withAlpha(color, 115), 0);
+            auto inner = _createRadialBrush(_withAlpha(color, 220), 0);
+            auto trail = _createStatusTrailBrush(color);
+            _errorOuterBloomBrush = outer;
+            _errorInnerGlowBrush = inner;
+            _errorTrailBrush = trail;
+            if (_snapshot.status == ProgressStatus::Error)
+            {
+                _setErrorHeadTreatment(true);
+            }
         }
 
         void _renderCancelled(const RenderTransitionPlan& plan)
@@ -1817,7 +1896,10 @@ namespace winTerm::VisualProgress
                     0.0,
                     0.0,
                     RainbowArcVisualConstants::BottomInset));
-                _fallbackTrackBrush.Color(_trackColor);
+                const auto errorWithoutProgress = status == ProgressStatus::Error &&
+                                                  mode == ProgressMode::Determinate &&
+                                                  progress <= 0.0001f;
+                _fallbackTrackBrush.Color(errorWithoutProgress ? _statusColor(status) : _trackColor);
                 _fallbackFillBrush.Color(_statusColor(status));
                 _fallbackFill.Visibility(width > 0.0f ? WUX::Visibility::Visible : WUX::Visibility::Collapsed);
             }
@@ -1835,11 +1917,11 @@ namespace winTerm::VisualProgress
             switch (status)
             {
             case ProgressStatus::Waiting:
-                return _color(RainbowArcVisualConstants::WaitingSolid);
+                return _waitingColor;
             case ProgressStatus::Success:
-                return _color(RainbowArcVisualConstants::SuccessSolid);
+                return _successColor;
             case ProgressStatus::Error:
-                return _color(RainbowArcVisualConstants::ErrorSolid);
+                return _errorColor;
             case ProgressStatus::Running:
             case ProgressStatus::Cancelled:
             default:
@@ -2023,27 +2105,24 @@ namespace winTerm::VisualProgress
 
         WUVM::UISettings _uiSettings{ nullptr };
         WUVM::AccessibilitySettings _accessibilitySettings{ nullptr };
-        WUCore::CoreWindow _coreWindow{ nullptr };
-
         winrt::event_token _loadedToken{};
         winrt::event_token _unloadedToken{};
         winrt::event_token _sizeChangedToken{};
         winrt::event_token _themeChangedToken{};
-        winrt::event_token _coreActivatedToken{};
-        winrt::event_token _coreVisibilityToken{};
         winrt::event_token _highContrastToken{};
         winrt::event_token _animationsToken{};
         bool _loadedSubscribed{};
         bool _unloadedSubscribed{};
         bool _sizeChangedSubscribed{};
         bool _themeChangedSubscribed{};
-        bool _coreActivatedSubscribed{};
-        bool _coreVisibilitySubscribed{};
         bool _highContrastSubscribed{};
         bool _animationsSubscribed{};
 
         WU::Color _trackColor{ _color(RainbowArcVisualConstants::DarkTrack) };
         WU::Color _runningColor{ _color(RainbowArcVisualConstants::RunningSolid) };
+        WU::Color _waitingColor{ _color(RainbowArcVisualConstants::WaitingSolid) };
+        WU::Color _successColor{ _color(RainbowArcVisualConstants::SuccessSolid) };
+        WU::Color _errorColor{ _color(RainbowArcVisualConstants::ErrorSolid) };
         WU::Color _hotColor{ _color(RainbowArcVisualConstants::WhiteHot) };
         uint64_t _lastBurstSequence{};
         float _trackWidth{};

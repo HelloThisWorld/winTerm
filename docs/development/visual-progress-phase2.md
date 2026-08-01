@@ -46,6 +46,8 @@ The composition layers, from back to front, are:
 
 The centralized geometry uses a 10-DIP horizontal inset, an 8-DIP bottom inset, a three-DIP corner radius, a five-DIP warm core, and an eight-DIP trail. Logical XAML sizing keeps the geometry stable at 100%, 125%, 150%, and 200% DPI and in narrow, maximized, split, and zoomed panes.
 
+`SizeChanged` recomputes the track and bloom drawing geometry. When the usable track width or vertical origin changes, the renderer stops the compositor animations that captured the old geometry and rebinds rainbow and comet movement through the current environment plan. The post-layout generation therefore uses the new endpoints without a CPU frame loop, stale absolute offsets, or a terminal viewport relayout.
+
 The rainbow is a coherent red-to-orange-to-yellow-to-green-to-cyan-to-blue-to-violet-to-magenta gradient. Its cached brush moves on a 2,000-millisecond cycle and is never rebuilt per frame. Determinate updates normally interpolate for 220 milliseconds. A real regression uses an intentional 240-millisecond phase-reset transition; the renderer does not invent a monotonic value. Zero percent keeps the welding head inside the track, while the fill remains clipped and the bloom drawing space remains available at 100 percent.
 
 Indeterminate progress uses a welding-head comet with a continuous tail covering 25 percent of the track. It traverses the track in 1,800 milliseconds, fades cleanly at the right edge, and reappears at the left without showing a fabricated percentage.
@@ -55,7 +57,7 @@ Indeterminate progress uses a welding-head comet with a continuous tail covering
 - **Running:** rainbow motion and the welding head are active. Only an eligible active pane emits sparse sparks.
 - **Waiting:** forward movement pauses, the last meaningful value remains visible, sparks stop, and the glow breathes on a 1,600-millisecond cycle.
 - **Success:** progress advances to 100 percent when appropriate, the head intensifies, a roughly 320-millisecond white highlight sweeps left to right, one controlled final burst is permitted, the beam takes on a success tint, and it fades over roughly 650 milliseconds.
-- **Error:** sparks and rainbow movement stop, the beam changes to the error treatment, one roughly 220-millisecond intensity pulse runs, and the state remains until a new prompt or safe reset. It never flashes continuously.
+- **Error:** sparks and rainbow movement stop, the beam changes to the error treatment, one roughly 220-millisecond intensity pulse runs, and the state remains until a new prompt or safe reset. It never flashes continuously. If an error has no meaningful progress value, the renderer preserves the real zero fill but colors the track and parks a visible error head at the zero boundary for the one-shot pulse. Static and solid fallbacks color the track instead, so unknown progress remains visibly erroneous without inventing a percentage.
 - **Cancelled:** sparks stop, brightness falls, and the presentation fades in roughly 180 milliseconds before releasing its resources.
 
 ### Sparks and resource limits
@@ -68,7 +70,9 @@ There is no CPU-driven frame loop, permanent per-pane timer, spark scheduler, pe
 
 ## Lifecycle and degradation
 
-Pane load, unload, close, split, detach, zoom, restore, focus, activation, and visibility changes update renderer eligibility without changing terminal state. Hidden or minimized windows pause animation. Inactive or background panes retain an inexpensive presentation but do not emit sparks. An unfocused window suppresses sparks and may simplify motion. Completion, cancellation, pane destruction, settings disable, dispatcher shutdown, and device loss stop animation and release pooled resources.
+Pane load, unload, close, split, detach, zoom, restore, focus, activation, and visibility changes update renderer eligibility without changing terminal state. In the XAML-Islands host, `CoreWindow` visibility and activation are not authoritative for the top-level Win32 window. `TerminalPage::WindowVisibilityChanged` and `TerminalPage::WindowActivated` instead publish the HWND-derived visible/focused pair through the root pane to every leaf renderer. New and restored tabs receive the current pair during tab-event registration, and newly split children inherit it immediately. A renderer starts unfocused and creates no continuous work or sparks until this authoritative state arrives.
+
+Hidden or minimized windows pause animation. Inactive or background panes retain an inexpensive presentation but do not emit sparks. An unfocused window pauses all continuous motion and suppresses sparks. Completion, cancellation, pane destruction, settings disable, dispatcher shutdown, and device loss stop animation and release pooled resources.
 
 Rendering is decorative and degrades independently for each affected pane:
 
@@ -82,7 +86,7 @@ Composition or GPU failure never changes PTY, input, output, selection, copy and
 
 ### Reduced Motion and High Contrast
 
-When Windows disables animation, the renderer uses the Phase 1 static behavior. Determinate values update directly, indeterminate state remains nonnumeric, and there is no moving rainbow, comet, interpolation, breathing, success sweep, or spark emission.
+When Windows disables animation, the renderer uses the Phase 1 static behavior. Determinate values update directly, indeterminate state remains nonnumeric, and there is no moving rainbow, comet, interpolation, breathing, success sweep, or spark emission. Solid and static status treatments use separate dark- and light-surface palettes selected from the XAML host theme, with system background luminance as a fallback when the theme is default. This keeps running, waiting, success, and error states legible on light backgrounds as well as dark ones.
 
 High Contrast uses a clear system-compatible solid track and fill. It does not depend on rainbow hue or glow to communicate progress. High Contrast also disables sparks and continuous decorative motion. These fallbacks take precedence over the full renderer tier.
 
@@ -102,16 +106,22 @@ Provider buffers clear on command completion, a new prompt, pane or tab close, c
 | --- | --- | --- |
 | Docker Pull | Layer states; real byte totals where present; otherwise bounded stage or indeterminate progress | Overlay only; preserve cursor-addressed and daemon output |
 | Docker BuildKit | Bounded active steps and reliable current/total step fractions | Overlay only; preserve all build logs and errors |
-| pip | Rich-style or legacy transfers with real byte totals, speed/ETA signatures, or real percentages | High-confidence single-line transient transfer frames may be replaced |
+| pip | Modern Rich two-record downloads, legacy transfers, real byte totals, speed/ETA signatures, or real percentages | High-confidence single-line transient transfer frames may be replaced |
 | Git | Counting, compressing, receiving, resolving, and updating phases using Git's real percentage or current/total values | High-confidence carriage-return percentage frames may be replaced |
 | curl and wget | Standard transfer meters using real percentage and byte totals; indeterminate when length is unknown | High-confidence single-line carriage-return transfer frames may be replaced |
 | npm, pnpm, and yarn | Resolve, fetch, link, build, postinstall, completion, and failure stages; determinate only for explicit counts or percentages | Overlay only; preserve warnings, audit findings, scripts, errors, and summaries |
 | nvm | Download, extract, install, switch, completion, and failure stages; delegated transfers reuse bounded transfer parsing | Overlay only |
-| Maven | Artifact transfer values and dependency/build stages | Overlay only; never estimate overall build percentage |
+| Maven | Tagged or untagged resolver transfers plus dependency/build stages | Overlay only; never estimate overall build percentage |
 | Gradle | Task state, dependency transfer, and actual emitted percentage or counts | Overlay only; never estimate overall build percentage |
 | Generic fallback | Anchored percentages, current/total, transfer speed with ETA, and repeated transient/spinner-like lines | Overlay only and never suppressible |
 
 Maven and Gradle use determinate mode only for a real transfer or explicit execution value. Stage names alone select indeterminate mode. Git phase regression is preserved as a real phase reset rather than converted into a fabricated overall percentage.
+
+Modern Rich pip may emit a sized archive announcement followed by an otherwise untagged meter such as a shared-unit `current/total MB` value with transfer rate and ETA. A bounded wheel announcement can establish pip context directly; generic source-archive extensions require an existing pip claim from an explicit signature such as `Collecting`. The following meter supplies the real value. Archive names are inspected only as bounded signatures and are not retained. Summaries remain ordinary terminal output.
+
+Maven Resolver output is not always prefixed with `[INFO]`. Anchored `Downloading from ...`, `Downloaded from ...`, and `Progress (n): current/total unit` records can bootstrap the Maven provider without a prior tagged line. Repository URLs and artifact names are not retained, and every Maven record remains overlay-only.
+
+The Generic fallback recognizes anchored real percentages or counts, transfer speed plus ETA even when no total is available, transient single-character `|`, `/`, `-`, or `\` spinners, and repeated carriage-return records with the same structural shape. A repeated transient shape must be observed again before it produces indeterminate progress. Generic recognition is always overlay-only, never suppresses output, and cannot replace an active high-confidence built-in provider. When the next complete record no longer resembles progress, a structural hidden update clears the Generic overlay immediately without retaining or logging that record.
 
 ## Safe transient replacement preview
 

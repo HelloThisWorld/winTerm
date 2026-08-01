@@ -79,6 +79,13 @@ namespace winTerm::VisualProgress::RainbowArcVisualConstants
     inline constexpr uint32_t WaitingSolid{ 0xFFF4C95Du };
     inline constexpr uint32_t SuccessSolid{ 0xFF4DDC88u };
     inline constexpr uint32_t ErrorSolid{ 0xFFFF6B6Bu };
+    // Light-surface status colors mirror the app theme resources in App.xaml.
+    // The brighter dark-surface palette does not provide sufficient contrast
+    // for Reduced Motion and other solid fallbacks on a light background.
+    inline constexpr uint32_t LightRunningSolid{ 0xFF087A63u };
+    inline constexpr uint32_t LightWaitingSolid{ 0xFF8A5D00u };
+    inline constexpr uint32_t LightSuccessSolid{ 0xFF087A42u };
+    inline constexpr uint32_t LightErrorSolid{ 0xFFB42318u };
     inline constexpr uint32_t WarmWhite{ 0xFFFFF2B3u };
     inline constexpr uint32_t WhiteHot{ 0xFFFFFFFFu };
     inline constexpr uint32_t SparkYellow{ 0xFFFFD166u };

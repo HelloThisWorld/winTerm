@@ -2094,6 +2094,11 @@ namespace winrt::TerminalApp::implementation
     // - hostingTab: The Tab that's hosting this TermControl instance
     void TerminalPage::_RegisterTabEvents(Tab& hostingTab)
     {
+        // New and restored pane trees must inherit the current HWND state;
+        // waiting for the next activation event would leave new renderers in
+        // their safe, non-animating default indefinitely.
+        hostingTab.GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated);
+
         auto weakTab{ hostingTab.get_weak() };
         auto weakThis{ get_weak() };
         // PropertyChanged is the generic mechanism by which the Tab
@@ -4163,6 +4168,7 @@ namespace winrt::TerminalApp::implementation
         {
             if (auto tabImpl{ _GetTabImpl(tab) })
             {
+                tabImpl->GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated);
                 // Manually enumerate the panes in each tab; this will let us recycle TerminalSettings
                 // objects but only have to iterate one time.
                 tabImpl->GetRootPane()->WalkTree([&](auto&& pane) {
@@ -5386,6 +5392,14 @@ namespace winrt::TerminalApp::implementation
         // the settings, change active panes, etc.
         _activated = activated;
         _updateThemeColors();
+
+        for (const auto& tab : _tabs)
+        {
+            if (const auto tabImpl{ _GetTabImpl(tab) })
+            {
+                tabImpl->GetRootPane()->SetVisualProgressHostWindowState(_visible, _activated);
+            }
+        }
 
         _adjustProcessPriorityThrottled->Run();
 

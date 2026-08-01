@@ -280,6 +280,7 @@ namespace winTerm::VisualProgress
             ProviderProgress progress;
             bool matched{};
             bool preserveOnly{};
+            bool pendingCandidate{};
         };
 
         struct LayerState
@@ -378,6 +379,32 @@ namespace winTerm::VisualProgress
                     continue;
                 }
                 if (_equalsInsensitive(value.substr(i, token.size()), token))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        static bool _containsFileExtensionInsensitive(const std::wstring_view value,
+                                                      const std::wstring_view extension) noexcept
+        {
+            if (extension.empty() || extension.size() > value.size())
+            {
+                return false;
+            }
+            for (size_t i = 0; i + extension.size() <= value.size(); ++i)
+            {
+                if (!_equalsInsensitive(value.substr(i, extension.size()), extension))
+                {
+                    continue;
+                }
+                const auto after = i + extension.size();
+                if (after == value.size() ||
+                    value[after] == L' ' || value[after] == L'\t' ||
+                    value[after] == L')' || value[after] == L'?' ||
+                    value[after] == L'#' || value[after] == L'\'' ||
+                    value[after] == L'"')
                 {
                     return true;
                 }
@@ -627,6 +654,65 @@ namespace winTerm::VisualProgress
             return std::nullopt;
         }
 
+        // Rich-style progress meters commonly put the unit after the total,
+        // for example "1.5/3.0 MB". The shared unit is applied to both
+        // operands so only structural numeric state is retained.
+        static std::optional<uint8_t> _findSharedUnitQuantityFraction(const std::wstring_view value) noexcept
+        {
+            for (size_t slash = 1; slash + 1 < value.size(); ++slash)
+            {
+                if (value[slash] != L'/')
+                {
+                    continue;
+                }
+
+                auto leftFirst = slash;
+                while (leftFirst > 0 && ((value[leftFirst - 1] >= L'0' && value[leftFirst - 1] <= L'9') ||
+                                         value[leftFirst - 1] == L'.'))
+                {
+                    --leftFirst;
+                }
+
+                auto rightFirst = slash + 1;
+                while (rightFirst < value.size() && (value[rightFirst] == L' ' || value[rightFirst] == L'\t'))
+                {
+                    ++rightFirst;
+                }
+                auto rightLast = rightFirst;
+                while (rightLast < value.size() && ((value[rightLast] >= L'0' && value[rightLast] <= L'9') ||
+                                                    value[rightLast] == L'.'))
+                {
+                    ++rightLast;
+                }
+
+                auto unitFirst = rightLast;
+                while (unitFirst < value.size() && (value[unitFirst] == L' ' || value[unitFirst] == L'\t'))
+                {
+                    ++unitFirst;
+                }
+                auto unitLast = unitFirst;
+                while (unitLast < value.size() && ((value[unitLast] >= L'A' && value[unitLast] <= L'Z') ||
+                                                   (value[unitLast] >= L'a' && value[unitLast] <= L'z')))
+                {
+                    ++unitLast;
+                }
+
+                if (leftFirst == slash || rightFirst == rightLast || unitFirst == unitLast)
+                {
+                    continue;
+                }
+
+                const auto current = _parseQuantity(value, leftFirst, slash, unitFirst, unitLast);
+                const auto total = _parseQuantity(value, rightFirst, rightLast, unitFirst, unitLast);
+                if (current.valid && total.valid && total.milliBytes > 0 && current.milliBytes <= total.milliBytes)
+                {
+                    return static_cast<uint8_t>((static_cast<long double>(current.milliBytes) * 100.0L) /
+                                                static_cast<long double>(total.milliBytes));
+                }
+            }
+            return std::nullopt;
+        }
+
         static std::optional<uint8_t> _realProgress(const std::wstring_view value) noexcept
         {
             if (const auto percent = _findPercent(value))
@@ -637,7 +723,22 @@ namespace winTerm::VisualProgress
             {
                 return quantity;
             }
+            if (const auto sharedUnitQuantity = _findSharedUnitQuantityFraction(value))
+            {
+                return sharedUnitQuantity;
+            }
             return _findIntegerFraction(value);
+        }
+
+        static bool _hasTransferRateAndEta(const std::wstring_view value) noexcept
+        {
+            const auto hasRate = _containsInsensitive(value, L"kb/s") ||
+                                 _containsInsensitive(value, L"mb/s") ||
+                                 _containsInsensitive(value, L"gb/s") ||
+                                 _containsInsensitive(value, L"kib/s") ||
+                                 _containsInsensitive(value, L"mib/s") ||
+                                 _containsInsensitive(value, L"gib/s");
+            return hasRate && _containsInsensitive(value, L"eta");
         }
 
         static bool _hasCurlMeterColumns(const std::wstring_view value, size_t cursor) noexcept
@@ -927,32 +1028,59 @@ namespace winTerm::VisualProgress
         Match _matchPip(const std::wstring_view line) const noexcept
         {
             const auto trimmed = _trim(line);
-            const auto transferShape = (_containsInsensitive(line, L"kb/s") ||
-                                        _containsInsensitive(line, L"mb/s") ||
-                                        _containsInsensitive(line, L"gb/s") ||
-                                        _containsInsensitive(line, L"eta")) &&
+            // Once a Python archive anchors the record, either a transfer rate
+            // or an ETA is sufficient. Requiring both would drop legitimate
+            // pip meters that append a warning in place of the ETA.
+            const auto pipTransferSignal = _containsInsensitive(line, L"kb/s") ||
+                                           _containsInsensitive(line, L"mb/s") ||
+                                           _containsInsensitive(line, L"gb/s") ||
+                                           _containsInsensitive(line, L"kib/s") ||
+                                           _containsInsensitive(line, L"mib/s") ||
+                                           _containsInsensitive(line, L"gib/s") ||
+                                           _containsInsensitive(line, L"eta");
+            const auto transferShape = pipTransferSignal &&
                                        (_findPercent(line).has_value() ||
                                         _findQuantityFraction(line).has_value() ||
+                                        _findSharedUnitQuantityFraction(line).has_value() ||
                                         _findIntegerFraction(line).has_value());
             const auto pipSignature = _containsInsensitive(line, L"pip ") ||
                                       _startsWithInsensitive(trimmed, L"collecting ") ||
                                       _containsInsensitive(line, L"installing collected packages");
-            // A bare "Downloading" transfer line is not owned by pip. Only a
-            // prior pip claim, an explicit pip signature, or Python's wheel
-            // archive format is strong enough to make replacement eligible.
-            const auto pipArchive = _containsInsensitive(line, L".whl");
-            const auto pipContext = _claimedProvider == ProgressProvider::Pip || pipSignature || pipArchive;
+            const auto pipWheel = _startsWithInsensitive(trimmed, L"downloading ") &&
+                                  _containsFileExtensionInsensitive(trimmed, L".whl");
+            const auto pipArchive = pipWheel ||
+                                    _containsFileExtensionInsensitive(trimmed, L".tar.gz") ||
+                                    _containsFileExtensionInsensitive(trimmed, L".tar.bz2") ||
+                                    _containsFileExtensionInsensitive(trimmed, L".tgz") ||
+                                    _containsFileExtensionInsensitive(trimmed, L".zip");
+            const auto pipSizedDownload = _startsWithInsensitive(trimmed, L"downloading ") &&
+                                          pipArchive &&
+                                          (_containsInsensitive(trimmed, L" kb)") ||
+                                           _containsInsensitive(trimmed, L" mb)") ||
+                                           _containsInsensitive(trimmed, L" gb)"));
+            // Modern pip emits a bounded two-record shape: a sized archive
+            // announcement followed by a Rich meter. Claim the structural
+            // announcement only; no package name or URL is retained.
+            // Wheel names are pip-specific enough to bootstrap ownership.
+            // Generic archive extensions are accepted only after an explicit
+            // pip signature or an existing pip claim establishes the stream.
+            const auto pipContext = _claimedProvider == ProgressProvider::Pip || pipSignature || pipWheel;
             if (pipContext &&
                 (_startsWithInsensitive(trimmed, L"error:") || _containsInsensitive(line, L"subprocess-exited-with-error")))
             {
                 return { _makeProgress(ProgressProvider::Pip, ProgressMode::Determinate, ProgressStatus::Error, 0, ProviderConfidence::High, 6), true, true };
             }
-            if (!pipContext || (!transferShape && !pipSignature))
+            if (!pipContext || (!transferShape && !pipSignature && !pipSizedDownload))
             {
                 return {};
             }
-            const auto confidence = transferShape ? ProviderConfidence::High : ProviderConfidence::Medium;
-            return _runningMatch(ProgressProvider::Pip, line, confidence, _containsInsensitive(line, L"installing") ? 2 : 1);
+            const auto hasRealProgress = _realProgress(line).has_value();
+            const auto confidence = transferShape || (pipSizedDownload && hasRealProgress) ?
+                                        ProviderConfidence::High :
+                                        ProviderConfidence::Medium;
+            auto match = _runningMatch(ProgressProvider::Pip, line, confidence, _containsInsensitive(line, L"installing") ? 2 : 1);
+            match.preserveOnly = pipSizedDownload && !transferShape;
+            return match;
         }
 
         Match _matchGit(const std::wstring_view line) const noexcept
@@ -1056,6 +1184,17 @@ namespace winTerm::VisualProgress
             // Require a strong wget anchor before this built-in provider can
             // classify the record; otherwise the generic overlay-only path
             // remains available and the terminal text is preserved.
+            if (explicitAnchor && (!transferShape || !bracketMeter))
+            {
+                return { _makeProgress(ProgressProvider::Wget,
+                                       ProgressMode::Indeterminate,
+                                       ProgressStatus::Running,
+                                       0,
+                                       ProviderConfidence::High,
+                                       1),
+                         true,
+                         true };
+            }
             if (!transferShape || !bracketMeter || !wgetContext)
             {
                 return {};
@@ -1172,7 +1311,18 @@ namespace winTerm::VisualProgress
             const auto trimmed = _trim(line);
             const auto taggedInfo = _startsWithInsensitive(trimmed, L"[info]");
             const auto taggedError = _startsWithInsensitive(trimmed, L"[error]");
-            const auto mavenAnchor = taggedInfo || taggedError || _claimedProvider == ProgressProvider::Maven;
+            const auto resolverTransfer = _startsWithInsensitive(trimmed, L"downloading from ") ||
+                                          _startsWithInsensitive(trimmed, L"downloaded from ") ||
+                                          (taggedInfo &&
+                                           (_containsInsensitive(trimmed, L"] downloading from ") ||
+                                            _containsInsensitive(trimmed, L"] downloaded from ")));
+            const auto resolverProgressPrefix = _startsWithInsensitive(trimmed, L"progress (") ||
+                                                (taggedInfo && _containsInsensitive(trimmed, L"] progress ("));
+            const auto resolverProgress = resolverProgressPrefix &&
+                                          _containsInsensitive(trimmed, L"):") &&
+                                          _realProgress(trimmed).has_value();
+            const auto mavenAnchor = taggedInfo || taggedError || resolverTransfer || resolverProgress ||
+                                     _claimedProvider == ProgressProvider::Maven;
             if (!mavenAnchor && _claimedProvider != ProgressProvider::Maven)
             {
                 return {};
@@ -1186,9 +1336,7 @@ namespace winTerm::VisualProgress
                 return { _makeProgress(ProgressProvider::Maven, ProgressMode::Determinate, ProgressStatus::Success, 100, ProviderConfidence::High, 7), true, true };
             }
             uint16_t stage{};
-            if (_containsInsensitive(line, L"downloading from") ||
-                _containsInsensitive(line, L"downloaded from") ||
-                _containsInsensitive(line, L"progress ("))
+            if (resolverTransfer || resolverProgress)
                 stage = 1;
             else if (_containsInsensitive(line, L"compile"))
                 stage = 2;
@@ -1202,7 +1350,16 @@ namespace winTerm::VisualProgress
             {
                 return {};
             }
-            auto match = _runningMatch(ProgressProvider::Maven, line, ProviderConfidence::High, stage);
+            auto match = resolverProgress ?
+                             _runningMatch(ProgressProvider::Maven, line, ProviderConfidence::High, stage) :
+                             Match{ _makeProgress(ProgressProvider::Maven,
+                                                  ProgressMode::Indeterminate,
+                                                  ProgressStatus::Running,
+                                                  0,
+                                                  ProviderConfidence::High,
+                                                  stage),
+                                    true,
+                                    true };
             match.preserveOnly = true;
             return match;
         }
@@ -1234,13 +1391,81 @@ namespace winTerm::VisualProgress
             return match;
         }
 
-        Match _matchGeneric(const std::wstring_view line) noexcept
+        static bool _isSpinner(const wchar_t value) noexcept
+        {
+            return value == L'|' || value == L'/' || value == L'-' || value == L'\\';
+        }
+
+        static uint64_t _genericTransientShape(const std::wstring_view value, bool& hasDigit) noexcept
+        {
+            uint64_t hash{ 1469598103934665603ull };
+            hasDigit = false;
+            for (const auto ch : value)
+            {
+                uint8_t category{};
+                if (ch >= L'0' && ch <= L'9')
+                {
+                    category = 1;
+                    hasDigit = true;
+                }
+                else if ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z'))
+                {
+                    category = 2;
+                }
+                else if (ch == L' ' || ch == L'\t')
+                {
+                    category = 3;
+                }
+                else if (ch < 0x80)
+                {
+                    category = 4;
+                }
+                else
+                {
+                    category = 5;
+                }
+                hash ^= category;
+                hash *= 1099511628211ull;
+            }
+            return hash == 0 ? 1 : hash;
+        }
+
+        ProviderConfidence _advanceGenericConfidence() noexcept
+        {
+            _genericMatchStreak = static_cast<uint8_t>(_genericMatchStreak < 2 ? _genericMatchStreak + 1 : 2);
+            return _genericMatchStreak >= 2 ? ProviderConfidence::Medium : ProviderConfidence::Low;
+        }
+
+        void _resetGenericHeuristics() noexcept
+        {
+            _genericMatchStreak = 0;
+            _genericTransientShapeValue = 0;
+            _genericTransientShapeLength = 0;
+            _genericTransientShapeStreak = 0;
+        }
+
+        Match _matchGeneric(const std::wstring_view line, const bool transientRecord) noexcept
         {
             const auto trimmed = _trim(line);
             if (trimmed.empty() || _isPreserveOnly(trimmed))
             {
-                _genericMatchStreak = 0;
+                _resetGenericHeuristics();
                 return {};
+            }
+
+            if (transientRecord && trimmed.size() == 1 && _isSpinner(trimmed.front()))
+            {
+                _genericTransientShapeValue = 0;
+                _genericTransientShapeLength = 0;
+                _genericTransientShapeStreak = 0;
+                return { _makeProgress(ProgressProvider::Generic,
+                                       ProgressMode::Indeterminate,
+                                       ProgressStatus::Running,
+                                       0,
+                                       _advanceGenericConfidence(),
+                                       2),
+                         true,
+                         false };
             }
 
             size_t first{};
@@ -1272,35 +1497,118 @@ namespace winTerm::VisualProgress
                 const auto slash = trimmed.find(L'/', first);
                 anchored = slash != std::wstring_view::npos && slash > first &&
                            (_findIntegerFraction(trimmed.substr(first)).has_value() ||
-                            _findQuantityFraction(trimmed.substr(first)).has_value());
+                            _findQuantityFraction(trimmed.substr(first)).has_value() ||
+                            _findSharedUnitQuantityFraction(trimmed.substr(first)).has_value());
             }
             const auto realProgress = _realProgress(trimmed);
-            if (!anchored || !realProgress)
+            const auto transferRateAndEta = _hasTransferRateAndEta(trimmed);
+            const auto bracketMeter = trimmed.find(L"%[") != std::wstring_view::npos &&
+                                      trimmed.find(L']') != std::wstring_view::npos;
+            if (anchored && realProgress)
             {
-                _genericMatchStreak = 0;
+                _genericTransientShapeValue = 0;
+                _genericTransientShapeLength = 0;
+                _genericTransientShapeStreak = 0;
+                auto match = Match{ _makeProgress(ProgressProvider::Generic,
+                                                  ProgressMode::Determinate,
+                                                  ProgressStatus::Running,
+                                                  *realProgress,
+                                                  _advanceGenericConfidence(),
+                                                  1),
+                                    true,
+                                    false };
+                match.progress.suppressible = false;
+                return match;
+            }
+
+            // A bracket meter with rate and ETA is a wget-shaped record. It is
+            // only trustworthy after wget has emitted its provider anchor; do
+            // not let the generic fallback claim unrelated bracketed output.
+            if (bracketMeter)
+            {
+                _resetGenericHeuristics();
                 return {};
             }
 
-            _genericMatchStreak = static_cast<uint8_t>(_genericMatchStreak < 2 ? _genericMatchStreak + 1 : 2);
-            auto match = Match{ _makeProgress(ProgressProvider::Generic,
-                                              ProgressMode::Determinate,
-                                              ProgressStatus::Running,
-                                              *realProgress,
-                                              _genericMatchStreak >= 2 ? ProviderConfidence::Medium : ProviderConfidence::Low,
-                                              1),
-                                true,
-                                false };
-            match.progress.suppressible = false;
-            return match;
+            if (transferRateAndEta)
+            {
+                _genericTransientShapeValue = 0;
+                _genericTransientShapeLength = 0;
+                _genericTransientShapeStreak = 0;
+                return { _makeProgress(ProgressProvider::Generic,
+                                       realProgress ? ProgressMode::Determinate : ProgressMode::Indeterminate,
+                                       ProgressStatus::Running,
+                                       realProgress.value_or(0),
+                                       _advanceGenericConfidence(),
+                                       3),
+                         true,
+                         false };
+            }
+
+            if (transientRecord && trimmed.size() >= 3)
+            {
+                bool hasDigit{};
+                const auto shape = _genericTransientShape(trimmed, hasDigit);
+                if (hasDigit)
+                {
+                    if (_genericTransientShapeValue == shape && _genericTransientShapeLength == trimmed.size())
+                    {
+                        _genericTransientShapeStreak = static_cast<uint8_t>(
+                            _genericTransientShapeStreak < 2 ? _genericTransientShapeStreak + 1 : 2);
+                    }
+                    else
+                    {
+                        _genericTransientShapeValue = shape;
+                        _genericTransientShapeLength = static_cast<uint16_t>(trimmed.size());
+                        _genericTransientShapeStreak = 1;
+                    }
+
+                    if (_genericTransientShapeStreak >= 2)
+                    {
+                        return { _makeProgress(ProgressProvider::Generic,
+                                               ProgressMode::Indeterminate,
+                                               ProgressStatus::Running,
+                                               0,
+                                               _advanceGenericConfidence(),
+                                               4),
+                                 true,
+                                 false };
+                    }
+                    return { {}, false, false, true };
+                }
+            }
+
+            _resetGenericHeuristics();
+            return {};
         }
 
-        Match _recognize(const std::wstring_view line, CallState& call) noexcept
+        bool _hasActiveHighConfidenceBuiltInClaim() const noexcept
+        {
+            return _claimedProvider != ProgressProvider::None &&
+                   _claimedProvider != ProgressProvider::Generic &&
+                   _claimedProviderConfidence == ProviderConfidence::High;
+        }
+
+        static ProviderProgress _providerClear() noexcept
+        {
+            ProviderProgress progress;
+            progress.provider = ProgressProvider::None;
+            progress.mode = ProgressMode::Hidden;
+            progress.status = ProgressStatus::Cancelled;
+            progress.confidence = ProviderConfidence::None;
+            progress.visible = false;
+            return progress;
+        }
+
+        Match _recognize(const std::wstring_view line,
+                         CallState& call,
+                         const bool transientRecord) noexcept
         {
             // Interactive text is an output barrier, even when it happens to
             // contain a percentage or transfer-rate shape.
             if (_isInteractivePrompt(line))
             {
-                _genericMatchStreak = 0;
+                _resetGenericHeuristics();
                 return {};
             }
 
@@ -1362,7 +1670,18 @@ namespace winTerm::VisualProgress
             {
                 return match;
             }
-            return _matchGeneric(line);
+
+            auto generic = _matchGeneric(line, transientRecord);
+            // Generic recognition is a fallback, not a new owner. A valid
+            // high-confidence built-in claim survives another progress-shaped
+            // record, but an ordinary record clears ownership below so a
+            // later command cannot inherit suppression authority.
+            if (_hasActiveHighConfidenceBuiltInClaim() &&
+                (generic.matched || generic.pendingCandidate))
+            {
+                return { {}, false, false, true };
+            }
+            return generic;
         }
 
         static bool _sameProgress(const ProviderProgress& left, const ProviderProgress& right) noexcept
@@ -1441,7 +1760,8 @@ namespace winTerm::VisualProgress
                 // Once a record exceeds a hard bound or contains malformed
                 // UTF-16, its retained prefix is not a valid recognition
                 // candidate. Preserve it and resume only at the next record.
-                auto match = _recordOverflow || _recordMalformed ? Match{} : _recognize(line, call);
+                const auto transientRecord = ending == RecordEnding::CarriageReturn || _recordHadEraseLine;
+                auto match = _recordOverflow || _recordMalformed ? Match{} : _recognize(line, call, transientRecord);
                 if (match.matched)
                 {
                     auto& progress = match.progress;
@@ -1474,10 +1794,12 @@ namespace winTerm::VisualProgress
                     else if (progress.provider != ProgressProvider::Generic && !terminalState)
                     {
                         _claimedProvider = progress.provider;
+                        _claimedProviderConfidence = progress.confidence;
                     }
                     else
                     {
                         _claimedProvider = ProgressProvider::None;
+                        _claimedProviderConfidence = ProviderConfidence::None;
                     }
 
                     if (ambiguousCarriageReturn)
@@ -1503,8 +1825,20 @@ namespace winTerm::VisualProgress
                 else
                 {
                     call.onlySafeContent = false;
-                    _genericMatchStreak = 0;
-                    _claimedProvider = ProgressProvider::None;
+                    if (_lastSeen && _lastSeen->visible && _lastSeen->provider == ProgressProvider::Generic)
+                    {
+                        // A structural clear is terminal-state exempt from the
+                        // publication throttle and contains no output text.
+                        _rememberProgress(_providerClear());
+                    }
+                    if (!match.pendingCandidate)
+                    {
+                        _resetGenericHeuristics();
+                    }
+                    if (!match.pendingCandidate)
+                    {
+                        _clearProviderContext();
+                    }
                 }
             }
 
@@ -1791,9 +2125,10 @@ namespace winTerm::VisualProgress
         void _clearProviderContext() noexcept
         {
             _claimedProvider = ProgressProvider::None;
+            _claimedProviderConfidence = ProviderConfidence::None;
             _curlHeaderSeen = false;
             _wgetAnchorSeen = false;
-            _genericMatchStreak = 0;
+            _resetGenericHeuristics();
             _dockerLayers = {};
             _buildKitSteps = {};
         }
@@ -1844,9 +2179,13 @@ namespace winTerm::VisualProgress
         bool _atColumnZero{};
 
         ProgressProvider _claimedProvider{ ProgressProvider::None };
+        ProviderConfidence _claimedProviderConfidence{ ProviderConfidence::None };
         bool _curlHeaderSeen{};
         bool _wgetAnchorSeen{};
         uint8_t _genericMatchStreak{};
+        uint64_t _genericTransientShapeValue{};
+        uint16_t _genericTransientShapeLength{};
+        uint8_t _genericTransientShapeStreak{};
         std::array<LayerState, DockerLayerCapacity> _dockerLayers{};
         std::array<StepState, BuildKitStepCapacity> _buildKitSteps{};
         std::array<ProviderProgress, RecentProgressCapacity> _recentProgress{};

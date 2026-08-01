@@ -120,6 +120,7 @@ public:
     void ClearActive();
     void SetActive();
     void SetPaneHeadersVisible(bool visible);
+    void SetVisualProgressHostWindowState(bool visible, bool focused) noexcept;
 
     struct BuildStartupState
     {
@@ -328,6 +329,8 @@ private:
     std::atomic<bool> _visualProgressFaulted{ false };
     std::atomic<bool> _visualProgressRendererReady{ false };
     std::atomic<bool> _visualProgressUpdateQueued{ false };
+    bool _visualProgressHostWindowVisible{ true };
+    bool _visualProgressHostWindowFocused{ false };
     winTerm::VisualProgress::ProgressStateMachine _visualProgressState;
     winTerm::VisualProgress::ProgressUpdateMailbox _visualProgressMailbox;
     std::shared_ptr<winTerm::VisualProgress::RainbowArcRenderer> _visualProgressRenderer;
