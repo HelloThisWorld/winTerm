@@ -40,6 +40,7 @@ namespace ControlUnitTests
 {
     class ControlCoreTests;
     class ControlInteractivityTests;
+    class CommandTimelineTests;
 };
 
 namespace winTerm::VisualProgress
@@ -495,6 +496,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         friend class ControlUnitTests::ControlCoreTests;
         friend class ControlUnitTests::ControlInteractivityTests;
+        friend class ControlUnitTests::CommandTimelineTests;
         bool _inUnitTests{ false };
     };
 }

@@ -310,6 +310,9 @@ namespace ControlUnitTests
         auto settings = winrt::make_self<MockControlSettings>();
         auto connection = winrt::make_self<MockConnection>();
         auto core = winrt::make_self<winrt::Microsoft::Terminal::Control::implementation::ControlCore>(*settings, *settings, *connection);
+        // Keep resize notifications synchronous in TAEF, matching the other
+        // ControlCore unit tests and avoiding a dependency on its UI dispatcher.
+        core->_inUnitTests = true;
         VERIFY_IS_TRUE(core->Initialize(270, 380, 1.0));
 
         connection->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aecho same\x1b]133;C\a\r\nSECRET_OUTPUT\r\n\x1b]133;D;0\a"));
