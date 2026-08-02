@@ -48,17 +48,16 @@ try
         }
         else
         {
-            $mode = 'fast'
-            $diffDescription = 'no applicable branch diff; auto selected fast validation'
+            $mode = 'quick'
+            $diffDescription = 'no applicable branch diff; auto selected quick validation'
         }
     }
 
     $classification = Get-WinTermChangeClassification -ChangedFiles $changedFiles -Labels $labels -Mode $mode
     $outputs = [ordered]@{
         change_class = $classification.ChangeClass
-        run_fast_build = $classification.RunFastBuild.ToString().ToLowerInvariant()
-        run_full_build = $classification.RunFullBuild.ToString().ToLowerInvariant()
-        run_package = $classification.RunPackage.ToString().ToLowerInvariant()
+        run_release_delivery = $classification.RunReleaseDelivery.ToString().ToLowerInvariant()
+        run_debug_validation = $classification.RunDebugValidation.ToString().ToLowerInvariant()
     }
     if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_OUTPUT))
     {
@@ -81,9 +80,8 @@ try
             '| Output | Value |',
             '| --- | --- |',
             ('| `change_class` | `{0}` |' -f $classification.ChangeClass),
-            ('| `run_fast_build` | `{0}` |' -f $outputs.run_fast_build),
-            ('| `run_full_build` | `{0}` |' -f $outputs.run_full_build),
-            ('| `run_package` | `{0}` |' -f $outputs.run_package)
+            ('| `run_release_delivery` | `{0}` |' -f $outputs.run_release_delivery),
+            ('| `run_debug_validation` | `{0}` |' -f $outputs.run_debug_validation)
         ) | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
     }
 

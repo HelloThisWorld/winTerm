@@ -101,13 +101,16 @@ try
         throw 'MSBuild was not found after initializing the Visual Studio development environment.'
     }
 
-    $msbuildArguments = @(
+    $commonMsBuildArguments = @(
         "/p:Configuration=$Configuration",
         "/p:Platform=$Platform",
         '/p:WindowsTerminalBranding=WinTerm',
         '/p:AppxSymbolPackageEnabled=false',
         '/p:AppxBundle=Never',
-        '/verbosity:minimal',
+        '/verbosity:minimal'
+    )
+    $packageMsBuildArguments = @(
+        $commonMsBuildArguments
         # The packaging dependency graph contains WinMD and shared-PDB edges that
         # are not safe under project-level parallelism in this upstream revision.
         # Keep compiler output visible while serializing projects for reliability.
@@ -116,12 +119,14 @@ try
 
     if ($GeneratePackage)
     {
-        $msbuildArguments += '/p:GenerateAppxPackageOnBuild=true'
-        $msbuildArguments += '/p:AppxPackageSigningEnabled=false'
+        $packageMsBuildArguments += '/p:GenerateAppxPackageOnBuild=true'
+        $packageMsBuildArguments += '/p:AppxPackageSigningEnabled=false'
     }
 
     Write-Host "Building winTerm package dependency graph ($Configuration, $Platform)..."
-    Invoke-OpenConsoleBuild @msbuildArguments '/t:Terminal\CascadiaPackage'
+    # Invoke-OpenConsoleBuild performs the repository NuGet restores and one
+    # solution-level MSBuild restore before compiling the package graph.
+    Invoke-OpenConsoleBuild @packageMsBuildArguments '/t:Terminal\CascadiaPackage'
     if ($LASTEXITCODE -ne 0)
     {
         throw "MSBuild failed with exit code $LASTEXITCODE."
@@ -136,7 +141,10 @@ try
         foreach ($testProject in $testProjects.GetEnumerator())
         {
             Write-Host "Building winTerm $($testProject.Key) ($Configuration, $Platform)..."
-            msbuild.exe $testProject.Value /restore @msbuildArguments $solutionDirArgument
+            # The solution restore above already covers these projects. Build
+            # each independent test graph with normal project parallelism while
+            # keeping the package/WinMD graph serialized.
+            msbuild.exe $testProject.Value @commonMsBuildArguments '/m' $solutionDirArgument
             if ($LASTEXITCODE -ne 0)
             {
                 throw "$($testProject.Key) build failed with exit code $LASTEXITCODE."

@@ -313,6 +313,22 @@ namespace ControlUnitTests
         // Keep resize notifications synchronous in TAEF, matching the other
         // ControlCore unit tests and avoiding a dependency on its UI dispatcher.
         core->_inUnitTests = true;
+        auto cleanup = wil::scope_exit([&]() noexcept {
+            try
+            {
+                if (core)
+                {
+                    core->Close();
+                }
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+            }
+            core = nullptr;
+            connection = nullptr;
+            settings = nullptr;
+        });
         VERIFY_IS_TRUE(core->Initialize(270, 380, 1.0));
 
         connection->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aecho same\x1b]133;C\a\r\nSECRET_OUTPUT\r\n\x1b]133;D;0\a"));
@@ -355,5 +371,12 @@ namespace ControlUnitTests
         VERIFY_IS_FALSE(closed.viewState.selectedCommandId.has_value());
         VERIFY_IS_FALSE(closed.viewState.visibleNativeAnchor.has_value());
         VERIFY_ARE_EQUAL(uint64_t{ 0 }, closed.viewState.executionGeneration);
+
+        // Release renderer, terminal, connection revokers, and WinRT objects
+        // before TAEF advances to the next class or unloads this test module.
+        core = nullptr;
+        connection = nullptr;
+        settings = nullptr;
+        cleanup.release();
     }
 }
