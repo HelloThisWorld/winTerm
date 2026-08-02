@@ -21,7 +21,7 @@ function Assert-Class
         [string[]]$Labels = @(),
 
         [Parameter()]
-        [ValidateSet('auto', 'fast', 'full')]
+        [ValidateSet('auto', 'quick', 'build', 'delivery', 'fast', 'full')]
         [string]$Mode = 'auto'
     )
 
@@ -37,31 +37,44 @@ try
     Import-Module (Join-Path $PSScriptRoot 'ci\ChangeClassification.psm1') -Force
 
     Assert-Class -Expected 'docs-only' -ChangedFiles @('README.md', 'docs/architecture/progress.md', '.github/ISSUE_TEMPLATE/bug.md')
-    Assert-Class -Expected 'code' -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp')
-    Assert-Class -Expected 'code' -ChangedFiles @('assets/winterm/icons/winterm-32.png')
-    Assert-Class -Expected 'delivery' -ChangedFiles @('.github/workflows/winterm-validation.yml')
-    Assert-Class -Expected 'delivery' -ChangedFiles @('src/winterm/Branding/version.json')
-    Assert-Class -Expected 'delivery' -ChangedFiles @('packaging/inno/winTerm.iss')
-    Assert-Class -Expected 'delivery' -ChangedFiles @('src/cascadia/TerminalApp/TerminalAppLib.vcxproj')
-    Assert-Class -Expected 'delivery' -ChangedFiles @('docs/releases/1.1.3.md')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('assets/winterm/icons/winterm-32.png')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('.github/workflows/winterm-validation.yml')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('src/winterm/Branding/version.json')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('packaging/inno/winTerm.iss')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('src/cascadia/TerminalApp/TerminalAppLib.vcxproj')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @('docs/releases/1.1.3.md')
+    Assert-Class -Expected 'validation-only' -ChangedFiles @()
+    Assert-Class -Expected 'build' -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp') -Labels @('build')
+    Assert-Class -Expected 'delivery' -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp') -Labels @('delivery')
     Assert-Class -Expected 'delivery' -ChangedFiles @('README.md') -Labels @('ci:full')
-    Assert-Class -Expected 'code' -ChangedFiles @() -Mode fast
+    Assert-Class -Expected 'validation-only' -ChangedFiles @() -Mode quick
+    Assert-Class -Expected 'build' -ChangedFiles @() -Mode build
+    Assert-Class -Expected 'delivery' -ChangedFiles @() -Mode delivery
+    Assert-Class -Expected 'build' -ChangedFiles @() -Mode fast
     Assert-Class -Expected 'delivery' -ChangedFiles @() -Mode full
 
     $docs = Get-WinTermChangeClassification -ChangedFiles @('README.md')
-    if ($docs.RunFastBuild -or $docs.RunFullBuild -or $docs.RunPackage)
+    if ($docs.RunReleaseDelivery -or $docs.RunDebugValidation)
     {
         throw 'Documentation-only changes must not select native build or package jobs.'
     }
-    $code = Get-WinTermChangeClassification -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp')
-    if (-not $code.RunFastBuild -or $code.RunFullBuild -or $code.RunPackage)
+    $codeWithoutLabel = Get-WinTermChangeClassification -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp')
+    if ($codeWithoutLabel.RunReleaseDelivery -or $codeWithoutLabel.RunDebugValidation)
     {
-        throw 'Code changes must select only the fast Release build.'
+        throw 'Code changes without a native-build label must select quick validation only.'
     }
-    $delivery = Get-WinTermChangeClassification -ChangedFiles @('.github/workflows/winterm-validation.yml')
-    if ($delivery.RunFastBuild -or -not $delivery.RunFullBuild -or -not $delivery.RunPackage)
+
+    $build = Get-WinTermChangeClassification -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp') -Labels @('build')
+    if (-not $build.RunReleaseDelivery -or $build.RunDebugValidation)
     {
-        throw 'Delivery changes must select full build and packaging without duplicating the Release-only job.'
+        throw 'The build label must select Release delivery without Debug validation.'
+    }
+
+    $delivery = Get-WinTermChangeClassification -ChangedFiles @('src/cascadia/TerminalApp/Pane.cpp') -Labels @('delivery')
+    if (-not $delivery.RunReleaseDelivery -or -not $delivery.RunDebugValidation)
+    {
+        throw 'The delivery label must select Release delivery plus Debug validation.'
     }
 
     Write-Host 'PASS: CI change classification and execution modes.' -ForegroundColor Green

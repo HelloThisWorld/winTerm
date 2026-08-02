@@ -33,6 +33,19 @@ Do not claim a build, package, architecture, signature, installer, or runtime te
 
 Describe scope, tests, security and privacy impact, accessibility impact, package impact, schema impact, and known limitations. Release pull requests must link the current release checklist and record signing, architecture, install, upgrade, uninstall, and coexistence status.
 
+### Label-gated validation builds
+
+Every pull request runs change classification, quick source validation, smoke tests, shell integration checks, layout validation, and the workspace benchmark. Ordinary development pull requests do not run a native C++ build unless a maintainer selects one of these labels:
+
+- No label: use for normal development and intermediate review. Only the quick validation job runs.
+- `build`: use for a roadmap milestone or an alpha/beta build that needs downloadable binaries. CI performs one package-capable x64 Release build, runs the three compiled test suites, reuses that build for the unpackaged stage, builds Setup and Portable distributions, runs their lifecycle tests, and uploads both files. It does not run Debug.
+- `delivery`: use for release candidates and final release preparation. It runs everything selected by `build` and adds the x64 Debug build and compiled test suites in parallel with the Release delivery job.
+- `ci:full`: backward-compatible alias for `delivery`.
+
+Adding or removing a validation label retriggers the pull-request workflow. Apply an expensive label after the intended milestone changes are pushed; later pushes retrigger the selected jobs. Manual dispatch supports `quick`, `build`, and `delivery`; the legacy `fast` and `full` choices remain aliases for `build` and `delivery`.
+
+Each compiled TAEF suite has its own 20-minute process timeout. On timeout, CI terminates the runner and its descendants, fails the job, and uploads suite stdout, stderr, and a diagnostic record. The tag-triggered Release workflow remains authoritative for publishing a public release.
+
 ## External contributions and protected review areas
 
 Every change from an external contributor is accepted only through a pull request reviewed and approved by a maintainer listed in `CODE_SIGNING_POLICY.md`. Maintainer review must explicitly cover, in addition to the code itself:

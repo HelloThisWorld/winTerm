@@ -2,15 +2,25 @@ name: winTerm validation
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - labeled
+      - unlabeled
   workflow_dispatch:
     inputs:
       validation:
-        description: Validation depth
+        description: Validation depth (fast/full are legacy aliases for build/delivery)
         required: true
         default: auto
         type: choice
         options:
           - auto
+          - quick
+          - build
+          - delivery
           - fast
           - full
 
@@ -28,9 +38,8 @@ jobs:
     timeout-minutes: 10
     outputs:
       change_class: ${{ steps.classify.outputs.change_class }}
-      run_fast_build: ${{ steps.classify.outputs.run_fast_build }}
-      run_full_build: ${{ steps.classify.outputs.run_full_build }}
-      run_package: ${{ steps.classify.outputs.run_package }}
+      run_release_delivery: ${{ steps.classify.outputs.run_release_delivery }}
+      run_debug_validation: ${{ steps.classify.outputs.run_debug_validation }}
     steps:
       - name: Check out source and history
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -38,7 +47,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Classify changed files
+      - name: Classify changed files and labels
         id: classify
         shell: pwsh
         env:
@@ -75,67 +84,67 @@ jobs:
           .\scripts\winterm\validate-layout.ps1 -TestFixture empty-slot.winterm-workspace.json
           .\scripts\winterm\benchmark-workspace.ps1
 
-  fast-build:
-    name: x64 Release build and relevant tests
+  debug-validation:
+    name: x64 Debug build and compiled tests
     needs:
       - classify-changes
       - quick-validation
-    if: needs.classify-changes.outputs.run_fast_build == 'true'
+    if: needs.classify-changes.outputs.run_debug_validation == 'true'
     runs-on: windows-2022
-    timeout-minutes: 180
+    timeout-minutes: 120
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Build x64 Release and compiled tests
+      - name: Build x64 Debug and compiled tests
         shell: pwsh
-        run: .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
+        run: .\scripts\winterm\build.ps1 -Configuration Debug -Platform x64 -IncludeTests
 
-      - name: Run relevant x64 Release compiled tests
+      - name: Run bounded x64 Debug compiled test suites
         shell: pwsh
-        run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
+        run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Debug -Platform x64 -CompiledTestTimeoutMinutes 20 -TestResultsDirectory artifacts\test-results\Debug
 
-  full-build:
-    name: x64 ${{ matrix.configuration }} build and relevant tests
+      - name: Upload Debug compiled test diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: winTerm-x64-Debug-compiled-test-diagnostics
+          path: artifacts/test-results/Debug
+          if-no-files-found: warn
+          retention-days: 14
+
+  release-delivery:
+    name: x64 Release build, tests, and downloadable distributions
     needs:
       - classify-changes
       - quick-validation
-    if: needs.classify-changes.outputs.run_full_build == 'true'
+    if: needs.classify-changes.outputs.run_release_delivery == 'true'
     runs-on: windows-2022
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration: [Debug, Release]
+    timeout-minutes: 120
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Build x64 ${{ matrix.configuration }} and compiled tests
+      - name: Build the package-capable x64 Release graph and compiled tests once
         shell: pwsh
-        run: .\scripts\winterm\build.ps1 -Configuration ${{ matrix.configuration }} -Platform x64 -IncludeTests
+        run: .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -GeneratePackage -IncludeTests
 
-      - name: Run relevant x64 ${{ matrix.configuration }} compiled tests
+      - name: Run bounded x64 Release compiled test suites
         shell: pwsh
-        run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration ${{ matrix.configuration }} -Platform x64
+        run: .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64 -CompiledTestTimeoutMinutes 20 -TestResultsDirectory artifacts\test-results\Release
 
-  package:
-    name: x64 unpackaged distributions and installer lifecycle tests
-    needs:
-      - classify-changes
-      - full-build
-    if: needs.classify-changes.outputs.run_package == 'true'
-    runs-on: windows-2022
-    timeout-minutes: 300
-    steps:
-      - name: Check out source
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Upload Release compiled test diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          persist-credentials: false
+          name: winTerm-x64-Release-compiled-test-diagnostics
+          path: artifacts/test-results/Release
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Resolve the application version
         shell: pwsh
@@ -167,10 +176,10 @@ jobs:
           }
           "WINTERM_INNO_COMPILER=$(Join-Path $installRoot 'ISCC.exe')" >> $env:GITHUB_ENV
 
-      - name: Build and verify unpackaged, Setup, and Portable distributions
+      - name: Reuse the Release build for unpackaged, Setup, and Portable distributions
         shell: pwsh
         run: |
-          .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64 -Force
+          .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64 -SkipBuild -Force
           .\scripts\winterm\build-installer.ps1 `
             -Version $env:WINTERM_VERSION `
             -Platform x64 `
@@ -201,7 +210,7 @@ jobs:
             -Version $env:WINTERM_VERSION `
             -RunLaunch
 
-      - name: Upload the exact unpackaged distribution allowlist
+      - name: Upload downloadable Setup and Portable artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: winTerm-${{ env.WINTERM_VERSION }}-x64-distributions
@@ -216,9 +225,8 @@ jobs:
     needs:
       - classify-changes
       - quick-validation
-      - fast-build
-      - full-build
-      - package
+      - debug-validation
+      - release-delivery
     runs-on: windows-latest
     timeout-minutes: 5
     steps:
@@ -228,21 +236,18 @@ jobs:
           CHANGE_CLASS: ${{ needs.classify-changes.outputs.change_class }}
           CLASSIFY_RESULT: ${{ needs.classify-changes.result }}
           QUICK_RESULT: ${{ needs.quick-validation.result }}
-          FAST_REQUIRED: ${{ needs.classify-changes.outputs.run_fast_build }}
-          FAST_RESULT: ${{ needs.fast-build.result }}
-          FULL_REQUIRED: ${{ needs.classify-changes.outputs.run_full_build }}
-          FULL_RESULT: ${{ needs.full-build.result }}
-          PACKAGE_REQUIRED: ${{ needs.classify-changes.outputs.run_package }}
-          PACKAGE_RESULT: ${{ needs.package.result }}
+          RELEASE_REQUIRED: ${{ needs.classify-changes.outputs.run_release_delivery }}
+          RELEASE_RESULT: ${{ needs.release-delivery.result }}
+          DEBUG_REQUIRED: ${{ needs.classify-changes.outputs.run_debug_validation }}
+          DEBUG_RESULT: ${{ needs.debug-validation.result }}
         run: |
           $failures = [System.Collections.Generic.List[string]]::new()
           if ($env:CLASSIFY_RESULT -ne 'success') { $failures.Add("classification was $env:CLASSIFY_RESULT") }
           if ($env:QUICK_RESULT -ne 'success') { $failures.Add("quick validation was $env:QUICK_RESULT") }
 
           foreach ($job in @(
-            @{ Name = 'fast build'; Required = $env:FAST_REQUIRED; Result = $env:FAST_RESULT },
-            @{ Name = 'full build'; Required = $env:FULL_REQUIRED; Result = $env:FULL_RESULT },
-            @{ Name = 'package'; Required = $env:PACKAGE_REQUIRED; Result = $env:PACKAGE_RESULT }
+            @{ Name = 'Release delivery'; Required = $env:RELEASE_REQUIRED; Result = $env:RELEASE_RESULT },
+            @{ Name = 'Debug validation'; Required = $env:DEBUG_REQUIRED; Result = $env:DEBUG_RESULT }
           )) {
             if ($job.Required -eq 'true' -and $job.Result -ne 'success') {
               $failures.Add("$($job.Name) was required but finished as $($job.Result)")

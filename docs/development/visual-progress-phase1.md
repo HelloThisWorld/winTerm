@@ -55,10 +55,11 @@ All overlay creation, dispatch, and update failures are caught and logged throug
 The PR workflow computes the exact base-to-head diff and chooses one class:
 
 - `docs-only`: conservative documentation allowlist; quick validation only.
-- `code`: quick validation plus one x64 Release build and relevant compiled tests.
-- `delivery`: workflow, version, installer, packaging, manifest, dependency, or build-system changes; quick validation, x64 Debug and Release builds, relevant compiled tests, unpackaged/Setup/Portable builds, lifecycle tests, and the exact artifact allowlist.
+- `validation-only`: any unlabeled non-documentation change; quick validation only.
+- `build`: the `build` label or manual build mode; quick validation plus one package-capable x64 Release build, bounded compiled tests, unpackaged/Setup/Portable staging, lifecycle tests, and downloadable artifacts.
+- `delivery`: the `delivery` label, the `ci:full` compatibility alias, or manual delivery mode; everything in `build` plus an x64 Debug build and bounded compiled tests running in parallel.
 
-The `ci:full` or `delivery` label forces delivery validation. Manual dispatch accepts `auto`, `fast`, or `full`. The final `ci-gate` job always appears and rejects any missing, failed, or cancelled required job. The separate tag-triggered `release.yml` remains authoritative and unchanged.
+Manual dispatch accepts `auto`, `quick`, `build`, and `delivery`; `fast` and `full` remain aliases for `build` and `delivery`. The final `ci-gate` job always appears and rejects any missing, failed, cancelled, or unexpectedly executed job. The separate tag-triggered `release.yml` remains authoritative and unchanged.
 
 Branch protection should require `ci-gate` after this workflow lands.
 

@@ -14,6 +14,8 @@ try
     $workflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\release.yml') -Raw
     $wingetWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winget.yml') -Raw
     $validationWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\winterm-validation.yml') -Raw
+    $buildScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\build.ps1') -Raw
+    $testScript = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\test.ps1') -Raw
     $wingetGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-winget-manifests.ps1') -Raw
     $releaseGenerator = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\winterm\generate-release-artifacts.ps1') -Raw
 
@@ -168,6 +170,9 @@ try
         'build-portable.ps1',
         'test-installer.ps1',
         'test-portable.ps1',
+        '-SkipBuild',
+        '-CompiledTestTimeoutMinutes 20',
+        'compiled-test-diagnostics',
         '-RunSilentRoundTrip',
         '-RunAllUsersRoundTrip',
         '-RunDefaultPathRoundTrips',
@@ -184,14 +189,20 @@ try
     foreach ($required in @(
         'classify-changes:',
         'change_class:',
-        'run_fast_build:',
-        'run_full_build:',
-        'run_package:',
+        'run_release_delivery:',
+        'run_debug_validation:',
+        'debug-validation:',
+        'release-delivery:',
         'ci-gate:',
         'if: always()',
         'cancel-in-progress: true',
+        '- labeled',
+        '- unlabeled',
         'validation:',
         '- auto',
+        '- quick',
+        '- build',
+        '- delivery',
         '- fast',
         '- full'
     ))
@@ -200,6 +211,40 @@ try
         {
             throw "Classified PR CI is missing required boundary '$required'."
         }
+    }
+    $releaseBuildCount = [regex]::Matches($validationWorkflow, '(?m)build\.ps1 -Configuration Release').Count
+    if ($releaseBuildCount -ne 1)
+    {
+        throw "Classified PR CI must perform exactly one package-capable Release build, found $releaseBuildCount."
+    }
+    if (-not $validationWorkflow.Contains('build-unpackaged.ps1 -Configuration Release -Platform x64 -SkipBuild -Force'))
+    {
+        throw 'Classified PR CI must reuse the Release package build when preparing the unpackaged stage.'
+    }
+    if ($validationWorkflow -match '(?m)^  (fast-build|full-build|package):')
+    {
+        throw 'Classified PR CI still contains a retired duplicate native build or package job.'
+    }
+    foreach ($required in @(
+        '$Process.Kill($true)',
+        'taskkill.exe /PID $Process.Id /T /F',
+        'WaitForExit($timeoutMilliseconds)',
+        '.stdout.log',
+        '.stderr.log',
+        '.diagnostic.txt',
+        'TimeoutMinutes=$TimeoutMinutes',
+        'Status=$status'
+    ))
+    {
+        if (-not $testScript.Contains($required))
+        {
+            throw "Bounded compiled-test execution is missing required boundary '$required'."
+        }
+    }
+    if (-not ($buildScript.Contains("'/m:1'") -and
+        $buildScript.Contains("msbuild.exe `$testProject.Value @commonMsBuildArguments '/m' `$solutionDirArgument")))
+    {
+        throw 'Build orchestration must serialize the package graph and use multiprocess MSBuild for independent test projects.'
     }
     if ($validationWorkflow -match '(?m)^\s*push\s*:' -or
         $validationWorkflow -match '(?m)^\s*pull_request_target\s*:' -or

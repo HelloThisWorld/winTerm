@@ -16,11 +16,202 @@ param(
     [string]$Platform = 'x64',
 
     [Parameter()]
-    [switch]$Build
+    [switch]$Build,
+
+    [Parameter()]
+    [ValidateRange(1, 60)]
+    [int]$CompiledTestTimeoutMinutes = 20,
+
+    [Parameter()]
+    [string]$TestResultsDirectory
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+function Stop-CompiledTestProcessTree
+{
+    param(
+        [Parameter(Mandatory)]
+        [System.Diagnostics.Process]$Process,
+
+        [Parameter(Mandatory)]
+        [string]$Suite
+    )
+
+    if ($Process.HasExited)
+    {
+        return
+    }
+
+    Write-Warning "Terminating timed-out compiled test suite '$Suite' and its complete process tree (PID $($Process.Id))."
+    try
+    {
+        $Process.Kill($true)
+    }
+    catch
+    {
+        Write-Warning "Process.Kill(entireProcessTree) failed for '$Suite': $($_.Exception.Message). Falling back to taskkill.exe."
+        & taskkill.exe /PID $Process.Id /T /F | Out-Host
+        if ($LASTEXITCODE -notin @(0, 128))
+        {
+            throw "Failed to terminate compiled test suite '$Suite' and its descendants (taskkill exit $LASTEXITCODE)."
+        }
+    }
+
+    if (-not $Process.WaitForExit(30000))
+    {
+        throw "Compiled test suite '$Suite' did not exit within 30 seconds after process-tree termination."
+    }
+}
+
+function Invoke-BoundedTaefSuite
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Suite,
+
+        [Parameter(Mandatory)]
+        [string]$Configuration,
+
+        [Parameter(Mandatory)]
+        [string]$Executable,
+
+        [Parameter(Mandatory)]
+        [string]$TestBinary,
+
+        [Parameter(Mandatory)]
+        [string]$WorkingDirectory,
+
+        [Parameter(Mandatory)]
+        [string]$ResultsDirectory,
+
+        [Parameter(Mandatory)]
+        [ValidateRange(1, 60)]
+        [int]$TimeoutMinutes
+    )
+
+    foreach ($requiredFile in @(
+        @{ Path = $Executable; Description = 'TAEF runner' },
+        @{ Path = $TestBinary; Description = 'compiled test binary' }
+    ))
+    {
+        if (-not (Test-Path -LiteralPath $requiredFile.Path -PathType Leaf))
+        {
+            throw "$($requiredFile.Description) for suite '$Suite' was not found at '$($requiredFile.Path)'."
+        }
+    }
+
+    New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
+    $stdoutPath = Join-Path $ResultsDirectory "$Suite.stdout.log"
+    $stderrPath = Join-Path $ResultsDirectory "$Suite.stderr.log"
+    $diagnosticPath = Join-Path $ResultsDirectory "$Suite.diagnostic.txt"
+    $startTime = [DateTimeOffset]::UtcNow
+    $endTime = $startTime
+    $status = 'runner-error'
+    $exitCode = $null
+    $runnerError = $null
+    $process = $null
+    $processStarted = $false
+    $stdoutTask = $null
+    $stderrTask = $null
+    $command = "`"$Executable`" `"$TestBinary`""
+
+    Write-Host "Running compiled test suite '$Suite' with a $TimeoutMinutes-minute process timeout: $command"
+    try
+    {
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = $Executable
+        $startInfo.WorkingDirectory = $WorkingDirectory
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $startInfo.ArgumentList.Add($TestBinary)
+
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
+        if (-not $process.Start())
+        {
+            throw "The TAEF runner for suite '$Suite' did not start."
+        }
+        $processStarted = $true
+
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $timeoutMilliseconds = $TimeoutMinutes * 60 * 1000
+        if (-not $process.WaitForExit($timeoutMilliseconds))
+        {
+            $status = 'timed-out'
+            Stop-CompiledTestProcessTree -Process $process -Suite $Suite
+        }
+        else
+        {
+            # The parameterless call flushes asynchronous output after the
+            # process handle has signaled completion.
+            $process.WaitForExit()
+            $exitCode = $process.ExitCode
+            $status = if ($exitCode -eq 0) { 'passed' } else { 'failed' }
+        }
+    }
+    catch
+    {
+        $runnerError = $_
+        if ($processStarted -and -not $process.HasExited)
+        {
+            Stop-CompiledTestProcessTree -Process $process -Suite $Suite
+        }
+    }
+    finally
+    {
+        $endTime = [DateTimeOffset]::UtcNow
+        $stdout = if ($stdoutTask) { $stdoutTask.GetAwaiter().GetResult() } else { '' }
+        $stderr = if ($stderrTask) { $stderrTask.GetAwaiter().GetResult() } else { '' }
+        [IO.File]::WriteAllText($stdoutPath, $stdout)
+        [IO.File]::WriteAllText($stderrPath, $stderr)
+
+        if (-not [string]::IsNullOrEmpty($stdout))
+        {
+            Write-Host -NoNewline $stdout
+        }
+        if (-not [string]::IsNullOrEmpty($stderr))
+        {
+            Write-Host -ForegroundColor Yellow -NoNewline $stderr
+        }
+
+        $exitCodeText = if ($null -eq $exitCode) { 'not-available' } else { [string]$exitCode }
+        @(
+            "Configuration=$Configuration",
+            "Suite=$Suite",
+            "Executable=$Executable",
+            "TestBinary=$TestBinary",
+            "Command=$command",
+            "StartTimeUtc=$($startTime.ToString('o'))",
+            "EndTimeUtc=$($endTime.ToString('o'))",
+            "TimeoutMinutes=$TimeoutMinutes",
+            "Status=$status",
+            "ExitCode=$exitCodeText"
+        ) | Set-Content -LiteralPath $diagnosticPath -Encoding utf8
+
+        if ($process)
+        {
+            $process.Dispose()
+        }
+    }
+
+    if ($runnerError)
+    {
+        throw "Compiled test suite '$Suite' runner failed: $($runnerError.Exception.Message)"
+    }
+    if ($status -eq 'timed-out')
+    {
+        throw "Compiled test suite '$Suite' timed out after $TimeoutMinutes minutes. The complete process tree was terminated. Diagnostics: '$diagnosticPath'."
+    }
+    if ($exitCode -ne 0)
+    {
+        throw "Compiled test suite '$Suite' failed with exit code $exitCode. Diagnostics: '$diagnosticPath'."
+    }
+}
 
 function Test-PowerShellSyntax
 {
@@ -325,10 +516,46 @@ try
 
     if ($Suite -eq 'Relevant')
     {
-        foreach ($testName in @('unitSettingsModel', 'terminalApp', 'unitControl'))
+        $resultsDirectory = if ([string]::IsNullOrWhiteSpace($TestResultsDirectory))
         {
-            Write-Host "Running upstream test group: $testName"
-            Invoke-OpenConsoleTests -Test $testName -Platform $Platform -Configuration $Configuration
+            Join-Path $repositoryRoot "artifacts\test-results\$Configuration"
+        }
+        elseif ([IO.Path]::IsPathRooted($TestResultsDirectory))
+        {
+            [IO.Path]::GetFullPath($TestResultsDirectory)
+        }
+        else
+        {
+            [IO.Path]::GetFullPath((Join-Path $repositoryRoot $TestResultsDirectory))
+        }
+
+        $centralTaef = Join-Path $repositoryRoot "packages\Microsoft.Taef.10.100.251104001\build\Binaries\$Platform\te.exe"
+        $compiledSuites = [ordered]@{
+            unitSettingsModel = @{
+                Executable = Join-Path $binaryDirectory 'UnitTests_SettingsModel\te.exe'
+                TestBinary = Join-Path $binaryDirectory 'UnitTests_SettingsModel\SettingsModel.Unit.Tests.dll'
+            }
+            terminalApp = @{
+                Executable = $centralTaef
+                TestBinary = Join-Path $binaryDirectory 'UnitTests_TerminalApp\Terminal.App.Unit.Tests.dll'
+            }
+            unitControl = @{
+                Executable = $centralTaef
+                TestBinary = Join-Path $binaryDirectory 'UnitTests_Control\Control.Unit.Tests.dll'
+            }
+        }
+
+        foreach ($testName in $compiledSuites.Keys)
+        {
+            $compiledSuite = $compiledSuites[$testName]
+            Invoke-BoundedTaefSuite `
+                -Suite $testName `
+                -Configuration $Configuration `
+                -Executable $compiledSuite.Executable `
+                -TestBinary $compiledSuite.TestBinary `
+                -WorkingDirectory $repositoryRoot `
+                -ResultsDirectory $resultsDirectory `
+                -TimeoutMinutes $CompiledTestTimeoutMinutes
         }
     }
     else

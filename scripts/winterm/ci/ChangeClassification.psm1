@@ -89,7 +89,7 @@ function Get-WinTermChangeClassification
         [string[]]$Labels = @(),
 
         [Parameter()]
-        [ValidateSet('auto', 'fast', 'full')]
+        [ValidateSet('auto', 'quick', 'build', 'delivery', 'fast', 'full')]
         [string]$Mode = 'auto'
     )
 
@@ -97,55 +97,63 @@ function Get-WinTermChangeClassification
     $normalizedLabels = @($Labels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim().ToLowerInvariant() })
     $reasons = [System.Collections.Generic.List[string]]::new()
 
-    if ($Mode -eq 'full')
+    if ($Mode -in @('delivery', 'full'))
     {
         $changeClass = 'delivery'
-        $reasons.Add('workflow_dispatch selected full validation')
+        $reasons.Add("workflow_dispatch selected $Mode validation")
     }
-    elseif ($Mode -eq 'fast')
+    elseif ($Mode -in @('build', 'fast'))
     {
-        $changeClass = 'code'
-        $reasons.Add('workflow_dispatch selected fast validation')
+        $changeClass = 'build'
+        $reasons.Add("workflow_dispatch selected $Mode validation")
     }
-    elseif ($normalizedLabels -contains 'ci:full' -or $normalizedLabels -contains 'delivery')
+    elseif ($Mode -eq 'quick')
+    {
+        $changeClass = 'validation-only'
+        $reasons.Add('workflow_dispatch selected quick validation')
+    }
+    elseif ($normalizedLabels -contains 'delivery' -or $normalizedLabels -contains 'ci:full')
     {
         $changeClass = 'delivery'
-        $reasons.Add('a delivery label requested the complete pipeline')
+        $reasons.Add('a delivery label requested Release delivery plus Debug validation')
+    }
+    elseif ($normalizedLabels -contains 'build')
+    {
+        $changeClass = 'build'
+        $reasons.Add('the build label requested Release delivery validation')
     }
     elseif ($normalizedFiles.Count -eq 0)
     {
-        $changeClass = 'delivery'
-        $reasons.Add('no changed files were resolved, so the classifier failed safe')
+        $changeClass = 'validation-only'
+        $reasons.Add('no changed files were resolved and no native-build label is present')
     }
     else
     {
-        $deliveryFiles = @($normalizedFiles | Where-Object { Test-WinTermDeliveryPath -Path $_ })
-        if ($deliveryFiles.Count -gt 0)
+        $nonDocumentationFiles = @($normalizedFiles | Where-Object { -not (Test-WinTermDocumentationPath -Path $_) })
+        if ($nonDocumentationFiles.Count -eq 0)
         {
-            $changeClass = 'delivery'
-            $reasons.Add("delivery-sensitive paths changed: $($deliveryFiles -join ', ')")
+            $changeClass = 'docs-only'
+            $reasons.Add('every changed file is in the conservative documentation allowlist')
         }
         else
         {
-            $nonDocumentationFiles = @($normalizedFiles | Where-Object { -not (Test-WinTermDocumentationPath -Path $_) })
-            if ($nonDocumentationFiles.Count -eq 0)
+            $changeClass = 'validation-only'
+            $deliveryFiles = @($normalizedFiles | Where-Object { Test-WinTermDeliveryPath -Path $_ })
+            if ($deliveryFiles.Count -gt 0)
             {
-                $changeClass = 'docs-only'
-                $reasons.Add('every changed file is in the conservative documentation allowlist')
+                $reasons.Add("delivery-sensitive paths changed without a native-build label: $($deliveryFiles -join ', ')")
             }
             else
             {
-                $changeClass = 'code'
-                $reasons.Add("non-documentation paths changed: $($nonDocumentationFiles -join ', ')")
+                $reasons.Add("non-documentation paths changed without a native-build label: $($nonDocumentationFiles -join ', ')")
             }
         }
     }
 
     [pscustomobject]@{
         ChangeClass = $changeClass
-        RunFastBuild = $changeClass -eq 'code'
-        RunFullBuild = $changeClass -eq 'delivery'
-        RunPackage = $changeClass -eq 'delivery'
+        RunReleaseDelivery = $changeClass -in @('build', 'delivery')
+        RunDebugValidation = $changeClass -eq 'delivery'
         ChangedFiles = $normalizedFiles
         Reasons = @($reasons)
     }
