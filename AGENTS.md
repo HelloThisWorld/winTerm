@@ -23,6 +23,16 @@ When the user says `create pr`, follow this workflow:
 - Remember that `workflow_dispatch` cannot dispatch a workflow that exists only outside the default branch. Use the pull-request trigger for new workflows or merge them before dispatching.
 - Before release operations, check for an existing tag or Release and never overwrite an existing release asset.
 
+## Changelog and Wiki Protocol
+
+- Every winTerm source or documentation commit created by a developer or agent must update the root `CHANGELOG.md` in that same source commit.
+- Immediately after creating a source commit, add and push a matching entry in the separate `HelloThisWorld/winTerm.wiki` `Development-Changes.md` ledger. A source commit is not complete until that Wiki commit is published.
+- Record the date, final source SHA and link, concise summary, and related checkpoint or release. Update the Wiki if amend, rebase, squash, or merge changes the SHA, including GitHub-generated merge or squash commits.
+- Wiki-only synchronization commits do not recursively require another Wiki ledger entry. If the Wiki push fails, report it and do not claim the source commit workflow is complete.
+- Do not add a secret-bearing public CI job for Wiki writes or make changelog validation trigger an expensive native build on every pull request.
+- For documentation screenshots, first reuse a suitable sanitized original from `HelloThisWorld/winterm-site`. Do not recapture, regenerate, duplicate, crop, round, mask, or frame an equivalent screenshot; use text when no suitable existing image is available.
+- Follow `docs/development/changelog-policy.md` for the complete permanent policy.
+
 ## Code Rules
 
 - Use English for code, function names, variable names, comments, logs, and error messages.

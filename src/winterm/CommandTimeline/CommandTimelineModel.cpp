@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cwctype>
+#include <limits>
 #include <unordered_set>
 
 namespace winTerm::CommandTimeline
@@ -36,6 +37,366 @@ namespace winTerm::CommandTimeline
         selectedVisualSlot.reset();
         loadedIntoInput = false;
         executionGeneration = 0;
+    }
+
+    CommandTimelinePresentationSnapshot CommandTimelineNavigationModel::Open(
+        const std::span<const CommandTimelineEntry> entries,
+        CommandTimelineViewState& viewState,
+        const ShellIntegrationCapability capability,
+        const size_t visibleCapacity)
+    {
+        _open = true;
+        _visibleCapacity = std::max<size_t>(1, visibleCapacity);
+        _wheelDeltaRemainder = 0;
+        _wheelSettlePending = false;
+        _reconcile(entries, viewState, false);
+        return _snapshot(entries, capability);
+    }
+
+    CommandTimelinePresentationSnapshot CommandTimelineNavigationModel::Reconcile(
+        const std::span<const CommandTimelineEntry> entries,
+        CommandTimelineViewState& viewState,
+        const ShellIntegrationCapability capability,
+        const size_t visibleCapacity)
+    {
+        _visibleCapacity = std::max<size_t>(1, visibleCapacity);
+        if (_open)
+        {
+            _reconcile(entries, viewState, true);
+        }
+        return _snapshot(entries, capability);
+    }
+
+    CommandTimelinePresentationSnapshot CommandTimelineNavigationModel::Navigate(
+        const NavigationAction action,
+        const std::span<const CommandTimelineEntry> entries,
+        CommandTimelineViewState& viewState,
+        const ShellIntegrationCapability capability)
+    {
+        if (_open)
+        {
+            _reconcile(entries, viewState, false);
+            _moveSelection(action, entries);
+            _syncViewState(entries, viewState);
+        }
+        return _snapshot(entries, capability);
+    }
+
+    CommandTimelinePresentationSnapshot CommandTimelineNavigationModel::SelectVisibleEntry(
+        const size_t visualSlot,
+        const std::span<const CommandTimelineEntry> entries,
+        CommandTimelineViewState& viewState,
+        const ShellIntegrationCapability capability)
+    {
+        if (_open)
+        {
+            _reconcile(entries, viewState, false);
+            const auto index = _firstVisibleIndex + visualSlot;
+            if (visualSlot < _visibleCapacity && index < entries.size())
+            {
+                _selectedIndex = index;
+                _syncViewState(entries, viewState);
+            }
+        }
+        return _snapshot(entries, capability);
+    }
+
+    CommandTimelinePresentationSnapshot CommandTimelineNavigationModel::ApplyWheelDelta(
+        const int delta,
+        const std::span<const CommandTimelineEntry> entries,
+        CommandTimelineViewState& viewState,
+        const ShellIntegrationCapability capability,
+        const int deltaPerEntry)
+    {
+        if (!_open || entries.empty() || delta == 0 || deltaPerEntry <= 0)
+        {
+            return _snapshot(entries, capability);
+        }
+
+        _reconcile(entries, viewState, false);
+        _wheelSettlePending = true;
+        const auto accumulated = static_cast<int64_t>(_wheelDeltaRemainder) + delta;
+        _wheelDeltaRemainder = gsl::narrow_cast<int>(std::clamp<int64_t>(
+            accumulated,
+            std::numeric_limits<int>::min(),
+            std::numeric_limits<int>::max()));
+
+        while (_wheelDeltaRemainder >= deltaPerEntry)
+        {
+            _wheelDeltaRemainder -= deltaPerEntry;
+            if (!_moveSelection(NavigationAction::Previous, entries))
+            {
+                _wheelDeltaRemainder = 0;
+                break;
+            }
+        }
+        while (_wheelDeltaRemainder <= -deltaPerEntry)
+        {
+            _wheelDeltaRemainder += deltaPerEntry;
+            if (!_moveSelection(NavigationAction::Next, entries))
+            {
+                _wheelDeltaRemainder = 0;
+                break;
+            }
+        }
+
+        _syncViewState(entries, viewState);
+        return _snapshot(entries, capability);
+    }
+
+    void CommandTimelineNavigationModel::SettleWheel() noexcept
+    {
+        _wheelDeltaRemainder = 0;
+        _wheelSettlePending = false;
+    }
+
+    void CommandTimelineNavigationModel::Close() noexcept
+    {
+        _selectedIndex.reset();
+        _lastLatestCommandId.reset();
+        _firstVisibleIndex = 0;
+        _visibleCapacity = 1;
+        _wheelDeltaRemainder = 0;
+        _open = false;
+        _wheelSettlePending = false;
+    }
+
+    bool CommandTimelineNavigationModel::IsOpen() const noexcept
+    {
+        return _open;
+    }
+
+    bool CommandTimelineNavigationModel::WheelSettlePending() const noexcept
+    {
+        return _wheelSettlePending;
+    }
+
+    int CommandTimelineNavigationModel::WheelDeltaRemainder() const noexcept
+    {
+        return _wheelDeltaRemainder;
+    }
+
+    size_t CommandTimelineNavigationModel::VisibleCapacity() const noexcept
+    {
+        return _visibleCapacity;
+    }
+
+    void CommandTimelineNavigationModel::_reconcile(const std::span<const CommandTimelineEntry> entries,
+                                                    CommandTimelineViewState& viewState,
+                                                    const bool allowFollowLatest)
+    {
+        if (entries.empty())
+        {
+            _selectedIndex.reset();
+            _lastLatestCommandId.reset();
+            _firstVisibleIndex = 0;
+            _syncViewState(entries, viewState);
+            return;
+        }
+
+        const auto wasFollowingLatest = allowFollowLatest &&
+                                        _lastLatestCommandId.has_value() &&
+                                        viewState.selectedCommandId == _lastLatestCommandId;
+        std::optional<size_t> selected;
+        if (wasFollowingLatest)
+        {
+            selected = entries.size() - 1;
+        }
+        else if (viewState.selectedCommandId.has_value())
+        {
+            selected = _findCommand(entries, *viewState.selectedCommandId);
+            if (!selected.has_value())
+            {
+                selected = _findNearestCommand(entries, *viewState.selectedCommandId);
+            }
+        }
+        else
+        {
+            selected = entries.size() - 1;
+        }
+        _selectedIndex = selected;
+
+        const auto maxFirst = entries.size() > _visibleCapacity ? entries.size() - _visibleCapacity : 0;
+        std::optional<size_t> restoredAnchor;
+        if (viewState.visibleNativeAnchor.has_value())
+        {
+            const auto anchor = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+                return entry.nativeMarkId == *viewState.visibleNativeAnchor;
+            });
+            if (anchor != entries.end())
+            {
+                restoredAnchor = gsl::narrow_cast<size_t>(std::distance(entries.begin(), anchor));
+            }
+        }
+
+        if (restoredAnchor.has_value())
+        {
+            _firstVisibleIndex = std::min(*restoredAnchor, maxFirst);
+        }
+        else
+        {
+            const auto desiredSlot = std::min(viewState.selectedVisualSlot.value_or(_visibleCapacity - 1),
+                                              _visibleCapacity - 1);
+            _firstVisibleIndex = *_selectedIndex > desiredSlot ? *_selectedIndex - desiredSlot : 0;
+            _firstVisibleIndex = std::min(_firstVisibleIndex, maxFirst);
+        }
+
+        if (*_selectedIndex < _firstVisibleIndex)
+        {
+            _firstVisibleIndex = *_selectedIndex;
+        }
+        else if (*_selectedIndex >= _firstVisibleIndex + _visibleCapacity)
+        {
+            _firstVisibleIndex = *_selectedIndex - _visibleCapacity + 1;
+        }
+        _firstVisibleIndex = std::min(_firstVisibleIndex, maxFirst);
+        _lastLatestCommandId = entries.back().id;
+        _syncViewState(entries, viewState);
+    }
+
+    bool CommandTimelineNavigationModel::_moveSelection(const NavigationAction action,
+                                                        const std::span<const CommandTimelineEntry> entries)
+    {
+        if (!_selectedIndex.has_value() || entries.empty())
+        {
+            return false;
+        }
+
+        auto next = *_selectedIndex;
+        switch (action)
+        {
+        case NavigationAction::Previous:
+            if (next == 0)
+            {
+                return false;
+            }
+            --next;
+            break;
+        case NavigationAction::Next:
+            if (next + 1 >= entries.size())
+            {
+                return false;
+            }
+            ++next;
+            break;
+        case NavigationAction::PageFirst:
+            next = _firstVisibleIndex;
+            break;
+        case NavigationAction::PageLast:
+            next = std::min(entries.size(), _firstVisibleIndex + _visibleCapacity) - 1;
+            break;
+        }
+
+        _selectedIndex = next;
+        if (next < _firstVisibleIndex)
+        {
+            _firstVisibleIndex = next;
+        }
+        else if (next >= _firstVisibleIndex + _visibleCapacity)
+        {
+            _firstVisibleIndex = next - _visibleCapacity + 1;
+        }
+        return true;
+    }
+
+    void CommandTimelineNavigationModel::_syncViewState(const std::span<const CommandTimelineEntry> entries,
+                                                        CommandTimelineViewState& viewState) const
+    {
+        if (!_selectedIndex.has_value() || entries.empty())
+        {
+            viewState.selectedCommandId.reset();
+            viewState.visibleNativeAnchor.reset();
+            viewState.selectedVisualSlot.reset();
+            return;
+        }
+
+        viewState.selectedCommandId = entries[*_selectedIndex].id;
+        viewState.visibleNativeAnchor = entries[_firstVisibleIndex].nativeMarkId;
+        viewState.selectedVisualSlot = *_selectedIndex - _firstVisibleIndex;
+    }
+
+    CommandTimelinePresentationSnapshot CommandTimelineNavigationModel::_snapshot(
+        const std::span<const CommandTimelineEntry> entries,
+        const ShellIntegrationCapability capability) const
+    {
+        CommandTimelinePresentationSnapshot result{
+            .capability = capability,
+            .totalEntryCount = entries.size(),
+            .firstVisibleIndex = _firstVisibleIndex,
+            .selectedVisualSlot = _selectedIndex.has_value() ? *_selectedIndex - _firstVisibleIndex : 0,
+            .wheelDeltaRemainder = _wheelDeltaRemainder,
+            .open = _open,
+            .wheelSettlePending = _wheelSettlePending,
+        };
+        if (!_open || entries.empty())
+        {
+            return result;
+        }
+
+        const auto end = std::min(entries.size(), _firstVisibleIndex + _visibleCapacity);
+        result.visibleEntries.reserve(end - _firstVisibleIndex);
+        for (auto index = _firstVisibleIndex; index < end; ++index)
+        {
+            const auto& entry = entries[index];
+            result.visibleEntries.emplace_back(CommandTimelineVisibleEntry{
+                .id = entry.id,
+                .commandText = entry.cachedCommandText,
+                .executionResult = _effectiveResult(entry),
+                .selected = _selectedIndex == index,
+            });
+        }
+        return result;
+    }
+
+    std::optional<size_t> CommandTimelineNavigationModel::_findCommand(
+        const std::span<const CommandTimelineEntry> entries,
+        const CommandId& id) noexcept
+    {
+        const auto found = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+            return entry.id == id;
+        });
+        if (found == entries.end())
+        {
+            return std::nullopt;
+        }
+        return gsl::narrow_cast<size_t>(std::distance(entries.begin(), found));
+    }
+
+    size_t CommandTimelineNavigationModel::_findNearestCommand(
+        const std::span<const CommandTimelineEntry> entries,
+        const CommandId& id) noexcept
+    {
+        if (id.paneSessionId != entries.front().id.paneSessionId)
+        {
+            return entries.size() - 1;
+        }
+        const auto next = std::lower_bound(entries.begin(), entries.end(), id.sequence, [](const auto& entry, const auto sequence) {
+            return entry.id.sequence < sequence;
+        });
+        if (next == entries.begin())
+        {
+            return 0;
+        }
+        if (next == entries.end())
+        {
+            return entries.size() - 1;
+        }
+
+        const auto nextIndex = gsl::narrow_cast<size_t>(std::distance(entries.begin(), next));
+        const auto previousIndex = nextIndex - 1;
+        const auto nextDistance = next->id.sequence - id.sequence;
+        const auto previousDistance = id.sequence - entries[previousIndex].id.sequence;
+        return previousDistance <= nextDistance ? previousIndex : nextIndex;
+    }
+
+    ExecutionResult CommandTimelineNavigationModel::_effectiveResult(const CommandTimelineEntry& entry) noexcept
+    {
+        if (entry.shellIntegrationCapability != ShellIntegrationCapability::Full &&
+            (entry.executionResult == ExecutionResult::Succeeded || entry.executionResult == ExecutionResult::Failed))
+        {
+            return ExecutionResult::Unknown;
+        }
+        return entry.executionResult;
     }
 
     std::wstring CommandTextCachePolicy::Apply(const std::wstring_view commandText) const

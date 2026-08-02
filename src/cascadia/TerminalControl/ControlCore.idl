@@ -197,6 +197,7 @@ namespace Microsoft.Terminal.Control
         event Windows.Foundation.TypedEventHandler<Object, Object> BackgroundColorChanged;
         event Windows.Foundation.TypedEventHandler<Object, Object> TaskbarProgressChanged;
         event Windows.Foundation.TypedEventHandler<Object, Object> ShellIntegrationChanged;
+        event Windows.Foundation.TypedEventHandler<Object, Object> CommandTimelineChanged;
         event Windows.Foundation.TypedEventHandler<Object, Object> VisualProgressProviderChanged;
         event Windows.Foundation.TypedEventHandler<Object, Object> RendererEnteredErrorState;
         event Windows.Foundation.TypedEventHandler<Object, ShowWindowArgs> ShowWindowChanged;

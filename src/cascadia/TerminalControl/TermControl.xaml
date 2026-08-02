@@ -1244,7 +1244,8 @@
         will solve a bunch of the search input issues we found last time we switched.
     -->
 
-    <Grid x:Name="RootGrid">
+    <Grid x:Name="RootGrid"
+          SizeChanged="_CommandTimelineSizeChanged">
         <Grid.Lights>
             <local:VisualBellLight x:Name="BellLight" />
         </Grid.Lights>
@@ -1364,6 +1365,67 @@
                    Visibility="Collapsed" />
 
         </Grid>
+
+        <Border x:Name="CommandTimelineOverlay"
+                Width="280"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Stretch"
+                Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+                BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0"
+                CornerRadius="0,8,8,0"
+                PointerWheelChanged="_CommandTimelineWheelHandler"
+                Visibility="Collapsed">
+            <Grid Padding="12,12,12,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock x:Uid="CommandTimelineTitle"
+                           Margin="28,0,0,10"
+                           FontSize="14"
+                           FontWeight="SemiBold" />
+
+                <ListView x:Name="CommandTimelineList"
+                          x:Uid="CommandTimelineList"
+                          Grid.Row="1"
+                          IsItemClickEnabled="False"
+                          IsTabStop="False"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ScrollViewer.HorizontalScrollMode="Disabled"
+                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                          ScrollViewer.VerticalScrollMode="Disabled"
+                          SelectionChanged="_CommandTimelineSelectionChanged"
+                          SelectionMode="Single" />
+
+                <TextBlock x:Name="CommandTimelineEmptyText"
+                           Grid.Row="1"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           AutomationProperties.LiveSetting="Off"
+                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                           TextAlignment="Center"
+                           TextWrapping="WrapWholeWords"
+                           Visibility="Collapsed" />
+            </Grid>
+        </Border>
+
+        <Button x:Name="CommandTimelineHandle"
+                x:Uid="CommandTimelineHandle"
+                Width="28"
+                Height="48"
+                Margin="8,0,0,0"
+                Padding="0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Click="_CommandTimelineHandleClick"
+                CornerRadius="6">
+            <FontIcon x:Name="CommandTimelineHandleIcon"
+                      FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                      FontSize="12"
+                      Glyph="&#xE76C;" />
+        </Button>
 
         <Grid x:Name="RendererFailedNotice"
               HorizontalAlignment="Center"

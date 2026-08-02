@@ -351,6 +351,21 @@ namespace winrt::TerminalApp::implementation
         args.Handled(true);
     }
 
+    void TerminalPage::_HandleToggleCommandTimeline(const IInspectable& sender,
+                                                    const ActionEventArgs& args)
+    {
+        if (const auto activeTab{ _senderOrFocusedTab(sender) })
+        {
+            if (const auto control{ activeTab->GetActiveTerminalControl() })
+            {
+                args.Handled(control.ToggleCommandTimeline());
+                return;
+            }
+        }
+
+        args.Handled(false);
+    }
+
     void TerminalPage::_HandleTogglePaneReadOnly(const IInspectable& sender,
                                                  const ActionEventArgs& args)
     {

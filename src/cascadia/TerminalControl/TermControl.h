@@ -9,6 +9,7 @@
 #include "../../cascadia/TerminalCore/Terminal.hpp"
 #include "../../renderer/uia/UiaRenderer.hpp"
 #include "../../tsf/Handle.h"
+#include "../../winterm/CommandTimeline/CommandTimelineModel.h"
 
 #include "ControlInteractivity.h"
 
@@ -71,6 +72,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void RestoreFromPath(winrt::hstring path);
         void PersistTo(int64_t handle) const;
         void OpenCWD();
+        bool ToggleCommandTimeline();
+        bool CommandTimelineOpen() const noexcept;
         void Close();
         Windows::Foundation::Size CharacterDimensions() const;
         Windows::Foundation::Size MinimumSize();
@@ -305,6 +308,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         };
 
         std::shared_ptr<ThrottledFunc<ScrollBarUpdate>> _updateScrollBar;
+        std::shared_ptr<ThrottledFunc<>> _updateCommandTimeline;
 
         bool _isInternalScrollBarUpdate;
 
@@ -313,8 +317,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         double _autoScrollVelocity;
         std::optional<Windows::UI::Input::PointerPoint> _autoScrollingPointerPoint;
         SafeDispatcherTimer _autoScrollTimer;
+        SafeDispatcherTimer _commandTimelineWheelSettleTimer;
         std::optional<std::chrono::high_resolution_clock::time_point> _lastAutoScrollUpdateTime;
         bool _pointerPressedInBounds{ false };
+        bool _commandTimelineOpen{ false };
+        bool _updatingCommandTimelineSelection{ false };
+        std::array<bool, 256> _commandTimelineConsumedKeys{};
 
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellLightAnimation{ nullptr };
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellDarkAnimation{ nullptr };
@@ -378,7 +386,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _PointerReleasedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _PointerExitedHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _MouseWheelHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _CommandTimelineWheelHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _CommandTimelineHandleClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _CommandTimelineSelectionChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::SelectionChangedEventArgs& e);
+        void _CommandTimelineSizeChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::SizeChangedEventArgs& e);
+        void _CommandTimelineWheelSettled(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& e);
         void _ScrollbarChangeHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs& e);
+
+        bool _tryHandleCommandTimelineKey(WORD vkey, ::Microsoft::Terminal::Core::ControlKeyStates modifiers, bool keyDown);
+        bool _tryHandleCommandTimelineWheel(const Windows::Foundation::Point& position, int delta);
+        bool _isPointOverCommandTimeline(const Windows::Foundation::Point& position) noexcept;
+        size_t _commandTimelineVisibleCapacity() noexcept;
+        void _refreshCommandTimeline();
+        void _renderCommandTimeline(const winTerm::CommandTimeline::CommandTimelinePresentationSnapshot& presentation);
+        void _closeCommandTimeline(bool returnFocus);
+        void _coreCommandTimelineChanged(const IInspectable& sender, const IInspectable& args);
 
         void _QuickFixButton_PointerEntered(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _QuickFixButton_PointerExited(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
@@ -471,6 +493,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Control::ControlCore::TabColorChanged_revoker TabColorChanged;
             Control::ControlCore::TaskbarProgressChanged_revoker TaskbarProgressChanged;
             Control::ControlCore::ShellIntegrationChanged_revoker ShellIntegrationChanged;
+            Control::ControlCore::CommandTimelineChanged_revoker CommandTimelineChanged;
             Control::ControlCore::VisualProgressProviderChanged_revoker VisualProgressProviderChanged;
             Control::ControlCore::ConnectionStateChanged_revoker ConnectionStateChanged;
             Control::ControlCore::ShowWindowChanged_revoker ShowWindowChanged;

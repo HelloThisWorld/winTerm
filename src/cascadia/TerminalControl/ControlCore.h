@@ -176,6 +176,13 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const uint64_t VisualProgressProviderState() const noexcept;
         winTerm::CommandTimeline::CommandTimelineSnapshot CommandTimelineSnapshot();
         void CommandTimelineViewState(const winTerm::CommandTimeline::CommandTimelineViewState& state);
+        winTerm::CommandTimeline::CommandTimelinePresentationSnapshot OpenCommandTimeline(size_t visibleCapacity);
+        winTerm::CommandTimeline::CommandTimelinePresentationSnapshot RefreshCommandTimeline(size_t visibleCapacity);
+        winTerm::CommandTimeline::CommandTimelinePresentationSnapshot NavigateCommandTimeline(winTerm::CommandTimeline::NavigationAction action);
+        winTerm::CommandTimeline::CommandTimelinePresentationSnapshot SelectCommandTimelineVisibleEntry(size_t visualSlot);
+        winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ScrollCommandTimeline(int wheelDelta);
+        void SettleCommandTimelineWheel();
+        void CloseCommandTimelineOverlay();
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;
@@ -296,6 +303,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::typed_event<IInspectable, Control::ScrollPositionChangedArgs> ScrollPositionChanged;
         til::typed_event<> TaskbarProgressChanged;
         til::typed_event<> ShellIntegrationChanged;
+        til::typed_event<> CommandTimelineChanged;
         til::typed_event<> VisualProgressProviderChanged;
         til::typed_event<> ConnectionStateChanged;
         til::typed_event<> HoveredHyperlinkChanged;
@@ -448,6 +456,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::mutex _visualProgressSuppressionMutex;
         std::unique_ptr<winTerm::VisualProgress::RecognitionEngine> _visualProgressRecognition;
         std::unique_ptr<winTerm::CommandTimeline::CommandTimelineIndex> _commandTimelineIndex;
+        winTerm::CommandTimeline::CommandTimelineNavigationModel _commandTimelineNavigation;
         winTerm::CommandTimeline::CommandTimelineViewState _commandTimelineViewState;
         std::atomic<uint64_t> _visualProgressProviderState{};
         std::atomic<uint64_t> _visualProgressProviderGeneration{};

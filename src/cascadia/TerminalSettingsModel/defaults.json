@@ -916,6 +916,7 @@
         { "command": { "action": "swapPane", "direction": "first" }, "id": "Terminal.SwapPaneFirst" },
         { "command": "toggleBroadcastInput", "id": "Terminal.ToggleBroadcastInput" },
         { "command": "togglePaneZoom", "id": "Terminal.TogglePaneZoom" },
+        { "command": "toggleCommandTimeline", "id": "winTerm.ToggleCommandTimeline" },
         { "command": "toggleSplitOrientation", "id": "Terminal.ToggleSplitOrientation" },
         { "command": "toggleReadOnlyMode", "id": "Terminal.ToggleReadOnlyMode" },
         { "command": "enableReadOnlyMode", "id": "Terminal.EnableReadOnlyMode" },
@@ -1035,7 +1036,7 @@
         // Tab Management
         // "command": "closeTab" is unbound by default.
         //   The closeTab command closes a tab without confirmation, even if it has multiple panes.
-        { "keys": "ctrl+shift+t", "id": "Terminal.OpenNewTab" },
+        { "keys": "ctrl+alt+t", "id": "Terminal.OpenNewTab" },
         { "keys": "ctrl+shift+n", "id": "Terminal.OpenNewWindow" },
         { "keys": "ctrl+shift+1", "id": "Terminal.OpenNewTabProfile0" },
         { "keys": "ctrl+shift+2", "id": "Terminal.OpenNewTabProfile1" },
@@ -1047,8 +1048,9 @@
         { "keys": "ctrl+shift+8", "id": "Terminal.OpenNewTabProfile7" },
         { "keys": "ctrl+shift+9", "id": "Terminal.OpenNewTabProfile8" },
         { "keys": "ctrl+shift+d", "id": "Terminal.DuplicateTab" },
-        { "keys": "ctrl+tab", "id": "Terminal.NextTab" },
-        { "keys": "ctrl+shift+tab", "id": "Terminal.PrevTab" },
+        { "keys": "ctrl+tab", "id": "winTerm.ToggleCommandTimeline" },
+        { "keys": "ctrl+t", "id": "Terminal.NextTab" },
+        { "keys": "ctrl+shift+t", "id": "Terminal.PrevTab" },
         { "keys": "ctrl+alt+1", "id": "Terminal.SwitchToTab0" },
         { "keys": "ctrl+alt+2", "id": "Terminal.SwitchToTab1" },
         { "keys": "ctrl+alt+3", "id": "Terminal.SwitchToTab2" },

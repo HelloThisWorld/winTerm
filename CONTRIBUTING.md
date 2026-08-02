@@ -28,6 +28,9 @@ Do not claim a build, package, architecture, signature, installer, or runtime te
 - Avoid large formatting-only changes, generated output, absolute paths, secrets, certificates, and unrelated changes.
 - Preserve Microsoft Terminal copyright, licenses, and third-party notices.
 - Keep commits focused and do not rewrite public history or force-push release work.
+- Update the root `CHANGELOG.md` in every source or documentation commit. After the source commit exists, immediately add its final SHA, link, summary, and checkpoint/release to the Wiki `Development-Changes.md` ledger and push the Wiki commit. Amend, rebase, squash, and GitHub merge SHAs must be corrected or added in the Wiki; a source commit is not complete until the matching Wiki commit is published.
+- Wiki-only synchronization commits do not require recursive Wiki entries. Report a Wiki push failure instead of claiming the workflow is complete, and do not add secret-bearing or expensive native-build CI to automate this policy.
+- Reuse suitable sanitized application screenshots from `HelloThisWorld/winterm-site` before adding documentation imagery. Do not recapture or regenerate an equivalent image. See `docs/development/changelog-policy.md`.
 
 ## Pull requests
 

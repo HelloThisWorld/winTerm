@@ -334,4 +334,46 @@
     <value>over 999</value>
     <comment>Will be read out by a screen reader when a search returns over 999 search results.</comment>
   </data>
+  <data name="CommandTimelineTitle.Text" xml:space="preserve">
+    <value>Command timeline</value>
+  </data>
+  <data name="CommandTimelineList.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Command timeline</value>
+  </data>
+  <data name="CommandTimelineHandle.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Open command timeline</value>
+  </data>
+  <data name="CommandTimelineHandle.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Open command timeline</value>
+  </data>
+  <data name="CommandTimelineOpen" xml:space="preserve">
+    <value>Open command timeline</value>
+  </data>
+  <data name="CommandTimelineClose" xml:space="preserve">
+    <value>Close command timeline</value>
+  </data>
+  <data name="CommandTimelineNoCommands" xml:space="preserve">
+    <value>No commands yet</value>
+  </data>
+  <data name="CommandTimelineUnavailable" xml:space="preserve">
+    <value>Command timeline unavailable</value>
+  </data>
+  <data name="CommandTimelineCommandUnavailable" xml:space="preserve">
+    <value>Command text unavailable</value>
+  </data>
+  <data name="CommandTimelineStatusRunning" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="CommandTimelineStatusSucceeded" xml:space="preserve">
+    <value>Succeeded</value>
+  </data>
+  <data name="CommandTimelineStatusFailed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="CommandTimelineStatusCancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="CommandTimelineStatusUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
 </root>

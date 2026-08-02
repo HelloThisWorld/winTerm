@@ -1,5 +1,79 @@
 # Changelog
 
+## 1.2.2 - 2026-08-02
+
+### Added
+
+- Added the pane-owned Command Timeline Phase 2 overlay with a compact
+  left-side handle. The overlay is layered above the terminal surface and does
+  not change pane dimensions, terminal rows or columns, swap-chain size, PTY
+  size, or padding.
+- Added a deterministic pure C++ navigation/presentation model that consumes
+  the Phase 1 index, materializes only visible entries, restores stable command
+  selection and visual slots, reconciles clear/eviction/reflow, and preserves
+  older-history browsing when new commands arrive.
+- Added keyboard-only Up, Down, Left, Right, and Escape navigation, hover and
+  click selection, page-edge one-in/one-out behavior, and pane-local
+  high-precision wheel/trackpad accumulation with complete-row settling.
+- Added list/list-item selection semantics, localized accessible names and
+  trustworthy status text, status glyphs that do not rely on color, themed
+  High Contrast presentation, and a no-animation Reduced Motion-safe path.
+- Added focused model, control source-boundary, settings, shortcut collision,
+  user-override, pane isolation, cleanup, warm-access, and privacy coverage.
+
+### Changed
+
+- Remapped the canonical defaults to `Ctrl+Tab` for the focused pane's Command
+  Timeline, `Ctrl+T` for the next tab, `Ctrl+Shift+T` for the previous tab, and
+  `Ctrl+Alt+T` for a new tab. Explicit user key bindings retain precedence.
+- Advanced engineering application and PowerShell module versions to `1.2.2`,
+  package/file versions to `1.2.2.0`, and the intended checkpoint tag to
+  `v1.2.2`; workspace, docking, shell, theme, update-manifest, package identity,
+  and signing-policy versions remain unchanged.
+- Established the canonical root changelog plus GitHub Wiki changelog and
+  per-source-commit development ledger, together with permanent contributor,
+  agent, and pull-request policy for keeping them synchronized.
+
+### Fixed
+
+- Replaced the README's stale `winterm-full-build.yml` Windows build badge with
+  a Windows CI badge and link for the existing `winterm-validation.yml`
+  workflow.
+
+### Checkpoint status
+
+- `v1.2.2` is an engineering checkpoint for Command Timeline Phase 2, not a
+  public GitHub Release. GitHub Latest and README public downloads remain on
+  v1.2.0. Command insertion, copy, paste, execution, output jumping, and search
+  remain reserved for later phases.
+
+## 1.2.1 - 2026-08-02
+
+### Added
+
+- Added the pane-owned Command Timeline Phase 1 data layer with stable
+  pane-scoped command IDs, native mark identity, an incremental OSC 133
+  lifecycle, trustworthy completion mapping, bounded command-text caching, and
+  no command-output cache or persistence.
+- Added cold bootstrap through native mark extents and warm access keyed by
+  `markRevision`, so unchanged reads do not rescan the TextBuffer.
+- Added clear, scrollback-eviction, reflow, and pane-close cleanup that retains
+  surviving native identities without duplicate entries or cross-pane state.
+- Added focused deterministic and native OSC component tests for lifecycle,
+  identity, capability, privacy, reflow, pruning, warm access, and cleanup.
+
+### Changed
+
+- Added bounded TAEF process-tree cleanup for hanging compiled tests and
+  label-gated CI classification so ordinary pull requests run quick validation
+  without an expensive native build; `build`, `delivery`, and `ci:full` remain
+  explicit maintainer-selected gates.
+
+### Checkpoint status
+
+- `v1.2.1` is an engineering checkpoint, not a public GitHub Release. It added
+  no Timeline overlay, input behavior, installer, Latest, or website change.
+
 ## 1.2.0 - 2026-08-01
 
 ### Added
