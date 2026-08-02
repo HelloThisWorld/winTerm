@@ -19,6 +19,11 @@ try
 
     foreach ($required in @(
         "- 'v*'",
+        'checkpoint-validation:',
+        'Validate engineering checkpoint',
+        '["v1.2.1","v1.2.2","v1.2.3","v1.2.4"]',
+        'verify-version.ps1 -RequireTag',
+        'test.ps1 -Suite Smoke',
         'contents: write',
         'id-token: write',
         'attestations: write',
@@ -54,6 +59,16 @@ try
         {
             throw "Release workflow is missing required boundary '$required'."
         }
+    }
+
+    $checkpointGuard = 'contains(fromJSON(''["v1.2.1","v1.2.2","v1.2.3","v1.2.4"]''), github.ref_name)'
+    if ([regex]::Matches($workflow, [regex]::Escape($checkpointGuard)).Count -ne 4)
+    {
+        throw 'Release workflow must guard the checkpoint validation and all three full release jobs.'
+    }
+    if ([regex]::Matches($workflow, [regex]::Escape("!$checkpointGuard")).Count -ne 3)
+    {
+        throw 'All full build, package, and publish jobs must explicitly reject checkpoint tags.'
     }
 
     if ($workflow -match '(?m)^\s*pull_request_target\s*:' -or

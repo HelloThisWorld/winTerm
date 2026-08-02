@@ -42,6 +42,9 @@ struct ScrollbarData
     // Prompts without an exit code haven't had a matching FTCS CommandEnd
     // called yet. Any value other than 0 is an error.
     std::optional<uint32_t> exitCode;
+    // Internal, in-memory identity for associating shell marks with pane-owned
+    // Command Timeline entries. This is never serialized or rendered.
+    uint64_t commandTimelineMarkId{ 0 };
     // Future consideration: stick the literal command as a string on here, if
     // we were given it with the 633;E sequence.
 };
