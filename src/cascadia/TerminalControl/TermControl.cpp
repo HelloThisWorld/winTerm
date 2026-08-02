@@ -30,6 +30,13 @@ using namespace winrt::Windows::Storage::Streams;
 // The updates are throttled to limit power usage.
 constexpr const auto ScrollBarUpdateInterval = std::chrono::milliseconds(8);
 
+// Coalesce bursts of OSC 133 and reflow notifications into one visible-list update.
+constexpr const auto CommandTimelineUpdateInterval = std::chrono::milliseconds(16);
+
+// A short debounce marks the end of high-precision wheel/trackpad input and
+// discards any partial-row remainder without running a continuous animation.
+constexpr const auto CommandTimelineWheelSettleInterval = std::chrono::milliseconds(140);
+
 // The minimum delay between updating the TSF input control.
 // This is already throttled primarily in the ControlCore, with a timeout of 100ms. We're adding another smaller one here, as the (potentially x-proc) call will come in off the UI thread
 constexpr const auto TsfRedrawInterval = std::chrono::milliseconds(8);
@@ -386,6 +393,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 }
             });
 
+        _updateCommandTimeline = std::make_shared<ThrottledFunc<>>(
+            dispatcher,
+            til::throttled_func_options{
+                .delay = CommandTimelineUpdateInterval,
+                .trailing = true,
+            },
+            [weakThis = get_weak()]() {
+                if (auto control{ weakThis.get() }; control && !control->_IsClosing() && control->_commandTimelineOpen)
+                {
+                    control->_refreshCommandTimeline();
+                }
+            });
+        _revokers.CommandTimelineChanged = _core.CommandTimelineChanged(winrt::auto_revoke, { get_weak(), &TermControl::_coreCommandTimelineChanged });
+
         // These events might all be triggered by the connection, but that
         // should be drained and closed before we complete destruction. So these
         // are safe.
@@ -399,6 +420,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         static constexpr auto AutoScrollUpdateInterval = std::chrono::microseconds(static_cast<int>(1.0 / 30.0 * 1000000));
         _autoScrollTimer.Interval(AutoScrollUpdateInterval);
         _autoScrollTimer.Tick({ get_weak(), &TermControl::_UpdateAutoScroll });
+
+        _commandTimelineWheelSettleTimer.Interval(CommandTimelineWheelSettleInterval);
+        _commandTimelineWheelSettleTimer.Tick({ get_weak(), &TermControl::_CommandTimelineWheelSettled });
 
         _ApplyUISettings();
 
@@ -1807,6 +1831,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return true;
         }
 
+        if (_tryHandleCommandTimelineKey(vkey, modifiers, keyDown))
+        {
+            return true;
+        }
+
         if (_TrySendKeyEvent(vkey, scanCode, modifiers, keyDown))
         {
             return true;
@@ -2146,6 +2175,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         const auto point = args.GetCurrentPoint(*this);
         auto delta = point.Properties().MouseWheelDelta();
+        if (!point.Properties().IsHorizontalMouseWheel() &&
+            _tryHandleCommandTimelineWheel(point.Position(), delta))
+        {
+            args.Handled(true);
+            return;
+        }
         auto result = _interactivity.MouseWheel(ControlKeyStates{ args.KeyModifiers() },
                                                 point.Properties().IsHorizontalMouseWheel() ?
                                                     Core::Point{ delta, 0 } :
@@ -2174,6 +2209,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                    const bool midButtonDown,
                                    const bool rightButtonDown)
     {
+        if (delta.Y != 0 && _tryHandleCommandTimelineWheel(location, delta.Y))
+        {
+            return true;
+        }
+
         const auto modifiers = _GetPressedModifierKeys();
 
         Control::MouseButtonState state{};
@@ -2182,6 +2222,361 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         WI_SetFlagIf(state, Control::MouseButtonState::IsRightButtonDown, rightButtonDown);
 
         return _interactivity.MouseWheel(modifiers, delta, _toTerminalOrigin(location), state);
+    }
+
+    bool TermControl::_tryHandleCommandTimelineKey(const WORD vkey,
+                                                   const ControlKeyStates modifiers,
+                                                   const bool keyDown)
+    {
+        if (vkey < _commandTimelineConsumedKeys.size() && !keyDown && _commandTimelineConsumedKeys[vkey])
+        {
+            _commandTimelineConsumedKeys[vkey] = false;
+            return true;
+        }
+
+        if (!_commandTimelineOpen ||
+            modifiers.IsCtrlPressed() || modifiers.IsAltPressed() ||
+            modifiers.IsShiftPressed() || modifiers.IsWinPressed())
+        {
+            return false;
+        }
+
+        std::optional<winTerm::CommandTimeline::NavigationAction> action;
+        switch (vkey)
+        {
+        case VK_UP:
+            action = winTerm::CommandTimeline::NavigationAction::Previous;
+            break;
+        case VK_DOWN:
+            action = winTerm::CommandTimeline::NavigationAction::Next;
+            break;
+        case VK_LEFT:
+            action = winTerm::CommandTimeline::NavigationAction::PageFirst;
+            break;
+        case VK_RIGHT:
+            action = winTerm::CommandTimeline::NavigationAction::PageLast;
+            break;
+        case VK_ESCAPE:
+            break;
+        default:
+            return false;
+        }
+
+        if (vkey < _commandTimelineConsumedKeys.size())
+        {
+            _commandTimelineConsumedKeys[vkey] = true;
+        }
+        if (!keyDown)
+        {
+            return true;
+        }
+
+        if (vkey == VK_ESCAPE)
+        {
+            _closeCommandTimeline(true);
+            return true;
+        }
+
+        try
+        {
+            const auto presentation = get_self<ControlCore>(_core)->NavigateCommandTimeline(*action);
+            _renderCommandTimeline(presentation);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+        }
+        return true;
+    }
+
+    bool TermControl::_tryHandleCommandTimelineWheel(const Windows::Foundation::Point& position,
+                                                     const int delta)
+    {
+        if (!_isPointOverCommandTimeline(position))
+        {
+            return false;
+        }
+
+        try
+        {
+            const auto presentation = get_self<ControlCore>(_core)->ScrollCommandTimeline(delta);
+            _renderCommandTimeline(presentation);
+            _commandTimelineWheelSettleTimer.Stop();
+            _commandTimelineWheelSettleTimer.Start();
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+        }
+        return true;
+    }
+
+    bool TermControl::_isPointOverCommandTimeline(const Windows::Foundation::Point& position) noexcept
+    {
+        if (!_commandTimelineOpen)
+        {
+            return false;
+        }
+
+        const auto overlay = CommandTimelineOverlay();
+        return position.X >= 0 && position.Y >= 0 &&
+               position.X < overlay.ActualWidth() && position.Y < overlay.ActualHeight();
+    }
+
+    void TermControl::_CommandTimelineWheelHandler(const IInspectable& /*sender*/,
+                                                   const PointerRoutedEventArgs& args)
+    {
+        if (_IsClosing())
+        {
+            return;
+        }
+
+        const auto point = args.GetCurrentPoint(*this);
+        if (!point.Properties().IsHorizontalMouseWheel() &&
+            _tryHandleCommandTimelineWheel(point.Position(), point.Properties().MouseWheelDelta()))
+        {
+            args.Handled(true);
+        }
+    }
+
+    void TermControl::_CommandTimelineHandleClick(const IInspectable& /*sender*/,
+                                                  const RoutedEventArgs& /*args*/)
+    {
+        ToggleCommandTimeline();
+    }
+
+    void TermControl::_CommandTimelineSelectionChanged(const IInspectable& /*sender*/,
+                                                       const Controls::SelectionChangedEventArgs& /*args*/)
+    {
+        if (_IsClosing() || !_commandTimelineOpen || _updatingCommandTimelineSelection)
+        {
+            return;
+        }
+
+        const auto selectedIndex = CommandTimelineList().SelectedIndex();
+        if (selectedIndex < 0)
+        {
+            return;
+        }
+
+        try
+        {
+            const auto presentation = get_self<ControlCore>(_core)->SelectCommandTimelineVisibleEntry(
+                gsl::narrow_cast<size_t>(selectedIndex));
+            _renderCommandTimeline(presentation);
+            Focus(FocusState::Programmatic);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+        }
+    }
+
+    void TermControl::_CommandTimelineSizeChanged(const IInspectable& /*sender*/,
+                                                  const SizeChangedEventArgs& args)
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return;
+        }
+
+        const auto width = std::clamp(static_cast<double>(args.NewSize().Width) * 0.42, 180.0, 360.0);
+        CommandTimelineOverlay().Width(std::max(1.0, std::min(width, static_cast<double>(args.NewSize().Width))));
+        _refreshCommandTimeline();
+    }
+
+    void TermControl::_CommandTimelineWheelSettled(const IInspectable& /*sender*/,
+                                                   const IInspectable& /*args*/)
+    {
+        _commandTimelineWheelSettleTimer.Stop();
+        if (_commandTimelineOpen && !_IsClosing())
+        {
+            try
+            {
+                get_self<ControlCore>(_core)->SettleCommandTimelineWheel();
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+                _closeCommandTimeline(true);
+            }
+        }
+    }
+
+    size_t TermControl::_commandTimelineVisibleCapacity() noexcept
+    {
+        constexpr double headerAndPaddingHeight{ 50.0 };
+        constexpr double entryHeight{ 48.0 };
+        const auto availableHeight = std::max(0.0, ActualHeight() - headerAndPaddingHeight);
+        return std::max<size_t>(1, static_cast<size_t>(availableHeight / entryHeight));
+    }
+
+    void TermControl::_refreshCommandTimeline()
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return;
+        }
+
+        try
+        {
+            const auto presentation = get_self<ControlCore>(_core)->RefreshCommandTimeline(_commandTimelineVisibleCapacity());
+            _renderCommandTimeline(presentation);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+        }
+    }
+
+    void TermControl::_renderCommandTimeline(const winTerm::CommandTimeline::CommandTimelinePresentationSnapshot& presentation)
+    {
+        if (!_commandTimelineOpen || _IsClosing() || !presentation.open)
+        {
+            return;
+        }
+
+        const auto list = CommandTimelineList();
+        _updatingCommandTimelineSelection = true;
+        list.SelectedIndex(-1);
+        list.Items().Clear();
+
+        if (presentation.visibleEntries.empty())
+        {
+            list.Visibility(Visibility::Collapsed);
+            CommandTimelineEmptyText().Text(
+                presentation.capability == winTerm::CommandTimeline::ShellIntegrationCapability::Limited ?
+                    RS_(L"CommandTimelineUnavailable") :
+                    RS_(L"CommandTimelineNoCommands"));
+            CommandTimelineEmptyText().Visibility(Visibility::Visible);
+            _updatingCommandTimelineSelection = false;
+            return;
+        }
+
+        list.Visibility(Visibility::Visible);
+        CommandTimelineEmptyText().Visibility(Visibility::Collapsed);
+
+        const auto statusPresentation = [](const winTerm::CommandTimeline::ExecutionResult result) {
+            using winTerm::CommandTimeline::ExecutionResult;
+            switch (result)
+            {
+            case ExecutionResult::Running:
+                return std::pair{ std::wstring{ L"\x25CF" }, std::wstring{ RS_(L"CommandTimelineStatusRunning") } };
+            case ExecutionResult::Succeeded:
+                return std::pair{ std::wstring{ L"\x2713" }, std::wstring{ RS_(L"CommandTimelineStatusSucceeded") } };
+            case ExecutionResult::Failed:
+                return std::pair{ std::wstring{ L"\x2715" }, std::wstring{ RS_(L"CommandTimelineStatusFailed") } };
+            case ExecutionResult::Cancelled:
+                return std::pair{ std::wstring{ L"\x25A0" }, std::wstring{ RS_(L"CommandTimelineStatusCancelled") } };
+            default:
+                return std::pair{ std::wstring{ L"?" }, std::wstring{ RS_(L"CommandTimelineStatusUnknown") } };
+            }
+        };
+
+        for (size_t slot = 0; slot < presentation.visibleEntries.size(); ++slot)
+        {
+            const auto& entry = presentation.visibleEntries[slot];
+            const auto [statusGlyph, statusLabel] = statusPresentation(entry.executionResult);
+            const auto commandText = entry.commandText.empty() ? std::wstring{ RS_(L"CommandTimelineCommandUnavailable") } : entry.commandText;
+
+            Controls::TextBlock command;
+            command.Text(winrt::hstring{ commandText });
+            command.TextTrimming(TextTrimming::CharacterEllipsis);
+            command.TextWrapping(TextWrapping::NoWrap);
+            command.MaxLines(1);
+
+            Controls::TextBlock status;
+            status.Text(winrt::hstring{ std::wstring{ statusGlyph } + L"  " + std::wstring{ statusLabel } });
+            status.FontSize(11);
+
+            Controls::StackPanel content;
+            content.Spacing(2);
+            content.Children().Append(command);
+            content.Children().Append(status);
+
+            Controls::ListViewItem item;
+            item.Content(content);
+            item.MinHeight(48);
+            item.Padding({ 8, 5, 8, 5 });
+            item.HorizontalContentAlignment(HorizontalAlignment::Stretch);
+            item.IsTabStop(false);
+
+            const auto accessibleName = commandText + L", " + std::wstring{ statusLabel };
+            Windows::UI::Xaml::Automation::AutomationProperties::SetName(item, winrt::hstring{ accessibleName });
+            Windows::UI::Xaml::Automation::AutomationProperties::SetPositionInSet(
+                item,
+                gsl::narrow_cast<int>(presentation.firstVisibleIndex + slot + 1));
+            Windows::UI::Xaml::Automation::AutomationProperties::SetSizeOfSet(
+                item,
+                gsl::narrow_cast<int>(presentation.totalEntryCount));
+
+            item.PointerEntered([weakThis = get_weak(), slot](const auto&, const auto&) {
+                if (auto control{ weakThis.get() };
+                    control && !control->_IsClosing() && control->_commandTimelineOpen &&
+                    control->CommandTimelineList().SelectedIndex() != gsl::narrow_cast<int>(slot))
+                {
+                    try
+                    {
+                        const auto updated = get_self<ControlCore>(control->_core)->SelectCommandTimelineVisibleEntry(slot);
+                        control->_renderCommandTimeline(updated);
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                        control->_closeCommandTimeline(true);
+                    }
+                }
+            });
+            list.Items().Append(item);
+        }
+
+        list.SelectedIndex(gsl::narrow_cast<int>(presentation.selectedVisualSlot));
+        _updatingCommandTimelineSelection = false;
+    }
+
+    void TermControl::_coreCommandTimelineChanged(const IInspectable& /*sender*/,
+                                                  const IInspectable& /*args*/)
+    {
+        if (_updateCommandTimeline)
+        {
+            _updateCommandTimeline->Run();
+        }
+    }
+
+    void TermControl::_closeCommandTimeline(const bool returnFocus)
+    {
+        _commandTimelineWheelSettleTimer.Stop();
+        if (_core)
+        {
+            try
+            {
+                get_self<ControlCore>(_core)->CloseCommandTimelineOverlay();
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+            }
+        }
+
+        _commandTimelineOpen = false;
+        _updatingCommandTimelineSelection = true;
+        CommandTimelineList().Items().Clear();
+        CommandTimelineList().SelectedIndex(-1);
+        _updatingCommandTimelineSelection = false;
+        CommandTimelineEmptyText().Visibility(Visibility::Collapsed);
+        CommandTimelineOverlay().Visibility(Visibility::Collapsed);
+        Windows::UI::Xaml::Automation::AutomationProperties::SetName(CommandTimelineHandle(), RS_(L"CommandTimelineOpen"));
+        Controls::ToolTipService::SetToolTip(CommandTimelineHandle(), box_value(RS_(L"CommandTimelineOpen")));
+        CommandTimelineHandleIcon().Glyph(L"\xE76C");
+
+        if (returnFocus && !_IsClosing())
+        {
+            Focus(FocusState::Programmatic);
+        }
     }
 
     // Method Description:
@@ -2637,6 +3032,48 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _core.OpenCWD();
     }
 
+    bool TermControl::ToggleCommandTimeline()
+    {
+        if (_IsClosing())
+        {
+            return false;
+        }
+
+        if (_commandTimelineOpen)
+        {
+            _closeCommandTimeline(true);
+            return true;
+        }
+
+        try
+        {
+            _commandTimelineOpen = true;
+            CommandTimelineOverlay().Visibility(Visibility::Visible);
+            CommandTimelineHandle().Margin({ 8, 0, 0, 0 });
+            Windows::UI::Xaml::Automation::AutomationProperties::SetName(CommandTimelineHandle(), RS_(L"CommandTimelineClose"));
+            Controls::ToolTipService::SetToolTip(CommandTimelineHandle(), box_value(RS_(L"CommandTimelineClose")));
+            CommandTimelineHandleIcon().Glyph(L"\xE76B");
+
+            const auto width = std::clamp(ActualWidth() * 0.42, 180.0, 360.0);
+            CommandTimelineOverlay().Width(std::max(1.0, std::min(width, ActualWidth())));
+            const auto presentation = get_self<ControlCore>(_core)->OpenCommandTimeline(_commandTimelineVisibleCapacity());
+            _renderCommandTimeline(presentation);
+            Focus(FocusState::Programmatic);
+            return true;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+            return false;
+        }
+    }
+
+    bool TermControl::CommandTimelineOpen() const noexcept
+    {
+        return _commandTimelineOpen;
+    }
+
     void TermControl::Close()
     {
         if (!_IsClosing())
@@ -2658,7 +3095,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             // In turn, we leak TermControl instances. This results in constant HWND messages
             // while the thread is supposed to be idle. Stop these timers avoids this.
             _autoScrollTimer.Stop();
+            _commandTimelineWheelSettleTimer.Stop();
             _bellLightTimer.Stop();
+
+            _closeCommandTimeline(false);
 
             // This is absolutely crucial, as the TSF code tries to hold a strong reference to _tsfDataProvider,
             // but right now _tsfDataProvider implements IUnknown as a no-op. This ensures that TSF stops referencing us.

@@ -16,6 +16,9 @@ List exact commands, environments, results, and any tests that were not availabl
 - [ ] Tests were added or updated where appropriate.
 - [ ] All tests claimed above actually ran and passed.
 - [ ] User-facing behavior and limitations are documented in this repository.
+- [ ] This source/docs commit updates the root `CHANGELOG.md`.
+- [ ] The Wiki `Development-Changes.md` ledger has been pushed with the final source SHA, link, summary, and checkpoint/release.
+- [ ] Documentation screenshots reuse a suitable existing sanitized `winterm-site` asset, or no screenshot was added.
 - [ ] Version or schema changes include compatibility and migration notes.
 - [ ] Package identity, `winterm.exe`, and Microsoft Terminal coexistence remain isolated.
 - [ ] No command text, terminal output, clipboard content, credentials, or private paths are logged.

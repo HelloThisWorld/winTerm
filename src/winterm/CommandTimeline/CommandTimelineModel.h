@@ -97,6 +97,93 @@ namespace winTerm::CommandTimeline
         bool closed{ false };
     };
 
+    enum class NavigationAction : uint8_t
+    {
+        Previous,
+        Next,
+        PageFirst,
+        PageLast,
+    };
+
+    struct CommandTimelineVisibleEntry
+    {
+        CommandId id{};
+        std::wstring commandText;
+        ExecutionResult executionResult{ ExecutionResult::Unknown };
+        bool selected{ false };
+    };
+
+    struct CommandTimelinePresentationSnapshot
+    {
+        std::vector<CommandTimelineVisibleEntry> visibleEntries;
+        ShellIntegrationCapability capability{ ShellIntegrationCapability::Unknown };
+        size_t totalEntryCount{};
+        size_t firstVisibleIndex{};
+        size_t selectedVisualSlot{};
+        int wheelDeltaRemainder{};
+        bool open{ false };
+        bool wheelSettlePending{ false };
+    };
+
+    class CommandTimelineNavigationModel final
+    {
+    public:
+        static constexpr int DefaultWheelDeltaPerEntry = 120;
+
+        CommandTimelinePresentationSnapshot Open(std::span<const CommandTimelineEntry> entries,
+                                                 CommandTimelineViewState& viewState,
+                                                 ShellIntegrationCapability capability,
+                                                 size_t visibleCapacity);
+        CommandTimelinePresentationSnapshot Reconcile(std::span<const CommandTimelineEntry> entries,
+                                                      CommandTimelineViewState& viewState,
+                                                      ShellIntegrationCapability capability,
+                                                      size_t visibleCapacity);
+        CommandTimelinePresentationSnapshot Navigate(NavigationAction action,
+                                                     std::span<const CommandTimelineEntry> entries,
+                                                     CommandTimelineViewState& viewState,
+                                                     ShellIntegrationCapability capability);
+        CommandTimelinePresentationSnapshot SelectVisibleEntry(size_t visualSlot,
+                                                               std::span<const CommandTimelineEntry> entries,
+                                                               CommandTimelineViewState& viewState,
+                                                               ShellIntegrationCapability capability);
+        CommandTimelinePresentationSnapshot ApplyWheelDelta(int delta,
+                                                            std::span<const CommandTimelineEntry> entries,
+                                                            CommandTimelineViewState& viewState,
+                                                            ShellIntegrationCapability capability,
+                                                            int deltaPerEntry = DefaultWheelDeltaPerEntry);
+        void SettleWheel() noexcept;
+        void Close() noexcept;
+
+        bool IsOpen() const noexcept;
+        bool WheelSettlePending() const noexcept;
+        int WheelDeltaRemainder() const noexcept;
+        size_t VisibleCapacity() const noexcept;
+
+    private:
+        void _reconcile(std::span<const CommandTimelineEntry> entries,
+                        CommandTimelineViewState& viewState,
+                        bool allowFollowLatest);
+        bool _moveSelection(NavigationAction action,
+                            std::span<const CommandTimelineEntry> entries);
+        void _syncViewState(std::span<const CommandTimelineEntry> entries,
+                            CommandTimelineViewState& viewState) const;
+        CommandTimelinePresentationSnapshot _snapshot(std::span<const CommandTimelineEntry> entries,
+                                                      ShellIntegrationCapability capability) const;
+        static std::optional<size_t> _findCommand(std::span<const CommandTimelineEntry> entries,
+                                                  const CommandId& id) noexcept;
+        static size_t _findNearestCommand(std::span<const CommandTimelineEntry> entries,
+                                          const CommandId& id) noexcept;
+        static ExecutionResult _effectiveResult(const CommandTimelineEntry& entry) noexcept;
+
+        std::optional<size_t> _selectedIndex;
+        std::optional<CommandId> _lastLatestCommandId;
+        size_t _firstVisibleIndex{};
+        size_t _visibleCapacity{ 1 };
+        int _wheelDeltaRemainder{};
+        bool _open{ false };
+        bool _wheelSettlePending{ false };
+    };
+
     struct NativeMarkSnapshot
     {
         uint64_t nativeMarkId{};

@@ -292,7 +292,7 @@ function Test-ShellExperienceFoundations
     }
 
     $manifest = Import-PowerShellDataFile -LiteralPath $moduleManifest
-    if ($manifest.ModuleVersion -ne '1.2.1' -or
+    if ($manifest.ModuleVersion -ne '1.2.2' -or
         $manifest.PrivateData.PSData.Prerelease -ne '' -or
         $manifest.PowerShellVersion -ne '5.1')
     {
@@ -455,6 +455,12 @@ try
     if (-not $?)
     {
         throw 'Visual Progress source validation failed.'
+    }
+
+    & (Join-Path $PSScriptRoot 'test-command-timeline.ps1')
+    if (-not $?)
+    {
+        throw 'Command Timeline Phase 2 source validation failed.'
     }
 
     & (Join-Path $PSScriptRoot 'test-diagnostics.ps1')

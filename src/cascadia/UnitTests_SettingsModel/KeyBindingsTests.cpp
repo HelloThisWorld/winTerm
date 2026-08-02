@@ -41,6 +41,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(TestGetKeyBindingForAction);
         TEST_METHOD(KeybindingsWithoutVkey);
         TEST_METHOD(ControlCIsReservedForTerminalInput);
+        TEST_METHOD(CommandTimelineDefaultShortcutsAndUserOverride);
     };
 
     void KeyBindingsTests::KeyChords()
@@ -151,6 +152,37 @@ namespace SettingsModelUnitTests
         VERIFY_IS_FALSE(actionMap->_KeyMap.contains(controlC));
         VERIFY_IS_TRUE(actionMap->_KeyMap.contains(controlShiftC));
         VERIFY_IS_TRUE(actionMap->_KeyMap.contains(controlV));
+    }
+
+    void KeyBindingsTests::CommandTimelineDefaultShortcutsAndUserOverride()
+    {
+        const auto settings = CascadiaSettings::LoadDefaults();
+        const auto actionMap = settings.ActionMap();
+        const auto verifyAction = [&](const KeyChord& chord, const ShortcutAction expected) {
+            const auto command = actionMap.GetActionByKeyChord(chord);
+            VERIFY_IS_NOT_NULL(command);
+            VERIFY_ARE_EQUAL(static_cast<int>(expected), static_cast<int>(command.ActionAndArgs().Action()));
+        };
+
+        verifyAction(KeyChord{ true, false, false, false, static_cast<int>('T'), 0 }, ShortcutAction::NextTab);
+        verifyAction(KeyChord{ true, false, true, false, static_cast<int>('T'), 0 }, ShortcutAction::PrevTab);
+        verifyAction(KeyChord{ true, true, false, false, static_cast<int>('T'), 0 }, ShortcutAction::NewTab);
+        verifyAction(KeyChord{ true, false, false, false, VK_TAB, 0 }, ShortcutAction::ToggleCommandTimeline);
+        VERIFY_IS_NULL(actionMap.GetActionByKeyChord(KeyChord{ true, false, true, false, VK_TAB, 0 }));
+
+        auto layered = winrt::make_self<implementation::ActionMap>();
+        layered->LayerJson(VerifyParseSucceeded(R"([
+            { "command": "toggleCommandTimeline", "keys": "ctrl+tab" }
+        ])"),
+                           OriginTag::InBox);
+        layered->LayerJson(VerifyParseSucceeded(R"([
+            { "command": "paste", "keys": "ctrl+tab" }
+        ])"),
+                           OriginTag::User);
+        const auto overridden = layered->GetActionByKeyChord(KeyChord{ true, false, false, false, VK_TAB, 0 });
+        VERIFY_IS_NOT_NULL(overridden);
+        VERIFY_ARE_EQUAL(static_cast<int>(ShortcutAction::PasteText),
+                         static_cast<int>(overridden.ActionAndArgs().Action()));
     }
 
     void KeyBindingsTests::LayerKeybindings()

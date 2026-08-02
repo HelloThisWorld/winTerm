@@ -1,7 +1,7 @@
 # winTerm
 
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
-[![Windows build](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-full-build.yml)
+[![Windows CI](https://img.shields.io/github/actions/workflow/status/HelloThisWorld/winTerm/winterm-validation.yml?branch=main&label=Windows%20CI)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Latest release](https://img.shields.io/github/v/release/HelloThisWorld/winTerm?display_name=tag&label=release)](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
 ## Download the latest winTerm release

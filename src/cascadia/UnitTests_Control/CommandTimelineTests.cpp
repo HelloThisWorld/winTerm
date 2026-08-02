@@ -30,6 +30,16 @@ namespace ControlUnitTests
         TEST_METHOD(CommandTextCacheIsBoundedAndOutputIsAbsent);
         TEST_METHOD(CloseClearsOwnedStateAndRejectsCallbacks);
         TEST_METHOD(NativeOscLifecycleFeedsPaneTimeline);
+        TEST_METHOD(NavigationEmptyOpenClosePreservesNoFakeEntry);
+        TEST_METHOD(NavigationInitialOpenAndRestoreSelection);
+        TEST_METHOD(NavigationMovesOneEntryAndDoesNotWrap);
+        TEST_METHOD(NavigationPageEdgesMoveOneInOneOut);
+        TEST_METHOD(NavigationPageFirstAndLastStayWithinViewport);
+        TEST_METHOD(NavigationHoverAndClickOnlySelectVisibleEntry);
+        TEST_METHOD(NavigationWheelAccumulatesReversesAndSettles);
+        TEST_METHOD(NavigationReconcilesRemovalReflowAndNewCommands);
+        TEST_METHOD(NavigationStateIsPaneLocalAndRepeatedCloseIsSafe);
+        TEST_METHOD(NavigationVisibleProjectionIsBoundedAndNeutralizesLimitedResults);
 
         TEST_CLASS_SETUP(ModuleSetup)
         {
@@ -354,6 +364,14 @@ namespace ControlUnitTests
             return entry.id == preservedId;
         }));
 
+        const auto opened = core->OpenCommandTimeline(2);
+        VERIFY_ARE_EQUAL(size_t{ 2 }, opened.visibleEntries.size());
+        core->CloseCommandTimelineOverlay();
+        const auto reopened = core->OpenCommandTimeline(2);
+        VERIFY_ARE_EQUAL(size_t{ 2 }, reopened.visibleEntries.size());
+        VERIFY_ARE_EQUAL(size_t{ 1 }, core->CommandTimelineSnapshot().bootstrapScanCount);
+        core->CloseCommandTimelineOverlay();
+
         CommandTimelineViewState viewState;
         viewState.selectedCommandId = resized.entries.back().id;
         viewState.visibleNativeAnchor = resized.entries.back().nativeMarkId;
@@ -378,5 +396,269 @@ namespace ControlUnitTests
         connection = nullptr;
         settings = nullptr;
         cleanup.release();
+    }
+
+    void CommandTimelineTests::NavigationEmptyOpenClosePreservesNoFakeEntry()
+    {
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        const std::vector<CommandTimelineEntry> entries;
+
+        const auto opened = navigation.Open(entries, viewState, ShellIntegrationCapability::Unknown, 0);
+        VERIFY_IS_TRUE(opened.open);
+        VERIFY_IS_TRUE(opened.visibleEntries.empty());
+        VERIFY_ARE_EQUAL(size_t{ 1 }, navigation.VisibleCapacity());
+        VERIFY_IS_FALSE(viewState.selectedCommandId.has_value());
+
+        navigation.Close();
+        navigation.Close();
+        VERIFY_IS_FALSE(navigation.IsOpen());
+        VERIFY_IS_FALSE(navigation.WheelSettlePending());
+    }
+
+    void CommandTimelineTests::NavigationInitialOpenAndRestoreSelection()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 5; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, std::to_wstring(nativeMark), 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        auto latest = navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        VERIFY_ARE_EQUAL(uint64_t{ 5 }, viewState.selectedCommandId->sequence);
+        VERIFY_ARE_EQUAL(size_t{ 2 }, *viewState.selectedVisualSlot);
+        VERIFY_ARE_EQUAL(size_t{ 3 }, latest.visibleEntries.size());
+
+        navigation.Close();
+        viewState.selectedCommandId = index.Entries()[3].id;
+        viewState.visibleNativeAnchor = index.Entries()[2].nativeMarkId;
+        viewState.selectedVisualSlot = 1;
+        const auto restored = navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        VERIFY_ARE_EQUAL(uint64_t{ 4 }, viewState.selectedCommandId->sequence);
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, restored.visibleEntries.front().id.sequence);
+        VERIFY_ARE_EQUAL(size_t{ 1 }, restored.selectedVisualSlot);
+    }
+
+    void CommandTimelineTests::NavigationMovesOneEntryAndDoesNotWrap()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 4; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, L"command", 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 2);
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.selectedCommandId->sequence);
+
+        for (size_t step = 0; step < 5; ++step)
+        {
+            navigation.Navigate(NavigationAction::Next, index.Entries(), viewState, index.Capability());
+        }
+        VERIFY_ARE_EQUAL(uint64_t{ 4 }, viewState.selectedCommandId->sequence);
+    }
+
+    void CommandTimelineTests::NavigationPageEdgesMoveOneInOneOut()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 6; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, L"command", 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        viewState.selectedCommandId = index.Entries()[2].id;
+        viewState.visibleNativeAnchor = index.Entries()[2].nativeMarkId;
+        viewState.selectedVisualSlot = 0;
+        const auto beforeUp = navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, beforeUp.visibleEntries.front().id.sequence);
+        const auto afterUp = navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 3 }, afterUp.visibleEntries.size());
+        VERIFY_ARE_EQUAL(uint64_t{ 2 }, afterUp.visibleEntries.front().id.sequence);
+        VERIFY_ARE_EQUAL(uint64_t{ 4 }, afterUp.visibleEntries.back().id.sequence);
+
+        viewState.selectedCommandId = index.Entries()[3].id;
+        viewState.visibleNativeAnchor = index.Entries()[1].nativeMarkId;
+        viewState.selectedVisualSlot = 2;
+        navigation.Close();
+        navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        const auto afterDown = navigation.Navigate(NavigationAction::Next, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 3 }, afterDown.visibleEntries.size());
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, afterDown.visibleEntries.front().id.sequence);
+        VERIFY_ARE_EQUAL(uint64_t{ 5 }, afterDown.visibleEntries.back().id.sequence);
+    }
+
+    void CommandTimelineTests::NavigationPageFirstAndLastStayWithinViewport()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 5; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, L"command", 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        navigation.Navigate(NavigationAction::PageFirst, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+        navigation.Navigate(NavigationAction::PageLast, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 5 }, viewState.selectedCommandId->sequence);
+    }
+
+    void CommandTimelineTests::NavigationHoverAndClickOnlySelectVisibleEntry()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"first", 0);
+        Execute(index, 2, revision, L"second", 0);
+        Execute(index, 3, revision, L"third", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        const auto hovered = navigation.SelectVisibleEntry(0, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.selectedCommandId->sequence);
+        VERIFY_IS_TRUE(hovered.visibleEntries[0].selected);
+        VERIFY_IS_FALSE(viewState.loadedIntoInput);
+        VERIFY_ARE_EQUAL(uint64_t{ 0 }, viewState.executionGeneration);
+
+        navigation.SelectVisibleEntry(2, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+        VERIFY_IS_FALSE(viewState.loadedIntoInput);
+    }
+
+    void CommandTimelineTests::NavigationWheelAccumulatesReversesAndSettles()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 5; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, L"command", 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        navigation.ApplyWheelDelta(60, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 5 }, viewState.selectedCommandId->sequence);
+        VERIFY_ARE_EQUAL(60, navigation.WheelDeltaRemainder());
+
+        navigation.ApplyWheelDelta(-30, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(30, navigation.WheelDeltaRemainder());
+        navigation.ApplyWheelDelta(90, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 4 }, viewState.selectedCommandId->sequence);
+        VERIFY_ARE_EQUAL(0, navigation.WheelDeltaRemainder());
+        navigation.ApplyWheelDelta(-1, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(-1, navigation.WheelDeltaRemainder());
+        VERIFY_IS_TRUE(navigation.WheelSettlePending());
+        navigation.SettleWheel();
+        VERIFY_ARE_EQUAL(0, navigation.WheelDeltaRemainder());
+        VERIFY_IS_FALSE(navigation.WheelSettlePending());
+
+        navigation.ApplyWheelDelta(360, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.selectedCommandId->sequence);
+    }
+
+    void CommandTimelineTests::NavigationReconcilesRemovalReflowAndNewCommands()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 4; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, L"command", 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 2);
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+
+        Execute(index, 5, revision, L"new", 0);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 2);
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+
+        const std::array<uint64_t, 1> removeSelected{ 3 };
+        index.InvalidateNativeMarks(removeSelected, ++revision);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 2);
+        VERIFY_ARE_EQUAL(uint64_t{ 2 }, viewState.selectedCommandId->sequence);
+
+        viewState.selectedCommandId = index.Entries().back().id;
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 2);
+        Execute(index, 6, revision, L"latest", 0);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 2);
+        VERIFY_ARE_EQUAL(uint64_t{ 6 }, viewState.selectedCommandId->sequence);
+
+        const auto stableId = viewState.selectedCommandId;
+        const std::array<uint64_t, 4> allSurvive{ 1, 2, 4, 5 };
+        index.ReconcileReflow(allSurvive, ++revision);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 2);
+        VERIFY_IS_TRUE(viewState.selectedCommandId.has_value());
+        VERIFY_ARE_NOT_EQUAL(stableId->sequence, viewState.selectedCommandId->sequence);
+    }
+
+    void CommandTimelineTests::NavigationStateIsPaneLocalAndRepeatedCloseIsSafe()
+    {
+        CommandTimelineIndex first{ PaneOne };
+        CommandTimelineIndex second{ PaneTwo };
+        uint64_t firstRevision = 0;
+        uint64_t secondRevision = 0;
+        Execute(first, 1, firstRevision, L"same", 0);
+        Execute(first, 2, firstRevision, L"same", 0);
+        Execute(second, 1, secondRevision, L"same", 0);
+        Execute(second, 2, secondRevision, L"same", 0);
+
+        CommandTimelineNavigationModel firstNavigation;
+        CommandTimelineNavigationModel secondNavigation;
+        CommandTimelineViewState firstView;
+        CommandTimelineViewState secondView;
+        firstNavigation.Open(first.Entries(), firstView, first.Capability(), 1);
+        secondNavigation.Open(second.Entries(), secondView, second.Capability(), 1);
+        firstNavigation.ApplyWheelDelta(60, first.Entries(), firstView, first.Capability());
+        VERIFY_ARE_EQUAL(60, firstNavigation.WheelDeltaRemainder());
+        VERIFY_ARE_EQUAL(0, secondNavigation.WheelDeltaRemainder());
+
+        const auto preserved = firstView.selectedCommandId;
+        firstNavigation.Close();
+        firstNavigation.Close();
+        VERIFY_IS_TRUE(firstView.selectedCommandId == preserved);
+        VERIFY_IS_TRUE(secondNavigation.IsOpen());
+    }
+
+    void CommandTimelineTests::NavigationVisibleProjectionIsBoundedAndNeutralizesLimitedResults()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t nativeMark = 1; nativeMark <= 10; ++nativeMark)
+        {
+            Execute(index, nativeMark, revision, L"same command", 0);
+        }
+
+        auto entries = index.Entries();
+        entries.back().shellIntegrationCapability = ShellIntegrationCapability::Limited;
+        entries.back().executionResult = ExecutionResult::Succeeded;
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        const auto presentation = navigation.Open(entries, viewState, ShellIntegrationCapability::Limited, 2);
+        VERIFY_ARE_EQUAL(size_t{ 2 }, presentation.visibleEntries.size());
+        VERIFY_ARE_EQUAL(std::wstring{ L"same command" }, presentation.visibleEntries[0].commandText);
+        VERIFY_ARE_EQUAL(std::wstring{ L"same command" }, presentation.visibleEntries[1].commandText);
+        VERIFY_ARE_NOT_EQUAL(presentation.visibleEntries[0].id.sequence, presentation.visibleEntries[1].id.sequence);
+        VERIFY_ARE_EQUAL(static_cast<int>(ExecutionResult::Unknown),
+                         static_cast<int>(presentation.visibleEntries[1].executionResult));
+        VERIFY_ARE_EQUAL(uint64_t{ 10 }, presentation.visibleEntries[1].id.sequence);
     }
 }

@@ -1666,6 +1666,72 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
+    winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ControlCore::OpenCommandTimeline(const size_t visibleCapacity)
+    {
+        const auto lock = _terminal->LockForWriting();
+        _ensureCommandTimelineBootstrap();
+        return _commandTimelineNavigation.Open(
+            _commandTimelineIndex->Entries(),
+            _commandTimelineViewState,
+            _commandTimelineIndex->Capability(),
+            visibleCapacity);
+    }
+
+    winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ControlCore::RefreshCommandTimeline(const size_t visibleCapacity)
+    {
+        const auto lock = _terminal->LockForWriting();
+        _ensureCommandTimelineBootstrap();
+        return _commandTimelineNavigation.Reconcile(
+            _commandTimelineIndex->Entries(),
+            _commandTimelineViewState,
+            _commandTimelineIndex->Capability(),
+            visibleCapacity);
+    }
+
+    winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ControlCore::NavigateCommandTimeline(
+        const winTerm::CommandTimeline::NavigationAction action)
+    {
+        const auto lock = _terminal->LockForWriting();
+        return _commandTimelineNavigation.Navigate(
+            action,
+            _commandTimelineIndex->Entries(),
+            _commandTimelineViewState,
+            _commandTimelineIndex->Capability());
+    }
+
+    winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ControlCore::SelectCommandTimelineVisibleEntry(
+        const size_t visualSlot)
+    {
+        const auto lock = _terminal->LockForWriting();
+        return _commandTimelineNavigation.SelectVisibleEntry(
+            visualSlot,
+            _commandTimelineIndex->Entries(),
+            _commandTimelineViewState,
+            _commandTimelineIndex->Capability());
+    }
+
+    winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ControlCore::ScrollCommandTimeline(const int wheelDelta)
+    {
+        const auto lock = _terminal->LockForWriting();
+        return _commandTimelineNavigation.ApplyWheelDelta(
+            wheelDelta,
+            _commandTimelineIndex->Entries(),
+            _commandTimelineViewState,
+            _commandTimelineIndex->Capability());
+    }
+
+    void ControlCore::SettleCommandTimelineWheel()
+    {
+        const auto lock = _terminal->LockForWriting();
+        _commandTimelineNavigation.SettleWheel();
+    }
+
+    void ControlCore::CloseCommandTimelineOverlay()
+    {
+        const auto lock = _terminal->LockForWriting();
+        _commandTimelineNavigation.Close();
+    }
+
     int ControlCore::ScrollOffset()
     {
         const auto lock = _terminal->LockForReading();
@@ -1766,6 +1832,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         _terminalCommandTimelineBufferChanged();
         _ensureCommandTimelineBootstrap();
+        const auto timelineRevisionBefore = _commandTimelineIndex->Revision();
 
         const auto nativeMarkId = _terminal->GetCurrentCommandTimelineMarkIdentity();
         const auto shellIntegrationState = static_cast<ShellIntegrationMarkKind>(_terminal->GetShellIntegrationState());
@@ -1806,6 +1873,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             });
         }
 
+        if (_commandTimelineIndex->Revision() != timelineRevisionBefore)
+        {
+            CommandTimelineChanged.raise(*this, nullptr);
+        }
+
         // OSC 133 prompt is the per-pane ownership boundary. Defer parser
         // cleanup to the next output callback so this terminal callback never
         // waits on the recognition mutex while the terminal lock is held.
@@ -1829,11 +1901,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return;
         }
 
+        const auto timelineRevisionBefore = _commandTimelineIndex->Revision();
         const auto nativeRevision = _terminal->GetCommandTimelineMarkRevision();
         _commandTimelineIndex->InvalidateNativeMarks(invalidated, nativeRevision);
         if (reflow.has_value())
         {
             _commandTimelineIndex->ReconcileReflow(*reflow, nativeRevision);
+        }
+        if (_commandTimelineIndex->Revision() != timelineRevisionBefore)
+        {
+            CommandTimelineChanged.raise(*this, nullptr);
         }
     }
 
@@ -2047,6 +2124,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             _commandTimelineIndex->Close();
         }
+        _commandTimelineNavigation.Close();
         _commandTimelineViewState.Reset();
     }
 

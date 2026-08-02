@@ -63,6 +63,7 @@ static constexpr std::string_view ToggleFullscreenKey{ "toggleFullscreen" };
 static constexpr std::string_view SetFullScreenKey{ "setFullScreen" };
 static constexpr std::string_view SetMaximizedKey{ "setMaximized" };
 static constexpr std::string_view TogglePaneZoomKey{ "togglePaneZoom" };
+static constexpr std::string_view ToggleCommandTimelineKey{ "toggleCommandTimeline" };
 static constexpr std::string_view ToggleSplitOrientationKey{ "toggleSplitOrientation" };
 static constexpr std::string_view LegacyToggleRetroEffectKey{ "toggleRetroEffect" };
 static constexpr std::string_view ToggleShaderEffectsKey{ "toggleShaderEffects" };
