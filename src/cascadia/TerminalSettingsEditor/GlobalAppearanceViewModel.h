@@ -51,6 +51,8 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, VisualProgressEnabled);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, VisualProgressRecognizeCliProgress);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, VisualProgressReplaceRecognizedOutput);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, CommandTimelineEnabled);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(_GlobalSettings, CommandTimelineHistoryLimit);
 
     private:
         Model::GlobalAppSettings _GlobalSettings;

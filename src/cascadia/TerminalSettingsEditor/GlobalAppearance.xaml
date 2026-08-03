@@ -211,5 +211,27 @@
                           IsOn="{x:Bind ViewModel.VisualProgressReplaceRecognizedOutput, Mode=TwoWay}"
                           Style="{StaticResource ToggleSwitchInExpanderStyle}" />
         </local:SettingContainer>
+
+        <TextBlock x:Uid="Globals_CommandTimelineHeader"
+                   Style="{StaticResource TextBlockSubHeaderStyle}" />
+
+        <local:SettingContainer x:Name="CommandTimelineEnabled"
+                                x:Uid="Globals_CommandTimelineEnabled">
+            <ToggleSwitch IsOn="{x:Bind ViewModel.CommandTimelineEnabled, Mode=TwoWay}"
+                          Style="{StaticResource ToggleSwitchInExpanderStyle}" />
+        </local:SettingContainer>
+
+        <local:SettingContainer x:Name="CommandTimelineHistoryLimit"
+                                x:Uid="Globals_CommandTimelineHistoryLimit">
+            <muxc:NumberBox AutomationProperties.AccessibilityView="Content"
+                            IsEnabled="{x:Bind ViewModel.CommandTimelineEnabled, Mode=OneWay}"
+                            LargeChange="100"
+                            Maximum="5000"
+                            Minimum="50"
+                            SmallChange="10"
+                            SpinButtonPlacementMode="Compact"
+                            Style="{StaticResource NumberBoxSettingStyle}"
+                            Value="{x:Bind ViewModel.CommandTimelineHistoryLimit, Mode=TwoWay}" />
+        </local:SettingContainer>
     </StackPanel>
 </Page>

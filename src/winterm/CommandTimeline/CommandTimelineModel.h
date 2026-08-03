@@ -19,6 +19,25 @@ namespace winTerm::CommandTimeline
 {
     inline constexpr size_t DefaultMaxCachedCommandText = 4096;
 
+    // Phase 4 search and history bounds. The query cap is expressed in UTF-16
+    // code units because that is what the input box and the cached command text
+    // are measured in.
+    inline constexpr size_t MaxCommandTimelineQueryLength = 256;
+    inline constexpr size_t DefaultCommandTimelineHistoryLimit = 500;
+    inline constexpr size_t MinCommandTimelineHistoryLimit = 50;
+    inline constexpr size_t MaxCommandTimelineHistoryLimit = 5000;
+
+    // Truncates a query to MaxCommandTimelineQueryLength without ever leaving a
+    // lone surrogate behind.
+    std::wstring NormalizeCommandTimelineQuery(std::wstring_view query);
+
+    // Literal, case-insensitive substring match. No regex, no fuzzy matching,
+    // and only ever applied to cached command text.
+    bool CommandTimelineQueryMatches(std::wstring_view commandText, std::wstring_view query) noexcept;
+
+    // Clamps a configured history limit into the supported range.
+    size_t ClampCommandTimelineHistoryLimit(int64_t historyLimit) noexcept;
+
     enum class CommandLifecycleState : uint8_t
     {
         Command,
@@ -114,15 +133,30 @@ namespace winTerm::CommandTimeline
         bool selected{ false };
     };
 
+    // Which "nothing to show" message the overlay should present. These are
+    // distinct states on purpose: an unsupported shell must never be reported
+    // as simply having run no commands.
+    enum class CommandTimelineEmptyState : uint8_t
+    {
+        None,
+        WaitingForShell,
+        ShellUnsupported,
+        NoCommands,
+        NoMatchingCommands,
+    };
+
     struct CommandTimelinePresentationSnapshot
     {
         std::vector<CommandTimelineVisibleEntry> visibleEntries;
         ShellIntegrationCapability capability{ ShellIntegrationCapability::Unknown };
+        CommandTimelineEmptyState emptyState{ CommandTimelineEmptyState::None };
         size_t totalEntryCount{};
+        size_t filteredEntryCount{};
         size_t firstVisibleIndex{};
         size_t selectedVisualSlot{};
         int wheelDeltaRemainder{};
         bool open{ false };
+        bool filtered{ false };
         bool wheelSettlePending{ false };
     };
 
@@ -152,6 +186,10 @@ namespace winTerm::CommandTimeline
                                                             CommandTimelineViewState& viewState,
                                                             ShellIntegrationCapability capability,
                                                             int deltaPerEntry = DefaultWheelDeltaPerEntry);
+        CommandTimelinePresentationSnapshot SetQuery(std::wstring_view query,
+                                                     std::span<const CommandTimelineEntry> entries,
+                                                     CommandTimelineViewState& viewState,
+                                                     ShellIntegrationCapability capability);
         void SettleWheel() noexcept;
         void Close() noexcept;
 
@@ -159,26 +197,36 @@ namespace winTerm::CommandTimeline
         bool WheelSettlePending() const noexcept;
         int WheelDeltaRemainder() const noexcept;
         size_t VisibleCapacity() const noexcept;
+        const std::wstring& Query() const noexcept;
+        size_t FilteredCount() const noexcept;
 
     private:
         void _reconcile(std::span<const CommandTimelineEntry> entries,
                         CommandTimelineViewState& viewState,
                         bool allowFollowLatest);
-        bool _moveSelection(NavigationAction action,
-                            std::span<const CommandTimelineEntry> entries);
+        void _rebuildFilter(std::span<const CommandTimelineEntry> entries);
+        bool _moveSelection(NavigationAction action);
         void _syncViewState(std::span<const CommandTimelineEntry> entries,
                             CommandTimelineViewState& viewState) const;
         CommandTimelinePresentationSnapshot _snapshot(std::span<const CommandTimelineEntry> entries,
                                                       ShellIntegrationCapability capability) const;
+        std::optional<size_t> _positionOf(size_t entryIndex) const noexcept;
+        size_t _nearestPosition(std::span<const CommandTimelineEntry> entries,
+                                const CommandId& id) const noexcept;
         static std::optional<size_t> _findCommand(std::span<const CommandTimelineEntry> entries,
                                                   const CommandId& id) noexcept;
         static size_t _findNearestCommand(std::span<const CommandTimelineEntry> entries,
                                           const CommandId& id) noexcept;
         static ExecutionResult _effectiveResult(const CommandTimelineEntry& entry) noexcept;
 
-        std::optional<size_t> _selectedIndex;
+        // Positions into _filtered, which holds indices into the caller's
+        // entries span. An empty query keeps every entry, so the unfiltered
+        // case walks the same code path.
+        std::vector<size_t> _filtered;
+        std::wstring _query;
+        std::optional<size_t> _selectedPosition;
         std::optional<CommandId> _lastLatestCommandId;
-        size_t _firstVisibleIndex{};
+        size_t _firstVisiblePosition{};
         size_t _visibleCapacity{ 1 };
         int _wheelDeltaRemainder{};
         bool _open{ false };
@@ -306,6 +354,7 @@ namespace winTerm::CommandTimeline
         void ReconcileReflow(std::span<const uint64_t> survivingNativeMarkIds,
                              uint64_t nativeRevision);
         void SetCapabilityFallback(ShellIntegrationCapability capability);
+        void SetHistoryLimit(size_t historyLimit);
         void Close() noexcept;
 
         const CommandTimelineEntry* Find(const CommandId& id) const noexcept;
@@ -316,6 +365,7 @@ namespace winTerm::CommandTimeline
         uint64_t Revision() const noexcept;
         uint64_t NativeRevision() const noexcept;
         uint64_t NextSequence() const noexcept;
+        size_t HistoryLimit() const noexcept;
         size_t BootstrapScanCount() const noexcept;
         size_t CachedCommandTextCharacters() const noexcept;
         bool IsBootstrapped() const noexcept;
@@ -328,6 +378,7 @@ namespace winTerm::CommandTimeline
         void _finishIncompleteCurrent(std::optional<std::chrono::system_clock::time_point> timestamp);
         void _observeLifecycleCapability(uint64_t nativeMarkId, LifecycleEventKind kind);
         void _refreshEntryCapabilities();
+        bool _applyHistoryLimit();
         void _rebuildLookups();
         void _incrementRevision() noexcept;
 
@@ -339,6 +390,7 @@ namespace winTerm::CommandTimeline
         std::unordered_map<uint64_t, uint8_t> _lifecycleByNativeMark;
         std::optional<uint64_t> _currentSequence;
         uint64_t _nextSequence{ 1 };
+        size_t _historyLimit{ DefaultCommandTimelineHistoryLimit };
         uint64_t _revision{};
         uint64_t _nativeRevision{};
         size_t _bootstrapScanCount{};

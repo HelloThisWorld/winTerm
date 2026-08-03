@@ -2378,6 +2378,18 @@
           "description": "When set to true, a selection is immediately copied to your clipboard upon creation. When set to false, the selection persists and awaits further action.",
           "type": "boolean"
         },
+        "commandTimeline.enabled": {
+          "default": true,
+          "description": "When set to true, the Command Timeline overlay and its left-side handle are available for each pane. When set to false, the handle is hidden and the toggle shortcut does not open the overlay.",
+          "type": "boolean"
+        },
+        "commandTimeline.historyLimit": {
+          "default": 500,
+          "description": "The maximum number of commands each pane keeps in its in-memory Command Timeline. Lowering this evicts the oldest commands immediately. History is never written to disk.",
+          "maximum": 5000,
+          "minimum": 50,
+          "type": "integer"
+        },
         "focusFollowMouse": {
           "default": false,
           "description": "When set to true, the terminal will focus the pane on mouse hover.",

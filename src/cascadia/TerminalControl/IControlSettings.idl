@@ -57,6 +57,8 @@ namespace Microsoft.Terminal.Control
         Boolean FocusFollowMouse { get; };
         Boolean ScrollToZoom { get; };
         Boolean ScrollToChangeOpacity { get; };
+        Boolean CommandTimelineEnabled { get; };
+        Int32 CommandTimelineHistoryLimit { get; };
 
         String Commandline { get; };
         String StartingDirectory { get; };

@@ -49,6 +49,18 @@ namespace ControlUnitTests
         TEST_METHOD(ActionLoadedInputIsReleasedOnEviction);
         TEST_METHOD(ActionCopyResolvesStableCommandIdNotRowIndex);
         TEST_METHOD(ActionOutputRequiresLiveNativeRangeAndIsNeverCached);
+        TEST_METHOD(SearchEmptyQueryProjectsEveryCommand);
+        TEST_METHOD(SearchMatchesLiterallyAndCaseInsensitively);
+        TEST_METHOD(SearchQueryTruncationIsSurrogateSafe);
+        TEST_METHOD(SearchKeepsStableSelectionAcrossQueryChanges);
+        TEST_METHOD(SearchSelectsNearestSurvivingMatch);
+        TEST_METHOD(SearchNavigationAndWheelWalkFilteredProjection);
+        TEST_METHOD(SearchNewCommandFollowsLatestOnlyWhenMatching);
+        TEST_METHOD(ShellDegradationStatesAreDistinct);
+        TEST_METHOD(HistoryLimitEvictsOldestFirstAndNeverResurrects);
+        TEST_METHOD(HistoryLimitClampsToSupportedRange);
+        TEST_METHOD(SearchCloseReleasesQueryAndProjection);
+        TEST_METHOD(SearchStressAtMaximumHistoryLimit);
 
         TEST_CLASS_SETUP(ModuleSetup)
         {
@@ -933,5 +945,387 @@ namespace ControlUnitTests
         pendingNavigation.Open(pending.Entries(), pendingView, pending.Capability(), 4);
         const auto pendingOutput = actions.Prepare(CommandActionKind::CopyOutput, pending.Entries(), pendingView, CommandLoadPolicy{});
         VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::OutputUnavailable), static_cast<int>(pendingOutput.status));
+    }
+
+    void CommandTimelineTests::SearchEmptyQueryProjectsEveryCommand()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"alpha", 0);
+        Execute(index, 2, revision, L"beta", 0);
+        Execute(index, 3, revision, L"gamma", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        const auto opened = navigation.Open(index.Entries(), viewState, index.Capability(), 10);
+        VERIFY_ARE_EQUAL(size_t{ 3 }, opened.filteredEntryCount);
+        VERIFY_IS_FALSE(opened.filtered);
+
+        const auto cleared = navigation.SetQuery(L"", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 3 }, cleared.filteredEntryCount);
+        VERIFY_ARE_EQUAL(size_t{ 3 }, cleared.visibleEntries.size());
+        VERIFY_IS_FALSE(cleared.filtered);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandTimelineEmptyState::None), static_cast<int>(cleared.emptyState));
+    }
+
+    void CommandTimelineTests::SearchMatchesLiterallyAndCaseInsensitively()
+    {
+        VERIFY_IS_TRUE(CommandTimelineQueryMatches(L"Git Status", L"git"));
+        VERIFY_IS_TRUE(CommandTimelineQueryMatches(L"git status", L"STATUS"));
+        VERIFY_IS_TRUE(CommandTimelineQueryMatches(L"aaaa", L"aaa"));
+        VERIFY_IS_TRUE(CommandTimelineQueryMatches(L"anything", L""));
+        VERIFY_IS_FALSE(CommandTimelineQueryMatches(L"git", L"git status"));
+        // Literal matching only: regex and glob metacharacters are just text.
+        VERIFY_IS_FALSE(CommandTimelineQueryMatches(L"git status", L"g.*s"));
+        VERIFY_IS_FALSE(CommandTimelineQueryMatches(L"git status", L"gs"));
+
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"GIT status", 0);
+        Execute(index, 2, revision, L"cargo build", 0);
+        Execute(index, 3, revision, L"git log", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 10);
+        const auto filtered = navigation.SetQuery(L"git", index.Entries(), viewState, index.Capability());
+
+        VERIFY_ARE_EQUAL(size_t{ 2 }, filtered.filteredEntryCount);
+        VERIFY_IS_TRUE(filtered.filtered);
+        VERIFY_ARE_EQUAL(size_t{ 3 }, filtered.totalEntryCount);
+        VERIFY_ARE_EQUAL(std::wstring{ L"GIT status" }, filtered.visibleEntries[0].commandText);
+        VERIFY_ARE_EQUAL(std::wstring{ L"git log" }, filtered.visibleEntries[1].commandText);
+    }
+
+    void CommandTimelineTests::SearchQueryTruncationIsSurrogateSafe()
+    {
+        // Exactly at the boundary nothing is dropped.
+        const std::wstring atLimit(MaxCommandTimelineQueryLength, L'x');
+        VERIFY_ARE_EQUAL(MaxCommandTimelineQueryLength, NormalizeCommandTimelineQuery(atLimit).size());
+
+        const std::wstring overLimit(MaxCommandTimelineQueryLength + 50, L'x');
+        VERIFY_ARE_EQUAL(MaxCommandTimelineQueryLength, NormalizeCommandTimelineQuery(overLimit).size());
+
+        // A surrogate pair straddling the boundary must not be split. U+1F600
+        // is encoded as the pair D83D DE00.
+        std::wstring straddling(MaxCommandTimelineQueryLength - 1, L'x');
+        straddling.push_back(L'\xD83D');
+        straddling.push_back(L'\xDE00');
+        const auto truncated = NormalizeCommandTimelineQuery(straddling);
+        VERIFY_ARE_EQUAL(MaxCommandTimelineQueryLength - 1, truncated.size());
+        VERIFY_IS_FALSE(truncated.back() >= 0xD800 && truncated.back() <= 0xDBFF);
+
+        // A pair that ends before the boundary is preserved whole.
+        std::wstring safe(MaxCommandTimelineQueryLength - 2, L'y');
+        safe.push_back(L'\xD83D');
+        safe.push_back(L'\xDE00');
+        safe.append(10, L'z');
+        const auto kept = NormalizeCommandTimelineQuery(safe);
+        VERIFY_ARE_EQUAL(MaxCommandTimelineQueryLength, kept.size());
+        VERIFY_ARE_EQUAL(L'\xDE00', kept[MaxCommandTimelineQueryLength - 1]);
+
+        // Non-ASCII text still matches literally.
+        VERIFY_IS_TRUE(CommandTimelineQueryMatches(L"echo \x4F60\x597D", L"\x4F60\x597D"));
+    }
+
+    void CommandTimelineTests::SearchKeepsStableSelectionAcrossQueryChanges()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"git status", 0);
+        Execute(index, 2, revision, L"cargo build", 0);
+        Execute(index, 3, revision, L"git log", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 10);
+        navigation.SelectVisibleEntry(0, index.Entries(), viewState, index.Capability());
+        const auto selected = *viewState.selectedCommandId;
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, selected.sequence);
+
+        // The selected command still matches, so it stays selected.
+        navigation.SetQuery(L"git", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(selected, *viewState.selectedCommandId);
+
+        // Clearing the query must not move the selection either.
+        navigation.SetQuery(L"", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(selected, *viewState.selectedCommandId);
+    }
+
+    void CommandTimelineTests::SearchSelectsNearestSurvivingMatch()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"git status", 0);
+        Execute(index, 2, revision, L"cargo build", 0);
+        Execute(index, 3, revision, L"git log", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 10);
+        navigation.SelectVisibleEntry(1, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 2 }, viewState.selectedCommandId->sequence);
+
+        // "cargo build" no longer matches, so the nearest surviving match takes
+        // the selection rather than dropping to the bottom.
+        const auto filtered = navigation.SetQuery(L"git", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 2 }, filtered.filteredEntryCount);
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.selectedCommandId->sequence);
+
+        // A query with no results leaves the selected command untouched.
+        const auto none = navigation.SetQuery(L"zzz", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 0 }, none.filteredEntryCount);
+        VERIFY_IS_TRUE(none.visibleEntries.empty());
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandTimelineEmptyState::NoMatchingCommands),
+                         static_cast<int>(none.emptyState));
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.selectedCommandId->sequence);
+    }
+
+    void CommandTimelineTests::SearchNavigationAndWheelWalkFilteredProjection()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        for (uint64_t mark = 1; mark <= 10; ++mark)
+        {
+            // Odd marks match the query, even marks do not.
+            Execute(index, mark, revision, mark % 2 ? L"git command" : L"other command", 0);
+        }
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        const auto filtered = navigation.SetQuery(L"git", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 5 }, filtered.filteredEntryCount);
+        VERIFY_ARE_EQUAL(uint64_t{ 9 }, viewState.selectedCommandId->sequence);
+
+        // Up moves to the previous *match*, skipping the non-matching command.
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 7 }, viewState.selectedCommandId->sequence);
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 5 }, viewState.selectedCommandId->sequence);
+        navigation.Navigate(NavigationAction::Next, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 7 }, viewState.selectedCommandId->sequence);
+
+        // Page edges stay inside the filtered viewport.
+        const auto pageFirst = navigation.Navigate(NavigationAction::PageFirst, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 0 }, pageFirst.selectedVisualSlot);
+        const auto pageLast = navigation.Navigate(NavigationAction::PageLast, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(size_t{ 2 }, pageLast.selectedVisualSlot);
+
+        // Wheel accumulation also walks matches only. A partial delta moves
+        // nothing; a full notch moves exactly one match.
+        const auto beforeWheel = viewState.selectedCommandId->sequence;
+        navigation.ApplyWheelDelta(40, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(beforeWheel, viewState.selectedCommandId->sequence);
+        navigation.ApplyWheelDelta(80, index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_NOT_EQUAL(beforeWheel, viewState.selectedCommandId->sequence);
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.selectedCommandId->sequence % 2);
+    }
+
+    void CommandTimelineTests::SearchNewCommandFollowsLatestOnlyWhenMatching()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"git one", 0);
+        Execute(index, 2, revision, L"git two", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 10);
+        navigation.SetQuery(L"git", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(uint64_t{ 2 }, viewState.selectedCommandId->sequence);
+
+        // Following latest: a new matching command becomes the selection.
+        Execute(index, 3, revision, L"git three", 0);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 10);
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+
+        // A new command that does not match must not change the selection.
+        Execute(index, 4, revision, L"unrelated", 0);
+        const auto afterNonMatching = navigation.Reconcile(index.Entries(), viewState, index.Capability(), 10);
+        VERIFY_ARE_EQUAL(uint64_t{ 3 }, viewState.selectedCommandId->sequence);
+        VERIFY_ARE_EQUAL(size_t{ 3 }, afterNonMatching.filteredEntryCount);
+
+        // Browsing older history: a new matching command must not yank the
+        // selection back to the bottom.
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+        const auto browsing = viewState.selectedCommandId->sequence;
+        VERIFY_ARE_EQUAL(uint64_t{ 2 }, browsing);
+        Execute(index, 5, revision, L"git five", 0);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 10);
+        VERIFY_ARE_EQUAL(browsing, viewState.selectedCommandId->sequence);
+    }
+
+    void CommandTimelineTests::ShellDegradationStatesAreDistinct()
+    {
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+
+        // Capability not yet determined and nothing recorded.
+        const auto waiting = navigation.Open({}, viewState, ShellIntegrationCapability::Unknown, 5);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandTimelineEmptyState::WaitingForShell),
+                         static_cast<int>(waiting.emptyState));
+
+        // Shell cannot report complete boundaries.
+        CommandTimelineNavigationModel limitedNavigation;
+        CommandTimelineViewState limitedView;
+        const auto unsupported = limitedNavigation.Open({}, limitedView, ShellIntegrationCapability::Limited, 5);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandTimelineEmptyState::ShellUnsupported),
+                         static_cast<int>(unsupported.emptyState));
+
+        // Shell integration works but no command has run yet.
+        CommandTimelineNavigationModel fullNavigation;
+        CommandTimelineViewState fullView;
+        const auto noCommands = fullNavigation.Open({}, fullView, ShellIntegrationCapability::Full, 5);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandTimelineEmptyState::NoCommands),
+                         static_cast<int>(noCommands.emptyState));
+
+        // Commands exist but the filter excludes all of them.
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"present", 0);
+        CommandTimelineNavigationModel filteredNavigation;
+        CommandTimelineViewState filteredView;
+        filteredNavigation.Open(index.Entries(), filteredView, index.Capability(), 5);
+        const auto noMatches = filteredNavigation.SetQuery(L"absent", index.Entries(), filteredView, index.Capability());
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandTimelineEmptyState::NoMatchingCommands),
+                         static_cast<int>(noMatches.emptyState));
+    }
+
+    void CommandTimelineTests::HistoryLimitEvictsOldestFirstAndNeverResurrects()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        index.SetHistoryLimit(MinCommandTimelineHistoryLimit);
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, index.HistoryLimit());
+
+        uint64_t revision = 0;
+        for (uint64_t mark = 1; mark <= 60; ++mark)
+        {
+            Execute(index, mark, revision, L"command " + std::to_wstring(mark), 0);
+        }
+
+        // Bounded at the limit, oldest dropped first, newest retained.
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, index.Entries().size());
+        VERIFY_ARE_EQUAL(uint64_t{ 11 }, index.Entries().front().id.sequence);
+        VERIFY_ARE_EQUAL(uint64_t{ 60 }, index.Entries().back().id.sequence);
+
+        // Lowering the limit evicts immediately.
+        CommandTimelineIndex lowered{ PaneTwo };
+        uint64_t loweredRevision = 0;
+        for (uint64_t mark = 1; mark <= 120; ++mark)
+        {
+            Execute(lowered, mark, loweredRevision, L"cmd", 0);
+        }
+        VERIFY_ARE_EQUAL(size_t{ 120 }, lowered.Entries().size());
+        lowered.SetHistoryLimit(MinCommandTimelineHistoryLimit);
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, lowered.Entries().size());
+        VERIFY_ARE_EQUAL(uint64_t{ 71 }, lowered.Entries().front().id.sequence);
+
+        // Raising the limit must not resurrect anything, and sequence numbers
+        // are never reissued.
+        lowered.SetHistoryLimit(1000);
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, lowered.Entries().size());
+        VERIFY_ARE_EQUAL(uint64_t{ 71 }, lowered.Entries().front().id.sequence);
+        VERIFY_ARE_EQUAL(uint64_t{ 121 }, lowered.NextSequence());
+        Execute(lowered, 500, loweredRevision, L"after raise", 0);
+        VERIFY_ARE_EQUAL(uint64_t{ 121 }, lowered.Entries().back().id.sequence);
+    }
+
+    void CommandTimelineTests::HistoryLimitClampsToSupportedRange()
+    {
+        VERIFY_ARE_EQUAL(DefaultCommandTimelineHistoryLimit, size_t{ 500 });
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, ClampCommandTimelineHistoryLimit(0));
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, ClampCommandTimelineHistoryLimit(-1));
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, ClampCommandTimelineHistoryLimit(49));
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, ClampCommandTimelineHistoryLimit(50));
+        VERIFY_ARE_EQUAL(size_t{ 500 }, ClampCommandTimelineHistoryLimit(500));
+        VERIFY_ARE_EQUAL(MaxCommandTimelineHistoryLimit, ClampCommandTimelineHistoryLimit(5000));
+        VERIFY_ARE_EQUAL(MaxCommandTimelineHistoryLimit, ClampCommandTimelineHistoryLimit(999999));
+
+        // An out-of-range configured value is clamped rather than rejected.
+        CommandTimelineIndex index{ PaneOne };
+        index.SetHistoryLimit(ClampCommandTimelineHistoryLimit(1));
+        VERIFY_ARE_EQUAL(MinCommandTimelineHistoryLimit, index.HistoryLimit());
+        index.SetHistoryLimit(ClampCommandTimelineHistoryLimit(100000));
+        VERIFY_ARE_EQUAL(MaxCommandTimelineHistoryLimit, index.HistoryLimit());
+    }
+
+    void CommandTimelineTests::SearchCloseReleasesQueryAndProjection()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"git status", 0);
+        Execute(index, 2, revision, L"cargo build", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 5);
+        navigation.SetQuery(L"git", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(std::wstring{ L"git" }, navigation.Query());
+        VERIFY_ARE_EQUAL(size_t{ 1 }, navigation.FilteredCount());
+
+        navigation.Close();
+        VERIFY_IS_TRUE(navigation.Query().empty());
+        VERIFY_ARE_EQUAL(size_t{ 0 }, navigation.FilteredCount());
+        VERIFY_IS_FALSE(navigation.IsOpen());
+        VERIFY_IS_FALSE(navigation.WheelSettlePending());
+        VERIFY_ARE_EQUAL(0, navigation.WheelDeltaRemainder());
+
+        // Repeated close stays safe.
+        navigation.Close();
+        VERIFY_IS_FALSE(navigation.IsOpen());
+
+        // Reopening starts unfiltered: a query is never persisted.
+        const auto reopened = navigation.Open(index.Entries(), viewState, index.Capability(), 5);
+        VERIFY_IS_TRUE(navigation.Query().empty());
+        VERIFY_IS_FALSE(reopened.filtered);
+        VERIFY_ARE_EQUAL(size_t{ 2 }, reopened.filteredEntryCount);
+    }
+
+    void CommandTimelineTests::SearchStressAtMaximumHistoryLimit()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        index.SetHistoryLimit(MaxCommandTimelineHistoryLimit);
+
+        uint64_t revision = 0;
+        for (uint64_t mark = 1; mark <= MaxCommandTimelineHistoryLimit; ++mark)
+        {
+            Execute(index, mark, revision, L"command " + std::to_wstring(mark), 0);
+        }
+        VERIFY_ARE_EQUAL(MaxCommandTimelineHistoryLimit, index.Entries().size());
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        const auto capacity = size_t{ 20 };
+        navigation.Open(index.Entries(), viewState, index.Capability(), capacity);
+
+        // Worst case: a query that matches every entry. Only the visible rows
+        // are ever materialized.
+        const auto broad = navigation.SetQuery(L"command", index.Entries(), viewState, index.Capability());
+        VERIFY_ARE_EQUAL(MaxCommandTimelineHistoryLimit, broad.filteredEntryCount);
+        VERIFY_ARE_EQUAL(capacity, broad.visibleEntries.size());
+
+        // Repeated filtering must stay bounded and must not accumulate.
+        for (int pass = 0; pass < 25; ++pass)
+        {
+            const auto narrow = navigation.SetQuery(L"command 4242", index.Entries(), viewState, index.Capability());
+            VERIFY_ARE_EQUAL(size_t{ 1 }, narrow.filteredEntryCount);
+            VERIFY_ARE_EQUAL(size_t{ 1 }, narrow.visibleEntries.size());
+
+            const auto missing = navigation.SetQuery(L"no such command", index.Entries(), viewState, index.Capability());
+            VERIFY_ARE_EQUAL(size_t{ 0 }, missing.filteredEntryCount);
+            VERIFY_IS_TRUE(missing.visibleEntries.empty());
+
+            const auto all = navigation.SetQuery(L"", index.Entries(), viewState, index.Capability());
+            VERIFY_ARE_EQUAL(MaxCommandTimelineHistoryLimit, all.filteredEntryCount);
+            VERIFY_ARE_EQUAL(capacity, all.visibleEntries.size());
+        }
+
+        // Command text stays bounded and no output is ever cached.
+        VERIFY_IS_TRUE(index.CachedCommandTextCharacters() <=
+                       MaxCommandTimelineHistoryLimit * DefaultMaxCachedCommandText);
+
+        navigation.Close();
+        VERIFY_ARE_EQUAL(size_t{ 0 }, navigation.FilteredCount());
     }
 }

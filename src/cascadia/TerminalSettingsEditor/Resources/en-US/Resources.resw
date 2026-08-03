@@ -2873,6 +2873,21 @@
   <data name="Globals_PaneResizeReset.Content" xml:space="preserve">
     <value>Reset pane resizing to defaults</value>
   </data>
+  <data name="Globals_CommandTimelineHeader.Text" xml:space="preserve">
+    <value>Command timeline</value>
+  </data>
+  <data name="Globals_CommandTimelineEnabled.Header" xml:space="preserve">
+    <value>Show command timeline</value>
+  </data>
+  <data name="Globals_CommandTimelineEnabled.HelpText" xml:space="preserve">
+    <value>When enabled, each pane shows a handle that opens a list of the commands that pane has run. Requires shell integration.</value>
+  </data>
+  <data name="Globals_CommandTimelineHistoryLimit.Header" xml:space="preserve">
+    <value>Commands remembered per pane</value>
+  </data>
+  <data name="Globals_CommandTimelineHistoryLimit.HelpText" xml:space="preserve">
+    <value>How many commands each pane keeps in memory, between 50 and 5000. Lowering this discards the oldest commands immediately. Command history is never written to disk.</value>
+  </data>
   <data name="Globals_VisualProgressHeader.Text" xml:space="preserve">
     <value>Visual progress</value>
   </data>
