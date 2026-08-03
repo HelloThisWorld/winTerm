@@ -183,6 +183,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ScrollCommandTimeline(int wheelDelta);
         void SettleCommandTimelineWheel();
         void CloseCommandTimelineOverlay();
+        winTerm::CommandTimeline::CommandActionRequest PrepareCommandTimelineAction(winTerm::CommandTimeline::CommandActionKind kind);
+        bool LoadCommandTimelineCommand(const winTerm::CommandTimeline::CommandActionRequest& request);
+        std::wstring ResolveCommandTimelineOutput(const winTerm::CommandTimeline::CommandActionRequest& request);
+        bool JumpToCommandTimelineOutput(const winTerm::CommandTimeline::CommandActionRequest& request);
+        bool CopyCommandTimelineText(const std::wstring& text);
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;
@@ -457,6 +462,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::unique_ptr<winTerm::VisualProgress::RecognitionEngine> _visualProgressRecognition;
         std::unique_ptr<winTerm::CommandTimeline::CommandTimelineIndex> _commandTimelineIndex;
         winTerm::CommandTimeline::CommandTimelineNavigationModel _commandTimelineNavigation;
+        winTerm::CommandTimeline::CommandTimelineActionModel _commandTimelineActions;
         winTerm::CommandTimeline::CommandTimelineViewState _commandTimelineViewState;
         std::atomic<uint64_t> _visualProgressProviderState{};
         std::atomic<uint64_t> _visualProgressProviderGeneration{};

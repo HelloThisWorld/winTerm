@@ -40,6 +40,15 @@ namespace ControlUnitTests
         TEST_METHOD(NavigationReconcilesRemovalReflowAndNewCommands);
         TEST_METHOD(NavigationStateIsPaneLocalAndRepeatedCloseIsSafe);
         TEST_METHOD(NavigationVisibleProjectionIsBoundedAndNeutralizesLimitedResults);
+        TEST_METHOD(ActionLoadPreparesSelectedCommandWithoutExecuting);
+        TEST_METHOD(ActionLoadRejectsMissingCommandText);
+        TEST_METHOD(ActionLoadRefusesMultilineWithoutBracketedPaste);
+        TEST_METHOD(ActionLoadConfirmsLargeCommandBeforeReady);
+        TEST_METHOD(ActionLoadTracksExecutionGeneration);
+        TEST_METHOD(ActionLateCompletionIsDetectedAfterExecutionStart);
+        TEST_METHOD(ActionLoadedInputIsReleasedOnEviction);
+        TEST_METHOD(ActionCopyResolvesStableCommandIdNotRowIndex);
+        TEST_METHOD(ActionOutputRequiresLiveNativeRangeAndIsNeverCached);
 
         TEST_CLASS_SETUP(ModuleSetup)
         {
@@ -660,5 +669,269 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(ExecutionResult::Unknown),
                          static_cast<int>(presentation.visibleEntries[1].executionResult));
         VERIFY_ARE_EQUAL(uint64_t{ 10 }, presentation.visibleEntries[1].id.sequence);
+    }
+
+    void CommandTimelineTests::ActionLoadPreparesSelectedCommandWithoutExecuting()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"git status", 0);
+        Execute(index, 2, revision, L"cargo build", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+
+        CommandTimelineActionModel actions;
+        const auto request = actions.Prepare(CommandActionKind::LoadIntoInput,
+                                             index.Entries(),
+                                             viewState,
+                                             CommandLoadPolicy{});
+
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::Ready), static_cast<int>(request.status));
+        VERIFY_IS_TRUE(request.Actionable());
+        VERIFY_ARE_EQUAL(std::wstring{ L"git status" }, request.commandText);
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, request.id.sequence);
+        // The prepared payload must never carry a submission character.
+        VERIFY_ARE_EQUAL(std::wstring::npos, request.commandText.find_first_of(L"\r\n"));
+        VERIFY_IS_FALSE(request.multiline);
+    }
+
+    void CommandTimelineTests::ActionLoadRejectsMissingCommandText()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        index.ProcessLifecycle(Update(LifecycleEventKind::Prompt, 1, ++revision));
+        index.ProcessLifecycle(Update(LifecycleEventKind::CommandStart, 1, ++revision));
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+
+        CommandTimelineActionModel actions;
+        const auto load = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::CommandTextUnavailable), static_cast<int>(load.status));
+        VERIFY_IS_FALSE(load.Actionable());
+
+        const auto copy = actions.Prepare(CommandActionKind::CopyCommand, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::CommandTextUnavailable), static_cast<int>(copy.status));
+
+        // An empty timeline cannot produce an actionable request at all.
+        CommandTimelineViewState emptyView;
+        const auto none = actions.Prepare(CommandActionKind::LoadIntoInput, {}, emptyView, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::NoSelection), static_cast<int>(none.status));
+    }
+
+    void CommandTimelineTests::ActionLoadRefusesMultilineWithoutBracketedPaste()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"for i in 1 2 3\ndo echo $i\ndone", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+
+        CommandTimelineActionModel actions;
+        VERIFY_IS_TRUE(CommandTimelineActionModel::IsMultiline(L"a\nb"));
+        VERIFY_IS_FALSE(CommandTimelineActionModel::IsMultiline(L"a b"));
+
+        const CommandLoadPolicy unbracketed{ .bracketedPasteEnabled = false };
+        const auto refused = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, unbracketed);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::MultilineUnsafe), static_cast<int>(refused.status));
+        VERIFY_IS_FALSE(refused.Actionable());
+        // A refused request must not become actionable by confirming it.
+        VERIFY_IS_FALSE(CommandTimelineActionModel::Confirm(refused).Actionable());
+
+        const CommandLoadPolicy bracketed{ .bracketedPasteEnabled = true, .warnOnMultilineLoad = false };
+        const auto allowed = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, bracketed);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::Ready), static_cast<int>(allowed.status));
+        VERIFY_IS_TRUE(allowed.multiline);
+    }
+
+    void CommandTimelineTests::ActionLoadConfirmsLargeCommandBeforeReady()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, std::wstring(2000, L'x'), 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+
+        CommandTimelineActionModel actions;
+        const CommandLoadPolicy policy{ .largeLoadCharacterThreshold = 1024, .bracketedPasteEnabled = true };
+        const auto pending = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, policy);
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::ConfirmationRequired), static_cast<int>(pending.status));
+        VERIFY_IS_FALSE(pending.Actionable());
+        VERIFY_ARE_EQUAL(size_t{ 2000 }, pending.characterCount);
+
+        const auto confirmed = CommandTimelineActionModel::Confirm(pending);
+        VERIFY_IS_TRUE(confirmed.Actionable());
+        VERIFY_ARE_EQUAL(confirmed.id, pending.id);
+
+        // Below the threshold no confirmation is asked for.
+        const CommandLoadPolicy generous{ .largeLoadCharacterThreshold = 4096, .bracketedPasteEnabled = true };
+        VERIFY_IS_TRUE(actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, generous).Actionable());
+    }
+
+    void CommandTimelineTests::ActionLoadTracksExecutionGeneration()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"echo one", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+
+        CommandTimelineActionModel actions;
+        VERIFY_IS_FALSE(viewState.loadedIntoInput);
+        VERIFY_ARE_EQUAL(uint64_t{ 0 }, viewState.executionGeneration);
+
+        const auto request = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, CommandLoadPolicy{});
+        actions.NotifyLoaded(viewState, request);
+
+        VERIFY_IS_TRUE(viewState.loadedIntoInput);
+        VERIFY_IS_TRUE(viewState.loadedCommandId.has_value());
+        VERIFY_ARE_EQUAL(request.id, *viewState.loadedCommandId);
+        VERIFY_ARE_EQUAL(uint64_t{ 1 }, viewState.executionGeneration);
+
+        // A non-load request must never mark the input as loaded.
+        CommandTimelineViewState other = viewState;
+        const auto copy = actions.Prepare(CommandActionKind::CopyCommand, index.Entries(), viewState, CommandLoadPolicy{});
+        actions.NotifyLoaded(other, copy);
+        VERIFY_ARE_EQUAL(viewState.executionGeneration, other.executionGeneration);
+    }
+
+    void CommandTimelineTests::ActionLateCompletionIsDetectedAfterExecutionStart()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"sleep 30", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+
+        CommandTimelineActionModel actions;
+        const auto request = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, CommandLoadPolicy{});
+        actions.NotifyLoaded(viewState, request);
+
+        const auto inFlightGeneration = viewState.executionGeneration;
+        VERIFY_IS_TRUE(CommandTimelineActionModel::IsCurrentGeneration(viewState, inFlightGeneration));
+
+        // The pane starts running a command; the earlier generation is retired.
+        actions.NotifyExecutionStarted(viewState);
+        VERIFY_IS_FALSE(CommandTimelineActionModel::IsCurrentGeneration(viewState, inFlightGeneration));
+        VERIFY_IS_TRUE(CommandTimelineActionModel::IsCurrentGeneration(viewState, viewState.executionGeneration));
+        VERIFY_IS_FALSE(viewState.loadedIntoInput);
+        VERIFY_IS_FALSE(viewState.loadedCommandId.has_value());
+    }
+
+    void CommandTimelineTests::ActionLoadedInputIsReleasedOnEviction()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"first", 0);
+        Execute(index, 2, revision, L"second", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+        navigation.Navigate(NavigationAction::Previous, index.Entries(), viewState, index.Capability());
+
+        CommandTimelineActionModel actions;
+        const auto request = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, CommandLoadPolicy{});
+        actions.NotifyLoaded(viewState, request);
+        VERIFY_IS_TRUE(viewState.loadedIntoInput);
+
+        // Still present after an unrelated reconcile.
+        actions.ReconcileLoadedInput(index.Entries(), viewState);
+        VERIFY_IS_TRUE(viewState.loadedIntoInput);
+
+        const std::array<uint64_t, 1> evicted{ 1 };
+        index.InvalidateNativeMarks(evicted, ++revision);
+        actions.ReconcileLoadedInput(index.Entries(), viewState);
+        VERIFY_IS_FALSE(viewState.loadedIntoInput);
+        VERIFY_IS_FALSE(viewState.loadedCommandId.has_value());
+
+        // A request prepared against the evicted command is no longer actionable.
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 4);
+        const auto after = actions.Prepare(CommandActionKind::LoadIntoInput, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_ARE_NOT_EQUAL(request.id.sequence, after.id.sequence);
+    }
+
+    void CommandTimelineTests::ActionCopyResolvesStableCommandIdNotRowIndex()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 1, revision, L"alpha", 0);
+        Execute(index, 2, revision, L"beta", 0);
+        Execute(index, 3, revision, L"gamma", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 3);
+        navigation.SelectVisibleEntry(1, index.Entries(), viewState, index.Capability());
+
+        CommandTimelineActionModel actions;
+        const auto before = actions.Prepare(CommandActionKind::CopyCommand, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(std::wstring{ L"beta" }, before.commandText);
+        VERIFY_ARE_EQUAL(uint64_t{ 2 }, before.id.sequence);
+
+        // Dropping the first entry shifts every row index by one. The selection
+        // must still resolve to the same command, not to whatever now sits in
+        // the old row.
+        const std::array<uint64_t, 1> evicted{ 1 };
+        index.InvalidateNativeMarks(evicted, ++revision);
+        navigation.Reconcile(index.Entries(), viewState, index.Capability(), 3);
+
+        const auto after = actions.Prepare(CommandActionKind::CopyCommand, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(before.id, after.id);
+        VERIFY_ARE_EQUAL(std::wstring{ L"beta" }, after.commandText);
+    }
+
+    void CommandTimelineTests::ActionOutputRequiresLiveNativeRangeAndIsNeverCached()
+    {
+        CommandTimelineIndex index{ PaneOne };
+        uint64_t revision = 0;
+        Execute(index, 7, revision, L"ls -la", 0);
+
+        CommandTimelineNavigationModel navigation;
+        CommandTimelineViewState viewState;
+        navigation.Open(index.Entries(), viewState, index.Capability(), 4);
+
+        CommandTimelineActionModel actions;
+        const auto copyOutput = actions.Prepare(CommandActionKind::CopyOutput, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_IS_TRUE(copyOutput.Actionable());
+        VERIFY_ARE_EQUAL(uint64_t{ 7 }, copyOutput.nativeMarkId);
+        // The request only carries the identity needed to resolve output later.
+        // No output text is ever produced or retained by the model.
+        VERIFY_ARE_EQUAL(std::wstring{ L"ls -la" }, copyOutput.commandText);
+
+        const auto jump = actions.Prepare(CommandActionKind::JumpToOutput, index.Entries(), viewState, CommandLoadPolicy{});
+        VERIFY_IS_TRUE(jump.Actionable());
+        VERIFY_ARE_EQUAL(uint64_t{ 7 }, jump.nativeMarkId);
+
+        // A stale native range disables both output actions.
+        auto entries = index.Entries();
+        entries.front().nativeRangeValid = false;
+        const auto staleCopy = actions.Prepare(CommandActionKind::CopyOutput, entries, viewState, CommandLoadPolicy{});
+        const auto staleJump = actions.Prepare(CommandActionKind::JumpToOutput, entries, viewState, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::OutputUnavailable), static_cast<int>(staleCopy.status));
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::OutputUnavailable), static_cast<int>(staleJump.status));
+
+        // A command that never reached its output stage cannot copy output.
+        CommandTimelineIndex pending{ PaneTwo };
+        uint64_t pendingRevision = 0;
+        pending.ProcessLifecycle(Update(LifecycleEventKind::Prompt, 1, ++pendingRevision));
+        pending.ProcessLifecycle(Update(LifecycleEventKind::CommandStart, 1, ++pendingRevision));
+        CommandTimelineNavigationModel pendingNavigation;
+        CommandTimelineViewState pendingView;
+        pendingNavigation.Open(pending.Entries(), pendingView, pending.Capability(), 4);
+        const auto pendingOutput = actions.Prepare(CommandActionKind::CopyOutput, pending.Entries(), pendingView, CommandLoadPolicy{});
+        VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::OutputUnavailable), static_cast<int>(pendingOutput.status));
     }
 }

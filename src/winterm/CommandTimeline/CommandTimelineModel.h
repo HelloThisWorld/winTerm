@@ -79,6 +79,7 @@ namespace winTerm::CommandTimeline
         std::optional<CommandId> selectedCommandId;
         std::optional<uint64_t> visibleNativeAnchor;
         std::optional<size_t> selectedVisualSlot;
+        std::optional<CommandId> loadedCommandId;
         bool loadedIntoInput{ false };
         uint64_t executionGeneration{};
 
@@ -182,6 +183,78 @@ namespace winTerm::CommandTimeline
         int _wheelDeltaRemainder{};
         bool _open{ false };
         bool _wheelSettlePending{ false };
+    };
+
+    enum class CommandActionKind : uint8_t
+    {
+        LoadIntoInput,
+        CopyCommand,
+        CopyOutput,
+        JumpToOutput,
+    };
+
+    enum class CommandActionStatus : uint8_t
+    {
+        Ready,
+        NoSelection,
+        CommandTextUnavailable,
+        OutputUnavailable,
+        ConfirmationRequired,
+        MultilineUnsafe,
+    };
+
+    // Describes how a Command Timeline entry may be loaded into the owning
+    // pane's input. The Timeline never reads the Windows clipboard, so the
+    // multiline and large-input protections that guard clipboard paste are
+    // reproduced here against the bounded command-text cache instead.
+    struct CommandLoadPolicy
+    {
+        size_t largeLoadCharacterThreshold{ 1024 };
+        bool bracketedPasteEnabled{ false };
+        bool warnOnMultilineLoad{ true };
+        bool warnOnLargeLoad{ true };
+    };
+
+    struct CommandActionRequest
+    {
+        CommandActionKind kind{ CommandActionKind::LoadIntoInput };
+        CommandActionStatus status{ CommandActionStatus::NoSelection };
+        CommandId id{};
+        uint64_t nativeMarkId{};
+        std::wstring commandText;
+        uint64_t executionGeneration{};
+        size_t characterCount{};
+        bool multiline{ false };
+
+        bool Actionable() const noexcept;
+    };
+
+    // Pure decision layer for the Phase 3 entry actions. It never resolves
+    // command output, never touches the clipboard, and never appends a
+    // carriage return, so a prepared load can only ever populate the shell's
+    // input line.
+    class CommandTimelineActionModel final
+    {
+    public:
+        CommandActionRequest Prepare(CommandActionKind kind,
+                                     std::span<const CommandTimelineEntry> entries,
+                                     const CommandTimelineViewState& viewState,
+                                     const CommandLoadPolicy& policy) const;
+        static CommandActionRequest Confirm(CommandActionRequest request) noexcept;
+
+        void NotifyLoaded(CommandTimelineViewState& viewState, const CommandActionRequest& request) noexcept;
+        void NotifyExecutionStarted(CommandTimelineViewState& viewState) noexcept;
+        void ReconcileLoadedInput(std::span<const CommandTimelineEntry> entries,
+                                  CommandTimelineViewState& viewState) noexcept;
+        static bool IsCurrentGeneration(const CommandTimelineViewState& viewState,
+                                        uint64_t executionGeneration) noexcept;
+        void Reset(CommandTimelineViewState& viewState) noexcept;
+
+        static bool IsMultiline(std::wstring_view commandText) noexcept;
+
+    private:
+        static const CommandTimelineEntry* _selected(std::span<const CommandTimelineEntry> entries,
+                                                     const CommandTimelineViewState& viewState) noexcept;
     };
 
     struct NativeMarkSnapshot

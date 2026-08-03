@@ -35,6 +35,7 @@ namespace winTerm::CommandTimeline
         selectedCommandId.reset();
         visibleNativeAnchor.reset();
         selectedVisualSlot.reset();
+        loadedCommandId.reset();
         loadedIntoInput = false;
         executionGeneration = 0;
     }
@@ -397,6 +398,170 @@ namespace winTerm::CommandTimeline
             return ExecutionResult::Unknown;
         }
         return entry.executionResult;
+    }
+
+    bool CommandActionRequest::Actionable() const noexcept
+    {
+        return status == CommandActionStatus::Ready;
+    }
+
+    bool CommandTimelineActionModel::IsMultiline(const std::wstring_view commandText) noexcept
+    {
+        return commandText.find_first_of(L"\r\n") != std::wstring_view::npos;
+    }
+
+    const CommandTimelineEntry* CommandTimelineActionModel::_selected(
+        const std::span<const CommandTimelineEntry> entries,
+        const CommandTimelineViewState& viewState) noexcept
+    {
+        if (!viewState.selectedCommandId.has_value())
+        {
+            return nullptr;
+        }
+
+        const auto found = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+            return entry.id == *viewState.selectedCommandId;
+        });
+        return found == entries.end() ? nullptr : &*found;
+    }
+
+    CommandActionRequest CommandTimelineActionModel::Prepare(const CommandActionKind kind,
+                                                             const std::span<const CommandTimelineEntry> entries,
+                                                             const CommandTimelineViewState& viewState,
+                                                             const CommandLoadPolicy& policy) const
+    {
+        CommandActionRequest request{
+            .kind = kind,
+            .status = CommandActionStatus::NoSelection,
+            .executionGeneration = viewState.executionGeneration,
+        };
+
+        const auto* const entry = _selected(entries, viewState);
+        if (!entry)
+        {
+            return request;
+        }
+
+        request.id = entry->id;
+        request.nativeMarkId = entry->nativeMarkId;
+        request.commandText = entry->cachedCommandText;
+        request.characterCount = entry->cachedCommandText.size();
+        request.multiline = IsMultiline(entry->cachedCommandText);
+
+        switch (kind)
+        {
+        case CommandActionKind::JumpToOutput:
+            // Jumping only needs a native mark that still resolves to a live
+            // range. The output text itself stays in the terminal buffer.
+            request.status = entry->nativeMarkId != 0 && entry->nativeRangeValid ?
+                                 CommandActionStatus::Ready :
+                                 CommandActionStatus::OutputUnavailable;
+            return request;
+        case CommandActionKind::CopyOutput:
+            // Output is resolved by the caller on demand. The Timeline holds no
+            // output cache, so this only reports whether a resolvable range
+            // still exists.
+            request.status = entry->nativeMarkId != 0 && entry->nativeRangeValid &&
+                                     entry->lifecycleState != CommandLifecycleState::Command ?
+                                 CommandActionStatus::Ready :
+                                 CommandActionStatus::OutputUnavailable;
+            return request;
+        case CommandActionKind::CopyCommand:
+            request.status = entry->cachedCommandText.empty() ?
+                                 CommandActionStatus::CommandTextUnavailable :
+                                 CommandActionStatus::Ready;
+            return request;
+        case CommandActionKind::LoadIntoInput:
+            break;
+        }
+
+        if (entry->cachedCommandText.empty())
+        {
+            request.status = CommandActionStatus::CommandTextUnavailable;
+            return request;
+        }
+
+        // A multiline command can only be placed on the input line safely when
+        // the shell brackets the paste. Without bracketed paste the embedded
+        // line breaks would be consumed as command submissions, which would
+        // execute the command the Timeline is only supposed to load.
+        if (request.multiline && !policy.bracketedPasteEnabled)
+        {
+            request.status = CommandActionStatus::MultilineUnsafe;
+            return request;
+        }
+
+        const auto warnMultiline = policy.warnOnMultilineLoad && request.multiline;
+        const auto warnLarge = policy.warnOnLargeLoad &&
+                               request.characterCount > policy.largeLoadCharacterThreshold;
+        request.status = warnMultiline || warnLarge ?
+                             CommandActionStatus::ConfirmationRequired :
+                             CommandActionStatus::Ready;
+        return request;
+    }
+
+    CommandActionRequest CommandTimelineActionModel::Confirm(CommandActionRequest request) noexcept
+    {
+        if (request.status == CommandActionStatus::ConfirmationRequired)
+        {
+            request.status = CommandActionStatus::Ready;
+        }
+        return request;
+    }
+
+    void CommandTimelineActionModel::NotifyLoaded(CommandTimelineViewState& viewState,
+                                                  const CommandActionRequest& request) noexcept
+    {
+        if (request.kind != CommandActionKind::LoadIntoInput || !request.Actionable())
+        {
+            return;
+        }
+
+        viewState.loadedCommandId = request.id;
+        viewState.loadedIntoInput = true;
+        ++viewState.executionGeneration;
+    }
+
+    void CommandTimelineActionModel::NotifyExecutionStarted(CommandTimelineViewState& viewState) noexcept
+    {
+        // The pane started a new command, so any text the Timeline previously
+        // placed on the input line has been consumed. Retiring the generation
+        // here is what makes a late completion from the previous command
+        // detectable by IsCurrentGeneration.
+        viewState.loadedCommandId.reset();
+        viewState.loadedIntoInput = false;
+        ++viewState.executionGeneration;
+    }
+
+    void CommandTimelineActionModel::ReconcileLoadedInput(const std::span<const CommandTimelineEntry> entries,
+                                                          CommandTimelineViewState& viewState) noexcept
+    {
+        if (!viewState.loadedCommandId.has_value())
+        {
+            viewState.loadedIntoInput = false;
+            return;
+        }
+
+        const auto survives = std::any_of(entries.begin(), entries.end(), [&](const auto& entry) {
+            return entry.id == *viewState.loadedCommandId;
+        });
+        if (!survives)
+        {
+            viewState.loadedCommandId.reset();
+            viewState.loadedIntoInput = false;
+        }
+    }
+
+    bool CommandTimelineActionModel::IsCurrentGeneration(const CommandTimelineViewState& viewState,
+                                                         const uint64_t executionGeneration) noexcept
+    {
+        return viewState.executionGeneration == executionGeneration;
+    }
+
+    void CommandTimelineActionModel::Reset(CommandTimelineViewState& viewState) noexcept
+    {
+        viewState.loadedCommandId.reset();
+        viewState.loadedIntoInput = false;
     }
 
     std::wstring CommandTextCachePolicy::Apply(const std::wstring_view commandText) const

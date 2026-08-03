@@ -1380,6 +1380,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock x:Uid="CommandTimelineTitle"
@@ -1406,6 +1407,15 @@
                            AutomationProperties.LiveSetting="Off"
                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                            TextAlignment="Center"
+                           TextWrapping="WrapWholeWords"
+                           Visibility="Collapsed" />
+
+                <TextBlock x:Name="CommandTimelineStatusText"
+                           Grid.Row="2"
+                           Margin="0,8,0,0"
+                           AutomationProperties.LiveSetting="Polite"
+                           FontSize="11"
+                           Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
                            TextWrapping="WrapWholeWords"
                            Visibility="Collapsed" />
             </Grid>

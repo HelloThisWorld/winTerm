@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.2.3 - 2026-08-03
+
+### Added
+
+- Added Command Timeline Phase 3 entry actions. Enter and a single click load
+  the selected command onto the focused pane's input line, Space jumps the
+  viewport to that command's native mark, and Ctrl+C copies the selected
+  command text while the Timeline owns the keyboard.
+- Added a per-entry context menu with copy command, copy output, and jump to
+  output. Every action resolves through the stable pane-scoped `CommandId`, so
+  eviction, reflow, or a list rebuild between the right-click and the
+  invocation can never retarget the action to a different command.
+- Added a pure C++ `CommandTimelineActionModel` that decides load eligibility,
+  tracks the loaded command, and advances an execution generation. A completion
+  that belongs to a retired generation is detectable and discarded, which is
+  what protects the loaded-input state from a late-completing command.
+- Added on-demand output resolution. Output is read straight from the terminal
+  buffer only when the user explicitly asks to copy it, and is never cached,
+  indexed, or retained by the Timeline.
+
+### Changed
+
+- A Timeline load never executes. The payload is filtered for control codes
+  only, the `CarriageReturnNewline` paste filter is deliberately not applied,
+  no carriage return is ever appended, and the text is sent straight to this
+  pane's connection, so the Windows clipboard is never read and input broadcast
+  cannot forward the load to another pane.
+- A multi-line command is refused outright when the shell has not enabled
+  bracketed paste, because the embedded line breaks would otherwise be consumed
+  as command submissions. With bracketed paste the command loads literally.
+- A load above 1024 characters asks for confirmation before it is placed on the
+  input line; Escape cancels the pending confirmation before it closes the
+  overlay.
+- Advanced engineering application and PowerShell module versions to `1.2.3`,
+  package/file versions to `1.2.3.0`, and the intended checkpoint tag to
+  `v1.2.3`; workspace, docking, shell, theme, update-manifest, package identity,
+  and signing-policy versions remain unchanged.
+
+### Checkpoint status
+
+- `v1.2.3` is an engineering checkpoint for Command Timeline Phase 3, not a
+  public GitHub Release. GitHub Latest and README public downloads remain on
+  v1.2.0. Search, filtering, and the public Command Timeline settings remain
+  reserved for Phase 4.
+
 ## 1.2.2 - 2026-08-02
 
 ### Added
