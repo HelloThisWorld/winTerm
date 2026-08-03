@@ -5,8 +5,8 @@ Last updated: 2026-08-04
 ## Repository state
 
 - Branch: `feature/command-timeline-v1.3.0-phase4`
-- Base branch: `feature/command-timeline-v1.3.0` (Command Timeline Phase 3,
-  tag `v1.2.3`, pull request #29 awaiting owner merge)
+- Base branch: `main`. Command Timeline Phase 3 (tag `v1.2.3`) was squash-merged
+  to `main` as `5fd2172` through pull request #29.
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
 - Engineering application and PowerShell module version: `1.2.4`

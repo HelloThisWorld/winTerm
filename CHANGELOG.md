@@ -49,6 +49,8 @@
   public GitHub Release. GitHub Latest and README public downloads remain on
   v1.2.0. There is still no persistent history, no output cache, and no
   telemetry.
+- Builds on Command Timeline Phase 3, squash-merged to `main` as `5fd2172`
+  through pull request #29.
 
 ## 1.2.3 - 2026-08-03
 
