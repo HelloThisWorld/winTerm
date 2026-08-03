@@ -137,6 +137,10 @@ try
             throw "WinGet workflow is missing required boundary '$required'."
         }
     }
+    if (-not $wingetWorkflow.Contains("github.event_name == 'release' && !github.event.release.prerelease"))
+    {
+        throw 'WinGet workflow must skip prerelease Releases so alpha and beta never reach WinGet.'
+    }
     if ($wingetWorkflow.Contains('Repair-WinGetPackageManager -Latest') -or
         $wingetWorkflow -match '(?i)\.msix(bundle)?')
     {
