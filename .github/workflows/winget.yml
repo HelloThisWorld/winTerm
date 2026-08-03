@@ -38,7 +38,13 @@ jobs:
 
   validate:
     name: Generate and validate manifests from a public Release
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    # WinGet distributes stable versions only. A prerelease Release (alpha or
+    # beta) must never generate a WinGet manifest, so it is skipped here rather
+    # than failing later on a version string WinGet cannot express. A manual
+    # dispatch still works for republishing an existing stable Release.
+    if: >-
+      (github.event_name == 'release' && !github.event.release.prerelease)
+      || github.event_name == 'workflow_dispatch'
     runs-on: windows-2022
     timeout-minutes: 30
     steps:

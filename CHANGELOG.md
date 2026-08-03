@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.3.0-alpha1 - 2026-08-04
+
+First public prerelease of the Command Timeline. This is an alpha for local
+testing, not a stable release: GitHub Latest and the winTerm website continue
+to point at v1.2.0, and this version is not submitted to WinGet.
+
+### Added
+
+- Promoted the Command Timeline to a testable prerelease, combining engineering
+  checkpoints v1.2.1 through v1.2.4: the pane-owned OSC 133 index, the overlay
+  and deterministic navigation, load/copy/jump entry actions, and pane-local
+  search with the two public settings.
+- Published `commandTimeline.enabled` (default `true`) and
+  `commandTimeline.historyLimit` (default `500`, range 50–5000) under
+  Settings → Appearance → Command timeline.
+
+### Changed
+
+- Advanced the release channel to `alpha` with application version
+  `1.3.0-alpha1`, package/file version `1.3.0.0`, and PowerShell module version
+  `1.3.0` plus prerelease suffix `alpha1`. The release workflow marks any
+  non-stable channel as a GitHub prerelease with `--latest=false`, so the
+  public Latest download remains v1.2.0.
+- Relaxed `verify-version.ps1` from a stable-only gate to a channel-aware one.
+  It now accepts `stable`, `alpha`, and `beta`, and additionally enforces that
+  the channel, the module prerelease suffix, and the application-version suffix
+  agree, that the package version stays four-part numeric, and that the module
+  version stays numeric.
+- Added a prerelease guard to the WinGet workflow so an alpha or beta Release
+  never generates a WinGet manifest.
+
+### Checkpoint status
+
+- Workspace schema, docking model, shell protocol, theme schema, update
+  manifest schema, package identity, and signing policy are unchanged from
+  v1.2.0. The Setup EXE remains unsigned; see the release notes.
+
 ## 1.2.4 - 2026-08-04
 
 ### Added
