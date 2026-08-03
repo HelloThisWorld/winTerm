@@ -323,6 +323,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool _commandTimelineOpen{ false };
         bool _updatingCommandTimelineSelection{ false };
         std::array<bool, 256> _commandTimelineConsumedKeys{};
+        std::optional<winTerm::CommandTimeline::CommandActionRequest> _commandTimelinePendingLoad;
 
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellLightAnimation{ nullptr };
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellDarkAnimation{ nullptr };
@@ -393,7 +394,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _CommandTimelineWheelSettled(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& e);
         void _ScrollbarChangeHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs& e);
 
+        void _CommandTimelineItemContextRequested(const Windows::UI::Xaml::UIElement& sender, const Windows::UI::Xaml::Input::ContextRequestedEventArgs& e);
+
         bool _tryHandleCommandTimelineKey(WORD vkey, ::Microsoft::Terminal::Core::ControlKeyStates modifiers, bool keyDown);
+        bool _loadCommandTimelineSelection();
+        bool _jumpToCommandTimelineOutput();
+        bool _copyCommandTimelineCommand();
+        bool _copyCommandTimelineOutput();
+        void _setCommandTimelineStatus(const winrt::hstring& status);
+        void _clearCommandTimelinePendingLoad();
         bool _tryHandleCommandTimelineWheel(const Windows::Foundation::Point& position, int delta);
         bool _isPointOverCommandTimeline(const Windows::Foundation::Point& position) noexcept;
         size_t _commandTimelineVisibleCapacity() noexcept;

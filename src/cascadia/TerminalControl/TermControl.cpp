@@ -2234,32 +2234,44 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return true;
         }
 
-        if (!_commandTimelineOpen ||
-            modifiers.IsCtrlPressed() || modifiers.IsAltPressed() ||
-            modifiers.IsShiftPressed() || modifiers.IsWinPressed())
+        if (!_commandTimelineOpen || modifiers.IsAltPressed() || modifiers.IsWinPressed())
+        {
+            return false;
+        }
+
+        // Ctrl+C copies the selected command while the Timeline owns the
+        // keyboard. Every other modifier combination is left to the existing
+        // key binding and PTY paths.
+        const auto copyCommandChord = modifiers.IsCtrlPressed() && !modifiers.IsShiftPressed() && vkey == 'C';
+        if (!copyCommandChord && (modifiers.IsCtrlPressed() || modifiers.IsShiftPressed()))
         {
             return false;
         }
 
         std::optional<winTerm::CommandTimeline::NavigationAction> action;
-        switch (vkey)
+        if (!copyCommandChord)
         {
-        case VK_UP:
-            action = winTerm::CommandTimeline::NavigationAction::Previous;
-            break;
-        case VK_DOWN:
-            action = winTerm::CommandTimeline::NavigationAction::Next;
-            break;
-        case VK_LEFT:
-            action = winTerm::CommandTimeline::NavigationAction::PageFirst;
-            break;
-        case VK_RIGHT:
-            action = winTerm::CommandTimeline::NavigationAction::PageLast;
-            break;
-        case VK_ESCAPE:
-            break;
-        default:
-            return false;
+            switch (vkey)
+            {
+            case VK_UP:
+                action = winTerm::CommandTimeline::NavigationAction::Previous;
+                break;
+            case VK_DOWN:
+                action = winTerm::CommandTimeline::NavigationAction::Next;
+                break;
+            case VK_LEFT:
+                action = winTerm::CommandTimeline::NavigationAction::PageFirst;
+                break;
+            case VK_RIGHT:
+                action = winTerm::CommandTimeline::NavigationAction::PageLast;
+                break;
+            case VK_ESCAPE:
+            case VK_RETURN:
+            case VK_SPACE:
+                break;
+            default:
+                return false;
+            }
         }
 
         if (vkey < _commandTimelineConsumedKeys.size())
@@ -2271,14 +2283,40 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             return true;
         }
 
-        if (vkey == VK_ESCAPE)
+        if (copyCommandChord)
         {
+            _copyCommandTimelineCommand();
+            return true;
+        }
+
+        switch (vkey)
+        {
+        case VK_ESCAPE:
+            // A pending load confirmation is cancelled before the overlay
+            // itself closes, so Escape never discards more than one step.
+            if (_commandTimelinePendingLoad.has_value())
+            {
+                _clearCommandTimelinePendingLoad();
+                _setCommandTimelineStatus({});
+                return true;
+            }
             _closeCommandTimeline(true);
             return true;
+        case VK_RETURN:
+            _loadCommandTimelineSelection();
+            return true;
+        case VK_SPACE:
+            _jumpToCommandTimelineOutput();
+            return true;
+        default:
+            break;
         }
 
         try
         {
+            // Moving the selection invalidates any confirmation that was still
+            // waiting on the previously selected command.
+            _clearCommandTimelinePendingLoad();
             const auto presentation = get_self<ControlCore>(_core)->NavigateCommandTimeline(*action);
             _renderCommandTimeline(presentation);
         }
@@ -2288,6 +2326,255 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             _closeCommandTimeline(true);
         }
         return true;
+    }
+
+    // Places the selected command on this pane's input line. The Timeline never
+    // executes it: no carriage return is ever appended, the Windows clipboard is
+    // never read, and only this pane's connection is targeted, so input
+    // broadcast cannot forward the load to another pane.
+    bool TermControl::_loadCommandTimelineSelection()
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return false;
+        }
+
+        using namespace winTerm::CommandTimeline;
+
+        try
+        {
+            auto core = get_self<ControlCore>(_core);
+            auto request = _commandTimelinePendingLoad.has_value() ?
+                               CommandTimelineActionModel::Confirm(*_commandTimelinePendingLoad) :
+                               core->PrepareCommandTimelineAction(CommandActionKind::LoadIntoInput);
+            _clearCommandTimelinePendingLoad();
+
+            switch (request.status)
+            {
+            case CommandActionStatus::Ready:
+                break;
+            case CommandActionStatus::ConfirmationRequired:
+                // Hold the prepared request so the next Enter confirms it.
+                _commandTimelinePendingLoad = request;
+                _setCommandTimelineStatus(RS_(L"CommandTimelineConfirmLoad"));
+                return false;
+            case CommandActionStatus::MultilineUnsafe:
+                _setCommandTimelineStatus(RS_(L"CommandTimelineMultilineBlocked"));
+                return false;
+            case CommandActionStatus::CommandTextUnavailable:
+                _setCommandTimelineStatus(RS_(L"CommandTimelineCommandUnavailable"));
+                return false;
+            default:
+                return false;
+            }
+
+            if (!core->LoadCommandTimelineCommand(request))
+            {
+                _setCommandTimelineStatus(RS_(L"CommandTimelineCommandUnavailable"));
+                return false;
+            }
+
+            _closeCommandTimeline(true);
+            return true;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+            return false;
+        }
+    }
+
+    bool TermControl::_jumpToCommandTimelineOutput()
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return false;
+        }
+
+        using namespace winTerm::CommandTimeline;
+
+        try
+        {
+            auto core = get_self<ControlCore>(_core);
+            const auto request = core->PrepareCommandTimelineAction(CommandActionKind::JumpToOutput);
+            if (!request.Actionable() || !core->JumpToCommandTimelineOutput(request))
+            {
+                _setCommandTimelineStatus(RS_(L"CommandTimelineOutputUnavailable"));
+                return false;
+            }
+            _setCommandTimelineStatus({});
+            return true;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+            return false;
+        }
+    }
+
+    bool TermControl::_copyCommandTimelineCommand()
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return false;
+        }
+
+        using namespace winTerm::CommandTimeline;
+
+        try
+        {
+            auto core = get_self<ControlCore>(_core);
+            const auto request = core->PrepareCommandTimelineAction(CommandActionKind::CopyCommand);
+            if (!request.Actionable() || !core->CopyCommandTimelineText(request.commandText))
+            {
+                _setCommandTimelineStatus(RS_(L"CommandTimelineCommandUnavailable"));
+                return false;
+            }
+            _setCommandTimelineStatus({});
+            return true;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+            return false;
+        }
+    }
+
+    // Output is resolved from the terminal buffer only at this point, for this
+    // one command. Nothing about the output is retained afterwards.
+    bool TermControl::_copyCommandTimelineOutput()
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return false;
+        }
+
+        using namespace winTerm::CommandTimeline;
+
+        try
+        {
+            auto core = get_self<ControlCore>(_core);
+            const auto request = core->PrepareCommandTimelineAction(CommandActionKind::CopyOutput);
+            if (!request.Actionable())
+            {
+                _setCommandTimelineStatus(RS_(L"CommandTimelineOutputUnavailable"));
+                return false;
+            }
+
+            const auto output = core->ResolveCommandTimelineOutput(request);
+            if (output.empty() || !core->CopyCommandTimelineText(output))
+            {
+                _setCommandTimelineStatus(RS_(L"CommandTimelineOutputUnavailable"));
+                return false;
+            }
+            _setCommandTimelineStatus({});
+            return true;
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+            return false;
+        }
+    }
+
+    void TermControl::_setCommandTimelineStatus(const winrt::hstring& status)
+    {
+        if (_IsClosing())
+        {
+            return;
+        }
+
+        const auto text = CommandTimelineStatusText();
+        text.Text(status);
+        text.Visibility(status.empty() ? Visibility::Collapsed : Visibility::Visible);
+    }
+
+    void TermControl::_clearCommandTimelinePendingLoad()
+    {
+        _commandTimelinePendingLoad.reset();
+    }
+
+    // Builds the per-entry context menu. Every action resolves through the
+    // model's stable CommandId rather than the XAML row, so a list rebuild
+    // between the right-click and the invocation cannot retarget the action.
+    void TermControl::_CommandTimelineItemContextRequested(const Windows::UI::Xaml::UIElement& sender,
+                                                           const Input::ContextRequestedEventArgs& args)
+    {
+        if (_IsClosing() || !_commandTimelineOpen)
+        {
+            return;
+        }
+
+        const auto list = CommandTimelineList();
+        uint32_t slot{};
+        if (!list.Items().IndexOf(sender, slot))
+        {
+            return;
+        }
+
+        try
+        {
+            _clearCommandTimelinePendingLoad();
+            const auto updated = get_self<ControlCore>(_core)->SelectCommandTimelineVisibleEntry(slot);
+            _renderCommandTimeline(updated);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+            return;
+        }
+
+        // _renderCommandTimeline rebuilds the rows, so the flyout must attach to
+        // the element that now occupies this slot.
+        if (slot >= list.Items().Size())
+        {
+            return;
+        }
+        const auto target = list.Items().GetAt(slot).try_as<Controls::ListViewItem>();
+        if (!target)
+        {
+            return;
+        }
+
+        Controls::MenuFlyout flyout;
+
+        Controls::MenuFlyoutItem copyCommand;
+        copyCommand.Text(RS_(L"CommandTimelineCopyCommand"));
+        copyCommand.Click([weakThis = get_weak()](const auto&, const auto&) {
+            if (auto control{ weakThis.get() })
+            {
+                control->_copyCommandTimelineCommand();
+            }
+        });
+        flyout.Items().Append(copyCommand);
+
+        Controls::MenuFlyoutItem copyOutput;
+        copyOutput.Text(RS_(L"CommandTimelineCopyOutput"));
+        copyOutput.Click([weakThis = get_weak()](const auto&, const auto&) {
+            if (auto control{ weakThis.get() })
+            {
+                control->_copyCommandTimelineOutput();
+            }
+        });
+        flyout.Items().Append(copyOutput);
+
+        Controls::MenuFlyoutItem jumpToOutput;
+        jumpToOutput.Text(RS_(L"CommandTimelineJumpToOutput"));
+        jumpToOutput.Click([weakThis = get_weak()](const auto&, const auto&) {
+            if (auto control{ weakThis.get() })
+            {
+                control->_jumpToCommandTimelineOutput();
+            }
+        });
+        flyout.Items().Append(jumpToOutput);
+
+        flyout.ShowAt(target);
+        args.Handled(true);
     }
 
     bool TermControl::_tryHandleCommandTimelineWheel(const Windows::Foundation::Point& position,
@@ -2521,6 +2808,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 {
                     try
                     {
+                        control->_clearCommandTimelinePendingLoad();
                         const auto updated = get_self<ControlCore>(control->_core)->SelectCommandTimelineVisibleEntry(slot);
                         control->_renderCommandTimeline(updated);
                     }
@@ -2531,6 +2819,29 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                     }
                 }
             });
+
+            // A single click loads the command onto the input line. Hover above
+            // only moves the selection, so pointing at an entry never loads it.
+            item.Tapped([weakThis = get_weak(), slot](const auto&, const auto& tapped) {
+                if (auto control{ weakThis.get() };
+                    control && !control->_IsClosing() && control->_commandTimelineOpen)
+                {
+                    try
+                    {
+                        const auto updated = get_self<ControlCore>(control->_core)->SelectCommandTimelineVisibleEntry(slot);
+                        control->_renderCommandTimeline(updated);
+                        control->_loadCommandTimelineSelection();
+                    }
+                    catch (...)
+                    {
+                        LOG_CAUGHT_EXCEPTION();
+                        control->_closeCommandTimeline(true);
+                    }
+                }
+                tapped.Handled(true);
+            });
+
+            item.ContextRequested({ get_weak(), &TermControl::_CommandTimelineItemContextRequested });
             list.Items().Append(item);
         }
 
@@ -2563,11 +2874,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         _commandTimelineOpen = false;
+        _clearCommandTimelinePendingLoad();
         _updatingCommandTimelineSelection = true;
         CommandTimelineList().Items().Clear();
         CommandTimelineList().SelectedIndex(-1);
         _updatingCommandTimelineSelection = false;
         CommandTimelineEmptyText().Visibility(Visibility::Collapsed);
+        CommandTimelineStatusText().Text({});
+        CommandTimelineStatusText().Visibility(Visibility::Collapsed);
         CommandTimelineOverlay().Visibility(Visibility::Collapsed);
         Windows::UI::Xaml::Automation::AutomationProperties::SetName(CommandTimelineHandle(), RS_(L"CommandTimelineOpen"));
         Controls::ToolTipService::SetToolTip(CommandTimelineHandle(), box_value(RS_(L"CommandTimelineOpen")));

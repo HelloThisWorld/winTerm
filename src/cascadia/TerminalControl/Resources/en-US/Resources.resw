@@ -376,4 +376,22 @@
   <data name="CommandTimelineStatusUnknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
+  <data name="CommandTimelineCopyCommand" xml:space="preserve">
+    <value>Copy command</value>
+  </data>
+  <data name="CommandTimelineCopyOutput" xml:space="preserve">
+    <value>Copy output</value>
+  </data>
+  <data name="CommandTimelineJumpToOutput" xml:space="preserve">
+    <value>Jump to output</value>
+  </data>
+  <data name="CommandTimelineOutputUnavailable" xml:space="preserve">
+    <value>Output is no longer available</value>
+  </data>
+  <data name="CommandTimelineMultilineBlocked" xml:space="preserve">
+    <value>This shell cannot load a multi-line command safely</value>
+  </data>
+  <data name="CommandTimelineConfirmLoad" xml:space="preserve">
+    <value>Press Enter again to load this command</value>
+  </data>
 </root>

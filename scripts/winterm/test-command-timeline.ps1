@@ -62,6 +62,23 @@ if ($modelHeader.Contains('commandOutput') -or $modelHeader.Contains('cachedOutp
     throw 'The visible Command Timeline model must never contain command output.'
 }
 
+Assert-Contains -Content $modelHeader -Values @(
+    'class CommandTimelineActionModel final',
+    'enum class CommandActionKind',
+    'CommandActionKind::LoadIntoInput',
+    'struct CommandLoadPolicy',
+    'NotifyExecutionStarted',
+    'IsCurrentGeneration',
+    'ReconcileLoadedInput'
+) -Failure 'The pure Command Timeline entry-action model is incomplete.'
+Assert-Contains -Content $modelSource -Values @(
+    'CommandActionStatus::MultilineUnsafe',
+    'CommandActionStatus::ConfirmationRequired',
+    'CommandActionStatus::OutputUnavailable',
+    '++viewState.executionGeneration',
+    'viewState.loadedCommandId.reset()'
+) -Failure 'Command Timeline load, confirmation, or execution-generation semantics are incomplete.'
+
 Assert-Contains -Content $controlCoreHeader -Values @(
     'CommandTimelineNavigationModel _commandTimelineNavigation',
     'OpenCommandTimeline',
@@ -75,6 +92,46 @@ Assert-Contains -Content $controlCoreSource -Values @(
     'CommandTimelineChanged.raise',
     '_commandTimelineNavigation.Close()'
 ) -Failure 'ControlCore does not project Phase 1 data incrementally or clean it up.'
+
+Assert-Contains -Content $controlCoreHeader -Values @(
+    'CommandTimelineActionModel _commandTimelineActions',
+    'PrepareCommandTimelineAction',
+    'LoadCommandTimelineCommand',
+    'ResolveCommandTimelineOutput',
+    'JumpToCommandTimelineOutput',
+    'CopyCommandTimelineText'
+) -Failure 'ControlCore does not expose the pane-local Timeline entry actions.'
+Assert-Contains -Content $controlCoreSource -Values @(
+    'FilterStringForPaste(request.commandText, ControlCodes)',
+    '_commandTimelineActions.NotifyLoaded',
+    '_commandTimelineActions.NotifyExecutionStarted',
+    '_commandTimelineActions.ReconcileLoadedInput',
+    '_terminal->ResolveCommandTimelineOutput(request.nativeMarkId)'
+) -Failure 'Timeline load, generation tracking, or on-demand output resolution is incomplete.'
+
+# A Timeline load must never submit the command. Requesting the
+# CarriageReturnNewline paste filter, or appending a carriage return to the
+# payload, would turn a load into an execution.
+$loadStart = $controlCoreSource.IndexOf('bool ControlCore::LoadCommandTimelineCommand', [StringComparison]::Ordinal)
+if ($loadStart -lt 0) {
+    throw 'ControlCore::LoadCommandTimelineCommand is missing.'
+}
+$loadEnd = $controlCoreSource.IndexOf("`n    }", $loadStart, [StringComparison]::Ordinal)
+$loadBody = $controlCoreSource.Substring($loadStart, $loadEnd - $loadStart)
+# Compare against code only. The body documents why these constructs are
+# excluded, so the prose must not trip the guard.
+$loadCode = [regex]::Replace($loadBody, '//.*', '')
+foreach ($forbidden in @('CarriageReturnNewline', 'append(L"\r")', "append(L'\r')", 'L"\r\n"')) {
+    if ($loadCode.Contains($forbidden)) {
+        throw "The Timeline load path must never submit the command. Found '$forbidden'."
+    }
+}
+if ($loadCode.Contains('clipboard::') -or $loadCode.Contains('Clipboard::GetContent')) {
+    throw 'The Timeline load path must never read the Windows clipboard.'
+}
+if (-not $loadCode.Contains('SendInput(payload)')) {
+    throw 'The Timeline load must target this pane connection directly.'
+}
 
 $overlayStart = $termControlXaml.IndexOf('<Border x:Name="CommandTimelineOverlay"', [StringComparison]::Ordinal)
 $rendererNoticeStart = $termControlXaml.IndexOf('<Grid x:Name="RendererFailedNotice"', [StringComparison]::Ordinal)
@@ -149,12 +206,37 @@ Assert-Contains -Content $resources -Values @(
     'CommandTimelineStatusUnknown'
 ) -Failure 'Timeline accessibility names or status text are missing.'
 
+Assert-Contains -Content $termControlSource -Values @(
+    '_loadCommandTimelineSelection()',
+    '_jumpToCommandTimelineOutput()',
+    '_copyCommandTimelineCommand()',
+    '_copyCommandTimelineOutput()',
+    'CommandActionKind::LoadIntoInput',
+    'CommandActionStatus::MultilineUnsafe',
+    '_clearCommandTimelinePendingLoad()',
+    'item.ContextRequested'
+) -Failure 'Timeline load, jump, copy, or context-menu routing is incomplete.'
+Assert-Contains -Content $resources -Values @(
+    'CommandTimelineCopyCommand',
+    'CommandTimelineCopyOutput',
+    'CommandTimelineJumpToOutput',
+    'CommandTimelineOutputUnavailable',
+    'CommandTimelineMultilineBlocked',
+    'CommandTimelineConfirmLoad'
+) -Failure 'Timeline entry-action localized strings are missing.'
+
 Assert-Contains -Content $controlTests -Values @(
     'NavigationPageEdgesMoveOneInOneOut',
     'NavigationWheelAccumulatesReversesAndSettles',
     'NavigationStateIsPaneLocalAndRepeatedCloseIsSafe',
-    'ColdBootstrapScansOnceAndWarmAccessDoesNotRescan'
-) -Failure 'Deterministic Timeline navigation, pane isolation, cleanup, or warm-access tests are missing.'
+    'ColdBootstrapScansOnceAndWarmAccessDoesNotRescan',
+    'ActionLoadPreparesSelectedCommandWithoutExecuting',
+    'ActionLoadRefusesMultilineWithoutBracketedPaste',
+    'ActionLateCompletionIsDetectedAfterExecutionStart',
+    'ActionLoadedInputIsReleasedOnEviction',
+    'ActionCopyResolvesStableCommandIdNotRowIndex',
+    'ActionOutputRequiresLiveNativeRangeAndIsNeverCached'
+) -Failure 'Deterministic Timeline navigation, action, pane isolation, cleanup, or warm-access tests are missing.'
 Assert-Contains -Content $settingsTests -Values @(
     'CommandTimelineDefaultShortcutsAndUserOverride',
     'ShortcutAction::ToggleCommandTimeline',
@@ -163,4 +245,4 @@ Assert-Contains -Content $settingsTests -Values @(
 
 [xml](Read-Source 'src\cascadia\TerminalControl\TermControl.xaml') | Out-Null
 [xml](Read-Source 'src\cascadia\TerminalControl\Resources\en-US\Resources.resw') | Out-Null
-Write-Host 'PASS: Command Timeline Phase 2 source, input, accessibility, privacy, and lifecycle boundaries' -ForegroundColor Green
+Write-Host 'PASS: Command Timeline Phase 3 source, input, action, accessibility, privacy, and lifecycle boundaries' -ForegroundColor Green

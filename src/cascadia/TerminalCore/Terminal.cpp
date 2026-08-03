@@ -1570,6 +1570,41 @@ std::wstring Terminal::CurrentCommandTimelineCommand() const
     return _inAltBuffer() ? std::wstring{} : _mainBuffer->CurrentCommandTimelineCommand();
 }
 
+// Resolves a Command Timeline native mark identity back to its current buffer
+// extents. Identities are already assigned while the Timeline index is built,
+// so this only re-reads the existing assignment and never invents a range.
+std::optional<MarkExtents> Terminal::FindCommandTimelineMarkExtents(const uint64_t identity)
+{
+    if (_inAltBuffer() || identity == 0)
+    {
+        return std::nullopt;
+    }
+
+    for (const auto& mark : _mainBuffer->GetMarkExtents())
+    {
+        if (_mainBuffer->EnsureCommandTimelineMarkIdentity(mark.start.y) == identity)
+        {
+            return mark;
+        }
+    }
+    return std::nullopt;
+}
+
+// Reads the output of a single Command Timeline entry directly out of the
+// terminal buffer. The Timeline keeps no output cache, so this is only called
+// when the user explicitly asks for the output of one command.
+std::wstring Terminal::ResolveCommandTimelineOutput(const uint64_t identity)
+{
+    const auto mark = FindCommandTimelineMarkExtents(identity);
+    if (!mark.has_value() || !mark->HasOutput())
+    {
+        return {};
+    }
+
+    const auto start = til::coalesce_value(mark->commandEnd, mark->end);
+    return _mainBuffer->GetPlainText(start, *mark->outputEnd);
+}
+
 std::vector<uint64_t> Terminal::ConsumeInvalidatedCommandTimelineMarkIdentities()
 {
     return _mainBuffer->ConsumeInvalidatedCommandTimelineMarkIdentities();

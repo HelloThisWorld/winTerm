@@ -1732,6 +1732,125 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _commandTimelineNavigation.Close();
     }
 
+    winTerm::CommandTimeline::CommandActionRequest ControlCore::PrepareCommandTimelineAction(
+        const winTerm::CommandTimeline::CommandActionKind kind)
+    {
+        const auto bracketedPaste = BracketedPasteEnabled();
+
+        const auto lock = _terminal->LockForWriting();
+        _ensureCommandTimelineBootstrap();
+        _commandTimelineActions.ReconcileLoadedInput(_commandTimelineIndex->Entries(), _commandTimelineViewState);
+
+        const winTerm::CommandTimeline::CommandLoadPolicy policy{
+            .largeLoadCharacterThreshold = 1024,
+            .bracketedPasteEnabled = bracketedPaste,
+            .warnOnMultilineLoad = false,
+            .warnOnLargeLoad = true,
+        };
+        return _commandTimelineActions.Prepare(kind,
+                                               _commandTimelineIndex->Entries(),
+                                               _commandTimelineViewState,
+                                               policy);
+    }
+
+    // Places a Timeline command on the pane's input line. This never reads the
+    // Windows clipboard, never appends a carriage return, and only ever targets
+    // this pane's connection, so it cannot execute the command and cannot be
+    // redirected by input broadcast.
+    bool ControlCore::LoadCommandTimelineCommand(const winTerm::CommandTimeline::CommandActionRequest& request)
+    {
+        using namespace ::Microsoft::Console::Utils;
+
+        if (request.kind != winTerm::CommandTimeline::CommandActionKind::LoadIntoInput ||
+            !request.Actionable() ||
+            request.commandText.empty())
+        {
+            return false;
+        }
+
+        // Only control codes are stripped. CarriageReturnNewline is deliberately
+        // not requested: converting a newline to a carriage return would submit
+        // the command instead of loading it.
+        auto payload = FilterStringForPaste(request.commandText, ControlCodes);
+        if (payload.empty())
+        {
+            return false;
+        }
+
+        if (BracketedPasteEnabled())
+        {
+            payload.insert(0, L"\x1b[200~");
+            payload.append(L"\x1b[201~");
+        }
+
+        // The connection may block, so the terminal lock must not be held here.
+        SendInput(payload);
+
+        const auto lock = _terminal->LockForWriting();
+        _commandTimelineActions.NotifyLoaded(_commandTimelineViewState, request);
+        _terminal->TrySnapOnInput();
+        return true;
+    }
+
+    // Resolves one command's output straight from the terminal buffer. Nothing
+    // is cached: the Timeline only ever holds command text.
+    std::wstring ControlCore::ResolveCommandTimelineOutput(const winTerm::CommandTimeline::CommandActionRequest& request)
+    {
+        if (request.kind != winTerm::CommandTimeline::CommandActionKind::CopyOutput || !request.Actionable())
+        {
+            return {};
+        }
+
+        const auto lock = _terminal->LockForWriting();
+        if (!winTerm::CommandTimeline::CommandTimelineActionModel::IsCurrentGeneration(_commandTimelineViewState,
+                                                                                       request.executionGeneration))
+        {
+            return {};
+        }
+        return _terminal->ResolveCommandTimelineOutput(request.nativeMarkId);
+    }
+
+    bool ControlCore::JumpToCommandTimelineOutput(const winTerm::CommandTimeline::CommandActionRequest& request)
+    {
+        if (request.kind != winTerm::CommandTimeline::CommandActionKind::JumpToOutput || !request.Actionable())
+        {
+            return false;
+        }
+
+        const auto viewHeight = ViewHeight();
+        const auto bufferSize = BufferHeight();
+        til::CoordType target{};
+        {
+            const auto lock = _terminal->LockForWriting();
+            const auto mark = _terminal->FindCommandTimelineMarkExtents(request.nativeMarkId);
+            if (!mark.has_value())
+            {
+                return false;
+            }
+            target = til::coalesce_value(mark->commandEnd, mark->end).y;
+            UserScrollViewport(target);
+        }
+
+        _terminalScrollPositionChanged(target, viewHeight, bufferSize);
+        return true;
+    }
+
+    // The only path that lets the Command Timeline reach the clipboard, and it
+    // is reached only from an explicit copy action. Plain text only: the
+    // Timeline never produces HTML or RTF payloads.
+    bool ControlCore::CopyCommandTimelineText(const std::wstring& text)
+    {
+        if (text.empty())
+        {
+            return false;
+        }
+
+        WriteToClipboard.raise(
+            *this,
+            winrt::make<WriteToClipboardEventArgs>(winrt::hstring{ text }, std::string{}, std::string{}));
+        return true;
+    }
+
     int ControlCore::ScrollOffset()
     {
         const auto lock = _terminal->LockForReading();
@@ -1871,6 +1990,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 .trustedExitCode = trustedExitCode,
                 .timestamp = std::chrono::system_clock::now(),
             });
+
+            // The pane began running a command, so anything the Timeline had
+            // placed on the input line is now consumed. Advancing the execution
+            // generation here is what lets a completion that belongs to the
+            // previous command be recognized as late and discarded.
+            if (kind == winTerm::CommandTimeline::LifecycleEventKind::CommandStart)
+            {
+                _commandTimelineActions.NotifyExecutionStarted(_commandTimelineViewState);
+            }
         }
 
         if (_commandTimelineIndex->Revision() != timelineRevisionBefore)

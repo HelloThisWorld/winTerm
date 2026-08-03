@@ -142,6 +142,8 @@ public:
     uint64_t GetCurrentCommandTimelineMarkIdentity() const noexcept;
     uint64_t GetCommandTimelineMarkRevision() const noexcept;
     std::wstring CurrentCommandTimelineCommand() const;
+    std::optional<MarkExtents> FindCommandTimelineMarkExtents(uint64_t identity);
+    std::wstring ResolveCommandTimelineOutput(uint64_t identity);
     std::vector<uint64_t> ConsumeInvalidatedCommandTimelineMarkIdentities();
     std::optional<std::vector<uint64_t>> ConsumeReflowCommandTimelineMarkIdentities();
 
