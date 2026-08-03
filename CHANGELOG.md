@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.2.4 - 2026-08-04
+
+### Added
+
+- Added pane-local Command Timeline search. `/` or Tab moves focus to the filter
+  box, typing filters the current pane's commands, Up and Down walk the filtered
+  results, and Enter loads the selected command without executing it. Neither
+  the focus keys nor the query text ever reach the PTY.
+- Added the `commandTimeline.enabled` and `commandTimeline.historyLimit` global
+  settings, exposed under Settings → Appearance → Command timeline. Defaults are
+  `true` and `500`; the history limit accepts 50 through 5000 per pane.
+- Added four distinct empty states so an unsupported shell is never reported as
+  simply having run no commands: waiting for shell integration, command timeline
+  unavailable, no commands yet, and no matching commands.
+- Added bounded per-pane history with oldest-first eviction, plus deterministic
+  coverage for filtered navigation, wheel accumulation over the filtered
+  projection, surrogate-safe query truncation, eviction, and a 5000-entry
+  worst-case search.
+
+### Changed
+
+- Search is a literal, case-insensitive substring match over each pane's bounded
+  in-memory command text only. There is no regex, no fuzzy matching, no output
+  search, and no terminal-buffer rescan.
+- Queries are capped at 256 UTF-16 code units and truncated without leaving a
+  lone surrogate. A query is never persisted: closing the overlay releases the
+  query, the filtered projection, and every materialized row.
+- The filtered projection keeps stable `CommandId` identity. A command that
+  still matches stays selected, a command that stops matching hands selection to
+  the nearest surviving match, and a new command only takes the selection when it
+  matches and the view was already following the latest command.
+- Escape now clears a non-empty query first and only closes the overlay once the
+  query is already empty.
+- Lowering `commandTimeline.historyLimit` evicts oldest-first immediately on
+  panes that already exist. Raising it never resurrects an evicted command, and
+  sequence IDs are never reused.
+- Disabling `commandTimeline.enabled` hides the left-side handle and closes an
+  overlay that is already open; the toggle shortcut no longer opens it.
+- Advanced engineering application and PowerShell module versions to `1.2.4`,
+  package/file versions to `1.2.4.0`, and the intended checkpoint tag to
+  `v1.2.4`; workspace, docking, shell, theme, update-manifest, package identity,
+  and signing-policy versions remain unchanged.
+
+### Checkpoint status
+
+- `v1.2.4` is an engineering checkpoint for Command Timeline Phase 4, not a
+  public GitHub Release. GitHub Latest and README public downloads remain on
+  v1.2.0. There is still no persistent history, no output cache, and no
+  telemetry.
+- Builds on Command Timeline Phase 3, squash-merged to `main` as `5fd2172`
+  through pull request #29.
+
 ## 1.2.3 - 2026-08-03
 
 ### Added

@@ -50,9 +50,11 @@
     <ClCompile Include="WinTermWorkspaceTests.cpp" />
     <ClCompile Include="WinTermPaneControlsTests.cpp" />
     <ClCompile Include="WinTermPaneResizeTests.cpp" />
+    <ClCompile Include="WinTermCommandTimelineTests.cpp" />
     <ClCompile Include="WinTermVisualProgressTests.cpp" />
     <ClCompile Include="MediaResourceTests.cpp" />
     <ClCompile Include="../TerminalSettingsAppAdapterLib/TerminalSettings.cpp" />
+    <ClCompile Include="../../winterm/CommandTimeline/CommandTimelineModel.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>

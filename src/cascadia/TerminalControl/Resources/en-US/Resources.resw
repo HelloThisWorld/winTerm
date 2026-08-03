@@ -394,4 +394,16 @@
   <data name="CommandTimelineConfirmLoad" xml:space="preserve">
     <value>Press Enter again to load this command</value>
   </data>
+  <data name="CommandTimelineSearchBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name" xml:space="preserve">
+    <value>Filter commands</value>
+  </data>
+  <data name="CommandTimelineSearchBox.PlaceholderText" xml:space="preserve">
+    <value>Filter commands</value>
+  </data>
+  <data name="CommandTimelineNoMatchingCommands" xml:space="preserve">
+    <value>No matching commands</value>
+  </data>
+  <data name="CommandTimelineWaitingForShell" xml:space="preserve">
+    <value>Waiting for shell integration</value>
+  </data>
 </root>

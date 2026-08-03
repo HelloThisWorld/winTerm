@@ -188,6 +188,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         std::wstring ResolveCommandTimelineOutput(const winTerm::CommandTimeline::CommandActionRequest& request);
         bool JumpToCommandTimelineOutput(const winTerm::CommandTimeline::CommandActionRequest& request);
         bool CopyCommandTimelineText(const std::wstring& text);
+        winTerm::CommandTimeline::CommandTimelinePresentationSnapshot FilterCommandTimeline(std::wstring_view query);
+        void ApplyCommandTimelineHistoryLimit();
+        bool CommandTimelineEnabled() const;
 
         hstring Title();
         Windows::Foundation::IReference<winrt::Windows::UI::Color> TabColor() noexcept;

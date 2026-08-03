@@ -381,6 +381,8 @@ namespace winrt::Microsoft::Terminal::Settings
         _UseBackgroundImageForWindow = globalSettings.UseBackgroundImageForWindow();
         _TrimBlockSelection = globalSettings.TrimBlockSelection();
         _DetectURLs = globalSettings.DetectURLs();
+        _CommandTimelineEnabled = globalSettings.CommandTimelineEnabled();
+        _CommandTimelineHistoryLimit = globalSettings.CommandTimelineHistoryLimit();
         _EnableUnfocusedAcrylic = globalSettings.EnableUnfocusedAcrylic();
     }
 

@@ -49,5 +49,7 @@ namespace Microsoft.Terminal.Settings.Editor
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, VisualProgressEnabled);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, VisualProgressRecognizeCliProgress);
         PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, VisualProgressReplaceRecognizedOutput);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, CommandTimelineEnabled);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Int32, CommandTimelineHistoryLimit);
     }
 }

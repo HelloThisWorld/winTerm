@@ -900,6 +900,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         // Update our control settings
         _ApplyUISettings();
+
+        // Reaches panes that already exist, so toggling commandTimeline.enabled
+        // hides the handle and closes an open overlay immediately.
+        _applyCommandTimelineEnabledSetting();
     }
 
     // Method Description:
@@ -2268,6 +2272,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             case VK_ESCAPE:
             case VK_RETURN:
             case VK_SPACE:
+            case VK_TAB:
+            case VK_OEM_2:
                 break;
             default:
                 return false;
@@ -2291,13 +2297,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         switch (vkey)
         {
+        case VK_TAB:
+        case VK_OEM_2:
+            // Slash and Tab move focus to the filter box. Both are consumed
+            // here so neither reaches the PTY.
+            _focusCommandTimelineSearch();
+            return true;
         case VK_ESCAPE:
-            // A pending load confirmation is cancelled before the overlay
-            // itself closes, so Escape never discards more than one step.
+            // A pending load confirmation is cancelled first, then a non-empty
+            // query, and only then does the overlay close.
             if (_commandTimelinePendingLoad.has_value())
             {
                 _clearCommandTimelinePendingLoad();
                 _setCommandTimelineStatus({});
+                return true;
+            }
+            if (!CommandTimelineSearchBox().Text().empty())
+            {
+                CommandTimelineSearchBox().Text({});
                 return true;
             }
             _closeCommandTimeline(true);
@@ -2496,6 +2513,126 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     void TermControl::_clearCommandTimelinePendingLoad()
     {
         _commandTimelinePendingLoad.reset();
+    }
+
+    void TermControl::_focusCommandTimelineSearch()
+    {
+        if (_commandTimelineOpen && !_IsClosing())
+        {
+            CommandTimelineSearchBox().Focus(FocusState::Programmatic);
+        }
+    }
+
+    // Filtering runs entirely over this pane's bounded command-text index. The
+    // query itself is UI-only state and is never persisted.
+    void TermControl::_CommandTimelineSearchTextChanged(const IInspectable& /*sender*/,
+                                                        const Controls::TextChangedEventArgs& /*args*/)
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return;
+        }
+
+        try
+        {
+            // Changing the query invalidates a confirmation waiting on the
+            // previously selected command.
+            _clearCommandTimelinePendingLoad();
+            _setCommandTimelineStatus({});
+
+            const auto box = CommandTimelineSearchBox();
+            const std::wstring_view raw{ box.Text() };
+            const auto normalized = winTerm::CommandTimeline::NormalizeCommandTimelineQuery(raw);
+            if (normalized.size() != raw.size())
+            {
+                // Surrogate-safe truncation may shorten the text; reflect that
+                // back into the box without re-entering this handler's work.
+                _updatingCommandTimelineSelection = true;
+                box.Text(winrt::hstring{ normalized });
+                box.SelectionStart(gsl::narrow_cast<int32_t>(normalized.size()));
+                _updatingCommandTimelineSelection = false;
+            }
+
+            const auto presentation = get_self<ControlCore>(_core)->FilterCommandTimeline(normalized);
+            _renderCommandTimeline(presentation);
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            _closeCommandTimeline(true);
+        }
+    }
+
+    // Keys handled while the filter box owns focus. Everything not claimed here
+    // stays with the text box, so ordinary caret editing, selection, and IME
+    // composition behave normally and nothing reaches the PTY.
+    void TermControl::_CommandTimelineSearchKeyDown(const IInspectable& /*sender*/,
+                                                    const Input::KeyRoutedEventArgs& args)
+    {
+        if (!_commandTimelineOpen || _IsClosing())
+        {
+            return;
+        }
+
+        switch (args.Key())
+        {
+        case Windows::System::VirtualKey::Up:
+            get_self<ControlCore>(_core)->NavigateCommandTimeline(winTerm::CommandTimeline::NavigationAction::Previous);
+            _refreshCommandTimeline();
+            args.Handled(true);
+            return;
+        case Windows::System::VirtualKey::Down:
+            get_self<ControlCore>(_core)->NavigateCommandTimeline(winTerm::CommandTimeline::NavigationAction::Next);
+            _refreshCommandTimeline();
+            args.Handled(true);
+            return;
+        case Windows::System::VirtualKey::Enter:
+            _loadCommandTimelineSelection();
+            args.Handled(true);
+            return;
+        case Windows::System::VirtualKey::Escape:
+            // Escape clears a non-empty query first and only closes the overlay
+            // once the query is already empty.
+            if (!CommandTimelineSearchBox().Text().empty())
+            {
+                CommandTimelineSearchBox().Text({});
+            }
+            else
+            {
+                _closeCommandTimeline(true);
+            }
+            args.Handled(true);
+            return;
+        default:
+            // Left/Right and every printable key stay with the text box.
+            return;
+        }
+    }
+
+    // Honors commandTimeline.enabled. Disabling hides the handle and closes an
+    // overlay that is already open.
+    void TermControl::_applyCommandTimelineEnabledSetting()
+    {
+        if (_IsClosing())
+        {
+            return;
+        }
+
+        auto enabled = true;
+        try
+        {
+            enabled = get_self<ControlCore>(_core)->CommandTimelineEnabled();
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+
+        CommandTimelineHandle().Visibility(enabled ? Visibility::Visible : Visibility::Collapsed);
+        if (!enabled && _commandTimelineOpen)
+        {
+            _closeCommandTimeline(true);
+        }
     }
 
     // Builds the per-entry context menu. Every action resolves through the
@@ -2734,11 +2871,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         if (presentation.visibleEntries.empty())
         {
+            using winTerm::CommandTimeline::CommandTimelineEmptyState;
             list.Visibility(Visibility::Collapsed);
-            CommandTimelineEmptyText().Text(
-                presentation.capability == winTerm::CommandTimeline::ShellIntegrationCapability::Limited ?
-                    RS_(L"CommandTimelineUnavailable") :
-                    RS_(L"CommandTimelineNoCommands"));
+            // Each state is distinct: an unsupported shell is never reported as
+            // simply having run no commands.
+            const auto emptyText = [&]() {
+                switch (presentation.emptyState)
+                {
+                case CommandTimelineEmptyState::NoMatchingCommands:
+                    return RS_(L"CommandTimelineNoMatchingCommands");
+                case CommandTimelineEmptyState::ShellUnsupported:
+                    return RS_(L"CommandTimelineUnavailable");
+                case CommandTimelineEmptyState::NoCommands:
+                    return RS_(L"CommandTimelineNoCommands");
+                default:
+                    return RS_(L"CommandTimelineWaitingForShell");
+                }
+            }();
+            CommandTimelineEmptyText().Text(emptyText);
             CommandTimelineEmptyText().Visibility(Visibility::Visible);
             _updatingCommandTimelineSelection = false;
             return;
@@ -2797,9 +2947,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Windows::UI::Xaml::Automation::AutomationProperties::SetPositionInSet(
                 item,
                 gsl::narrow_cast<int>(presentation.firstVisibleIndex + slot + 1));
+            // Position and set size describe the filtered result, so assistive
+            // technology announces "3 of 7 matches", not a position within the
+            // unfiltered history.
             Windows::UI::Xaml::Automation::AutomationProperties::SetSizeOfSet(
                 item,
-                gsl::narrow_cast<int>(presentation.totalEntryCount));
+                gsl::narrow_cast<int>(presentation.filteredEntryCount));
 
             item.PointerEntered([weakThis = get_weak(), slot](const auto&, const auto&) {
                 if (auto control{ weakThis.get() };
@@ -2876,6 +3029,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _commandTimelineOpen = false;
         _clearCommandTimelinePendingLoad();
         _updatingCommandTimelineSelection = true;
+        // The query, the filtered projection, and every materialized row are
+        // released together; nothing about a search survives a close.
+        CommandTimelineSearchBox().Text({});
         CommandTimelineList().Items().Clear();
         CommandTimelineList().SelectedIndex(-1);
         _updatingCommandTimelineSelection = false;
@@ -3357,6 +3513,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             _closeCommandTimeline(true);
             return true;
+        }
+
+        // With commandTimeline.enabled off, the shortcut must not open the
+        // overlay at all.
+        try
+        {
+            if (!get_self<ControlCore>(_core)->CommandTimelineEnabled())
+            {
+                return false;
+            }
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+            return false;
         }
 
         try

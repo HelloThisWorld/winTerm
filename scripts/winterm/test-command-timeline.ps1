@@ -79,6 +79,51 @@ Assert-Contains -Content $modelSource -Values @(
     'viewState.loadedCommandId.reset()'
 ) -Failure 'Command Timeline load, confirmation, or execution-generation semantics are incomplete.'
 
+Assert-Contains -Content $modelHeader -Values @(
+    'MaxCommandTimelineQueryLength = 256',
+    'DefaultCommandTimelineHistoryLimit = 500',
+    'MinCommandTimelineHistoryLimit = 50',
+    'MaxCommandTimelineHistoryLimit = 5000',
+    'NormalizeCommandTimelineQuery',
+    'CommandTimelineQueryMatches',
+    'ClampCommandTimelineHistoryLimit',
+    'enum class CommandTimelineEmptyState',
+    'SetHistoryLimit'
+) -Failure 'Phase 4 search bounds, history limit, or degradation states are incomplete.'
+Assert-Contains -Content $modelSource -Values @(
+    'CommandTimelineEmptyState::NoMatchingCommands',
+    'CommandTimelineEmptyState::ShellUnsupported',
+    'CommandTimelineEmptyState::WaitingForShell',
+    '_rebuildFilter',
+    '_nearestPosition',
+    '_applyHistoryLimit'
+) -Failure 'Phase 4 filtered projection or eviction semantics are incomplete.'
+
+# Search must be literal and case-insensitive over command text only. A regex
+# engine, a fuzzy matcher, or an output field would each break the stated
+# privacy and performance boundaries. Compare against code only: the model
+# documents why these are excluded, and that prose must not trip the guard.
+$modelCode = [regex]::Replace($modelSource, '//.*', '') + [regex]::Replace($modelHeader, '//.*', '')
+foreach ($forbidden in @('std::regex', 'std::wregex', 'regex_search', 'fuzzy', 'Fuzzy')) {
+    if ($modelCode.Contains($forbidden)) {
+        throw "Command Timeline search must be literal. Found '$forbidden'."
+    }
+}
+$matchStart = $modelSource.IndexOf('bool CommandTimelineQueryMatches', [StringComparison]::Ordinal)
+if ($matchStart -lt 0) {
+    throw 'CommandTimelineQueryMatches is missing.'
+}
+$matchBody = $modelSource.Substring($matchStart, $modelSource.IndexOf("`n    }", $matchStart, [StringComparison]::Ordinal) - $matchStart)
+if (-not $matchBody.Contains('std::search') -or -not $matchBody.Contains('towlower')) {
+    throw 'Command Timeline search must be a case-insensitive literal substring search.'
+}
+
+$filterStart = $modelSource.IndexOf('void CommandTimelineNavigationModel::_rebuildFilter', [StringComparison]::Ordinal)
+$filterBody = $modelSource.Substring($filterStart, $modelSource.IndexOf("`n    }", $filterStart, [StringComparison]::Ordinal) - $filterStart)
+if (-not $filterBody.Contains('cachedCommandText')) {
+    throw 'Command Timeline filtering must only read the bounded cached command text.'
+}
+
 Assert-Contains -Content $controlCoreHeader -Values @(
     'CommandTimelineNavigationModel _commandTimelineNavigation',
     'OpenCommandTimeline',
@@ -225,6 +270,55 @@ Assert-Contains -Content $resources -Values @(
     'CommandTimelineConfirmLoad'
 ) -Failure 'Timeline entry-action localized strings are missing.'
 
+# Phase 4: search box, settings, and degradation states.
+Assert-Contains -Content $resources -Values @(
+    'CommandTimelineSearchBox.[using:Windows.UI.Xaml.Automation]AutomationProperties.Name',
+    'CommandTimelineNoMatchingCommands',
+    'CommandTimelineWaitingForShell'
+) -Failure 'Timeline search accessibility name or empty-state strings are missing.'
+Assert-Contains -Content $overlayXaml -Values @(
+    'x:Name="CommandTimelineSearchBox"',
+    'MaxLength="256"',
+    'KeyDown="_CommandTimelineSearchKeyDown"',
+    'TextChanged="_CommandTimelineSearchTextChanged"'
+) -Failure 'The Timeline filter box is missing or unbounded.'
+Assert-Contains -Content $termControlSource -Values @(
+    'FilterCommandTimeline',
+    'NormalizeCommandTimelineQuery',
+    '_focusCommandTimelineSearch()',
+    'CommandTimelineSearchBox().Text({})',
+    'CommandTimelineEmptyState::NoMatchingCommands',
+    'presentation.filteredEntryCount',
+    '_applyCommandTimelineEnabledSetting'
+) -Failure 'Timeline filtering, focus routing, cleanup, or enabled-setting handling is incomplete.'
+
+$settingsMacros = Read-Source 'src\cascadia\TerminalSettingsModel\MTSMSettings.h'
+Assert-Contains -Content $settingsMacros -Values @(
+    'X(bool, CommandTimelineEnabled, "commandTimeline.enabled", true)',
+    'X(int32_t, CommandTimelineHistoryLimit, "commandTimeline.historyLimit", 500)'
+) -Failure 'The public Command Timeline settings are not declared with their documented defaults.'
+Assert-Contains -Content $defaults -Values @(
+    '"commandTimeline.enabled": true',
+    '"commandTimeline.historyLimit": 500'
+) -Failure 'The Command Timeline defaults are missing from defaults.json.'
+
+$schema = Read-Source 'doc\cascadia\profiles.schema.json'
+Assert-Contains -Content $schema -Values @(
+    '"commandTimeline.enabled"',
+    '"commandTimeline.historyLimit"',
+    '"maximum": 5000',
+    '"minimum": 50'
+) -Failure 'The Command Timeline settings schema is missing its type, default, or range.'
+
+$settingsUi = Read-Source 'src\cascadia\TerminalSettingsEditor\GlobalAppearance.xaml'
+Assert-Contains -Content $settingsUi -Values @(
+    'x:Uid="Globals_CommandTimelineHeader"',
+    'ViewModel.CommandTimelineEnabled',
+    'ViewModel.CommandTimelineHistoryLimit',
+    'Maximum="5000"',
+    'Minimum="50"'
+) -Failure 'The Settings UI does not expose the Command Timeline settings within their range.'
+
 Assert-Contains -Content $controlTests -Values @(
     'NavigationPageEdgesMoveOneInOneOut',
     'NavigationWheelAccumulatesReversesAndSettles',
@@ -235,8 +329,27 @@ Assert-Contains -Content $controlTests -Values @(
     'ActionLateCompletionIsDetectedAfterExecutionStart',
     'ActionLoadedInputIsReleasedOnEviction',
     'ActionCopyResolvesStableCommandIdNotRowIndex',
-    'ActionOutputRequiresLiveNativeRangeAndIsNeverCached'
-) -Failure 'Deterministic Timeline navigation, action, pane isolation, cleanup, or warm-access tests are missing.'
+    'ActionOutputRequiresLiveNativeRangeAndIsNeverCached',
+    'SearchMatchesLiterallyAndCaseInsensitively',
+    'SearchQueryTruncationIsSurrogateSafe',
+    'SearchKeepsStableSelectionAcrossQueryChanges',
+    'SearchSelectsNearestSurvivingMatch',
+    'SearchNavigationAndWheelWalkFilteredProjection',
+    'SearchNewCommandFollowsLatestOnlyWhenMatching',
+    'ShellDegradationStatesAreDistinct',
+    'HistoryLimitEvictsOldestFirstAndNeverResurrects',
+    'HistoryLimitClampsToSupportedRange',
+    'SearchCloseReleasesQueryAndProjection',
+    'SearchStressAtMaximumHistoryLimit'
+) -Failure 'Deterministic Timeline navigation, action, search, eviction, pane isolation, cleanup, or warm-access tests are missing.'
+
+$commandTimelineSettingsTests = Read-Source 'src\cascadia\UnitTests_SettingsModel\WinTermCommandTimelineTests.cpp'
+Assert-Contains -Content $commandTimelineSettingsTests -Values @(
+    'CommandTimelineSettingsUseStableDefaults',
+    'CommandTimelineSettingsRoundTripThroughJson',
+    'CommandTimelineHistoryLimitIsClampedAtRuntime',
+    'CommandTimelineSettingsTolerateOutOfRangeAndOddValues'
+) -Failure 'Command Timeline settings defaults, round-trip, range, and invalid-value tests are missing.'
 Assert-Contains -Content $settingsTests -Values @(
     'CommandTimelineDefaultShortcutsAndUserOverride',
     'ShortcutAction::ToggleCommandTimeline',
@@ -245,4 +358,4 @@ Assert-Contains -Content $settingsTests -Values @(
 
 [xml](Read-Source 'src\cascadia\TerminalControl\TermControl.xaml') | Out-Null
 [xml](Read-Source 'src\cascadia\TerminalControl\Resources\en-US\Resources.resw') | Out-Null
-Write-Host 'PASS: Command Timeline Phase 3 source, input, action, accessibility, privacy, and lifecycle boundaries' -ForegroundColor Green
+Write-Host 'PASS: Command Timeline Phase 4 source, search, settings, input, action, accessibility, privacy, and lifecycle boundaries' -ForegroundColor Green

@@ -33,6 +33,10 @@
     "minimizeToNotificationArea": false,
     "alwaysShowNotificationIcon": false,
 
+    // Command timeline
+    "commandTimeline.enabled": true,
+    "commandTimeline.historyLimit": 500,
+
     "profiles":
     [
         {

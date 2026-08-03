@@ -105,6 +105,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             commandTimelineSessionId = ::Microsoft::Console::Utils::CreateGuid();
         }
         _commandTimelineIndex = std::make_unique<winTerm::CommandTimeline::CommandTimelineIndex>(commandTimelineSessionId);
+        // A new pane starts at the configured limit rather than the built-in
+        // default, so the setting applies to new and existing panes alike.
+        _commandTimelineIndex->SetHistoryLimit(
+            winTerm::CommandTimeline::ClampCommandTimelineHistoryLimit(settings.CommandTimelineHistoryLimit()));
         const auto commandline = settings.Commandline();
         _commandTimelineIndex->SetCapabilityFallback(
             winTerm::CommandTimeline::InferCapabilityFallbackFromCommandline(
@@ -975,6 +979,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         const auto lock = _terminal->LockForWriting();
 
+        // A settings change reaches panes that already exist, so a lowered
+        // history limit evicts here rather than only on the next new pane.
+        if (_commandTimelineIndex)
+        {
+            _commandTimelineIndex->SetHistoryLimit(
+                winTerm::CommandTimeline::ClampCommandTimelineHistoryLimit(_settings.CommandTimelineHistoryLimit()));
+            _commandTimelineActions.ReconcileLoadedInput(_commandTimelineIndex->Entries(), _commandTimelineViewState);
+        }
+
         _builtinGlyphs = _settings.EnableBuiltinGlyphs();
         _colorGlyphs = _settings.EnableColorGlyphs();
         _cellWidth = CSSLengthPercentage::FromString(_settings.CellWidth().c_str());
@@ -1730,6 +1743,48 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         const auto lock = _terminal->LockForWriting();
         _commandTimelineNavigation.Close();
+    }
+
+    // Applies the query to this pane's bounded command-text index only. It
+    // never reads output and never rescans the terminal buffer.
+    winTerm::CommandTimeline::CommandTimelinePresentationSnapshot ControlCore::FilterCommandTimeline(
+        const std::wstring_view query)
+    {
+        const auto lock = _terminal->LockForWriting();
+        _ensureCommandTimelineBootstrap();
+        return _commandTimelineNavigation.SetQuery(
+            query,
+            _commandTimelineIndex->Entries(),
+            _commandTimelineViewState,
+            _commandTimelineIndex->Capability());
+    }
+
+    // Pushes the current commandTimeline.historyLimit onto this pane's index.
+    // Lowering it evicts oldest-first immediately; raising it never resurrects
+    // an entry that was already dropped.
+    void ControlCore::ApplyCommandTimelineHistoryLimit()
+    {
+        const auto configured = winTerm::CommandTimeline::ClampCommandTimelineHistoryLimit(
+            _settings ? _settings.CommandTimelineHistoryLimit() : 0);
+
+        const auto lock = _terminal->LockForWriting();
+        if (!_commandTimelineIndex)
+        {
+            return;
+        }
+
+        const auto revisionBefore = _commandTimelineIndex->Revision();
+        _commandTimelineIndex->SetHistoryLimit(configured);
+        if (_commandTimelineIndex->Revision() != revisionBefore)
+        {
+            _commandTimelineActions.ReconcileLoadedInput(_commandTimelineIndex->Entries(), _commandTimelineViewState);
+            CommandTimelineChanged.raise(*this, nullptr);
+        }
+    }
+
+    bool ControlCore::CommandTimelineEnabled() const
+    {
+        return _settings ? _settings.CommandTimelineEnabled() : true;
     }
 
     winTerm::CommandTimeline::CommandActionRequest ControlCore::PrepareCommandTimelineAction(

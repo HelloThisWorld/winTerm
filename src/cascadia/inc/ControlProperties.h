@@ -52,6 +52,8 @@
     X(bool, AllowKittyKeyboardMode, true)                                                                         \
     X(winrt::hstring, StartingTitle)                                                                              \
     X(bool, DetectURLs, true)                                                                                     \
+    X(bool, CommandTimelineEnabled, true)                                                                         \
+    X(int32_t, CommandTimelineHistoryLimit, 500)                                                                  \
     X(bool, AutoMarkPrompts)                                                                                      \
     X(bool, RepositionCursorWithMouse, false)                                                                     \
     X(bool, RainbowSuggestions)                                                                                   \

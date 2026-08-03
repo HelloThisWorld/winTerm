@@ -403,6 +403,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool _copyCommandTimelineOutput();
         void _setCommandTimelineStatus(const winrt::hstring& status);
         void _clearCommandTimelinePendingLoad();
+        void _CommandTimelineSearchTextChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::TextChangedEventArgs& e);
+        void _CommandTimelineSearchKeyDown(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::KeyRoutedEventArgs& e);
+        void _focusCommandTimelineSearch();
+        void _applyCommandTimelineEnabledSetting();
         bool _tryHandleCommandTimelineWheel(const Windows::Foundation::Point& position, int delta);
         bool _isPointOverCommandTimeline(const Windows::Foundation::Point& position) noexcept;
         size_t _commandTimelineVisibleCapacity() noexcept;
