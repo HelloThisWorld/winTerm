@@ -23,6 +23,7 @@ namespace ControlUnitTests
         TEST_METHOD(ColdBootstrapScansOnceAndWarmAccessDoesNotRescan);
         TEST_METHOD(LifecycleUpdatesAreIncrementalAndIdempotent);
         TEST_METHOD(OutOfOrderLifecycleStaysUnknown);
+        TEST_METHOD(EnterKeypressSuppliesExecutedTransition);
         TEST_METHOD(TrustedCompletionMapsResults);
         TEST_METHOD(CapabilityRequiresCompleteNativeLifecycle);
         TEST_METHOD(InvalidationAndEvictionPruneGhostEntries);
@@ -225,6 +226,62 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(CommandLifecycleState::Incomplete), static_cast<int>(incomplete.lifecycleState));
         VERIFY_ARE_EQUAL(static_cast<int>(ExecutionResult::Unknown), static_cast<int>(incomplete.executionResult));
         VERIFY_IS_NULL(index.Current());
+    }
+
+    void CommandTimelineTests::EnterKeypressSuppliesExecutedTransition()
+    {
+        // The supported PowerShell flow emits 133;A/B/D from the shell and
+        // relies on the Enter keypress heuristic for the executed transition.
+        // This drives that exact flow through a live core: no 133;C ever
+        // arrives on the wire.
+        auto settings = winrt::make_self<MockControlSettings>();
+        settings->AutoMarkPrompts(true);
+        auto connection = winrt::make_self<MockConnection>();
+        auto core = winrt::make_self<winrt::Microsoft::Terminal::Control::implementation::ControlCore>(*settings, *settings, *connection);
+        core->_inUnitTests = true;
+        auto cleanup = wil::scope_exit([&]() noexcept {
+            try
+            {
+                if (core)
+                {
+                    core->Close();
+                }
+            }
+            catch (...)
+            {
+                LOG_CAUGHT_EXCEPTION();
+            }
+            core = nullptr;
+            connection = nullptr;
+            settings = nullptr;
+        });
+        VERIFY_IS_TRUE(core->Initialize(270, 380, 1.0));
+
+        connection->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aecho hi"));
+        VERIFY_IS_TRUE(core->CommandTimelineSnapshot().entries.empty());
+
+        core->SendCharEvent(L'\r', 0, {});
+        auto running = core->CommandTimelineSnapshot();
+        VERIFY_ARE_EQUAL(size_t{ 1 }, running.entries.size());
+        VERIFY_ARE_EQUAL(std::wstring{ L"echo hi" }, running.entries[0].cachedCommandText);
+        VERIFY_ARE_EQUAL(static_cast<int>(ExecutionResult::Running), static_cast<int>(running.entries[0].executionResult));
+
+        connection->WriteInput(winrt_wstring_to_array_view(L"\r\nhi\r\n\x1b]133;D;0\a\x1b]133;A\aPS> \x1b]133;B\a"));
+        auto finished = core->CommandTimelineSnapshot();
+        VERIFY_ARE_EQUAL(size_t{ 1 }, finished.entries.size());
+        VERIFY_ARE_EQUAL(static_cast<int>(ExecutionResult::Succeeded), static_cast<int>(finished.entries[0].executionResult));
+        VERIFY_ARE_EQUAL(uint32_t{ 0 }, *finished.entries[0].trustedExitCode);
+        VERIFY_ARE_EQUAL(static_cast<int>(ShellIntegrationCapability::Full), static_cast<int>(finished.capability));
+
+        // An Enter on an empty integrated prompt starts no command and adds
+        // no entry.
+        core->SendCharEvent(L'\r', 0, {});
+        VERIFY_ARE_EQUAL(size_t{ 1 }, core->CommandTimelineSnapshot().entries.size());
+
+        core = nullptr;
+        connection = nullptr;
+        settings = nullptr;
+        cleanup.release();
     }
 
     void CommandTimelineTests::TrustedCompletionMapsResults()

@@ -3013,6 +3013,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Controls::TextBlock status;
             status.Text(winrt::hstring{ std::wstring{ statusGlyph } + L"  " + std::wstring{ statusLabel } });
             status.FontSize(11);
+            if (entry.executionResult == winTerm::CommandTimeline::ExecutionResult::Unknown)
+            {
+                // Unknown is a trust statement, not an error; say so where the
+                // question arises.
+                Controls::ToolTipService::SetToolTip(status, box_value(RS_(L"CommandTimelineStatusUnknownDetail")));
+            }
 
             Controls::StackPanel content;
             content.Spacing(2);
@@ -3025,6 +3031,18 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             item.Padding({ 8, 5, 8, 5 });
             item.HorizontalContentAlignment(HorizontalAlignment::Stretch);
             item.IsTabStop(false);
+
+            // The row shows one trimmed line; the tooltip carries the full
+            // command text so a long command stays readable without any
+            // marquee animation. The text is already on screen in this pane,
+            // so the tooltip introduces no new exposure.
+            Controls::TextBlock fullCommand;
+            fullCommand.Text(winrt::hstring{ commandText });
+            fullCommand.TextWrapping(TextWrapping::Wrap);
+            fullCommand.MaxWidth(480.0);
+            Controls::ToolTip rowTip;
+            rowTip.Content(fullCommand);
+            Controls::ToolTipService::SetToolTip(item, rowTip);
 
             const auto accessibleName = commandText + L", " + std::wstring{ statusLabel };
             Windows::UI::Xaml::Automation::AutomationProperties::SetName(item, winrt::hstring{ accessibleName });

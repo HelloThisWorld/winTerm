@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+Fixes for the three alpha3 field reports.
+
+### Fixed
+
+- Opening a PowerShell tab no longer raises an antivirus alert. The `touch`
+  compatibility command created files through a raw `File::Open` write call,
+  which — combined with the native-dispatch blocks in the same script — read
+  as a write-then-execute shape to antivirus heuristics and flagged the whole
+  module at load, on some engines with a user-visible warning for every new
+  tab. File creation now goes through `New-Item`; behavior is unchanged
+  (create if missing, update the timestamp without truncating otherwise), and
+  the module loads clean under the engine that previously flagged it.
+- Completed commands now show ✓/✕ instead of staying `? Unknown`. The Enter
+  keypress heuristic that supplies the command-executed transition only set
+  buffer marks and never notified the shell-integration lifecycle, so the
+  chain never observed the executed stage, the pane's capability never read
+  Full, and the presentation downgraded every trusted result to Unknown. The
+  Enter path now reports the executed transition when the mark was
+  established by the shell and the input line is non-empty; a heuristic-only
+  mark (no shell integration, for example cmd.exe) still reports nothing.
+  This also restores the Running status while a command executes.
+- A long Timeline command is now readable in full: every row carries a
+  tooltip with the complete command text, wrapped, with no marquee animation.
+- The `Unknown` status now explains itself: hovering it shows that the shell
+  did not report a result for this command, and that success and failure are
+  shown only when shell integration reports them.
+
 ## 1.3.0-alpha3 - 2026-08-04
 
 Third alpha prerelease: fixes for the five alpha2 field reports. Like the
