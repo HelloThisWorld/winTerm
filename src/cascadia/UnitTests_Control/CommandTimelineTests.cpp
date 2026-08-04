@@ -186,12 +186,16 @@ namespace ControlUnitTests
     void CommandTimelineTests::LifecycleUpdatesAreIncrementalAndIdempotent()
     {
         CommandTimelineIndex index{ PaneOne };
+        // 133;B alone is the user composing input at the prompt. No command
+        // exists yet, so nothing may be listed for it.
         index.ProcessLifecycle(Update(LifecycleEventKind::CommandStart, 11, 1));
         const auto revisionAfterStart = index.Revision();
         index.ProcessLifecycle(Update(LifecycleEventKind::CommandStart, 11, 1));
-        VERIFY_ARE_EQUAL(size_t{ 1 }, index.Entries().size());
+        VERIFY_IS_TRUE(index.Entries().empty());
         VERIFY_ARE_EQUAL(revisionAfterStart, index.Revision());
 
+        // The entry materializes when the command actually executes, and the
+        // earlier 133;B still lets it read as Running rather than Unknown.
         index.ProcessLifecycle(Update(LifecycleEventKind::OutputStart, 11, 2, L"build"));
         VERIFY_ARE_EQUAL(size_t{ 1 }, index.Entries().size());
         VERIFY_ARE_EQUAL(static_cast<int>(CommandLifecycleState::Output), static_cast<int>(index.Entries()[0].lifecycleState));
@@ -712,10 +716,14 @@ namespace ControlUnitTests
 
     void CommandTimelineTests::ActionLoadRejectsMissingCommandText()
     {
+        // An executed command whose text could not be captured still lists,
+        // but its text-dependent actions must refuse.
         CommandTimelineIndex index{ PaneOne };
         uint64_t revision = 0;
         index.ProcessLifecycle(Update(LifecycleEventKind::Prompt, 1, ++revision));
         index.ProcessLifecycle(Update(LifecycleEventKind::CommandStart, 1, ++revision));
+        index.ProcessLifecycle(Update(LifecycleEventKind::OutputStart, 1, ++revision, L""));
+        VERIFY_ARE_EQUAL(size_t{ 1 }, index.Entries().size());
 
         CommandTimelineNavigationModel navigation;
         CommandTimelineViewState viewState;
@@ -936,10 +944,19 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(static_cast<int>(CommandActionStatus::OutputUnavailable), static_cast<int>(staleJump.status));
 
         // A command that never reached its output stage cannot copy output.
+        // Such an entry comes from bootstrapping a mid-execution mark; a
+        // 133;B-only prompt no longer produces an entry at all.
         CommandTimelineIndex pending{ PaneTwo };
-        uint64_t pendingRevision = 0;
-        pending.ProcessLifecycle(Update(LifecycleEventKind::Prompt, 1, ++pendingRevision));
-        pending.ProcessLifecycle(Update(LifecycleEventKind::CommandStart, 1, ++pendingRevision));
+        const auto pendingLoader = []() {
+            return NativeBootstrapSnapshot{
+                .nativeRevision = 1,
+                .marks = {
+                    { .nativeMarkId = 1, .commandText = L"pending", .hasCommand = true, .hasOutput = false },
+                },
+            };
+        };
+        pending.Access(1, pendingLoader);
+        VERIFY_ARE_EQUAL(size_t{ 1 }, pending.Entries().size());
         CommandTimelineNavigationModel pendingNavigation;
         CommandTimelineViewState pendingView;
         pendingNavigation.Open(pending.Entries(), pendingView, pending.Capability(), 4);

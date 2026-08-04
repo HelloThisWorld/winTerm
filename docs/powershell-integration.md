@@ -39,9 +39,13 @@ standard behavior of every launcher-based shell integration.
 
 ## Prompt and marks
 
-On an eligible session, the module captures the current `prompt` function, sends prompt/CWD marks around its output, and calls the original script block. A second import detects its own wrapper instead of nesting it. Removing `winTerm.Shell` restores the captured prompt when the wrapper is still active. This preserves common profile customizations, including prompt frameworks loaded before the module.
+On an eligible session, the module captures the current `prompt` function and wraps it. A second import detects its own wrapper instead of nesting it. Removing `winTerm.Shell` restores the captured prompt when the wrapper is still active. This preserves common profile customizations, including prompt frameworks loaded before the module.
 
-The module emits `OSC 133;A`, `OSC 9;9`, `OSC 133;B`, and then `OSC 133;D;<exit>` on the next prompt. The inherited `autoMarkPrompts` behavior supplies the command-executed transition. Command duration is intentionally not guessed from prompt idle time.
+The wrapper returns a single string with the marks embedded around the original prompt text: `OSC 133;D;<exit>` (from the second prompt on), `OSC 133;A`, `OSC 9;9`, the original prompt output, then `OSC 133;B`. Embedding matters: the console host writes a prompt function's console output before it writes the returned text, so side-effect writes would place the command-start mark before the visible prompt and the recorded command region would include the prompt itself. Each sequence is terminated by ESC `\`; in PowerShell single quotes that is `'\'` — one character, since backslash is not an escape character in PowerShell strings. The inherited `autoMarkPrompts` behavior supplies the command-executed transition. Command duration is intentionally not guessed from prompt idle time.
+
+## Component resilience
+
+Some antivirus engines block individual script files at parse time. A component file that fails to dot-source is skipped and recorded — `Get-WinTermShellDiagnostics` reports a redacted failure category — instead of spilling a parse error into the user's session. Shell integration needs only the `Private` components; a blocked `Compatibility.ps1` costs the compatibility commands and nothing else. Only functions that actually loaded are exported.
 
 ## Compatibility and completion
 

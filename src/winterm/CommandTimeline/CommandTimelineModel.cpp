@@ -838,24 +838,15 @@ namespace winTerm::CommandTimeline
             }
             break;
         case LifecycleEventKind::CommandStart:
+            // 133;B means the user is composing input at the prompt; no
+            // command exists yet, so no entry is created and no existing
+            // entry changes state. The capability bit recorded above still
+            // lets a later OutputStart distinguish Running from Unknown.
+            // Only a previous command that never reported completion is
+            // closed out here.
             if (_currentSequence.has_value() && (!entry || *_currentSequence != entry->id.sequence))
             {
                 _finishIncompleteCurrent(update.timestamp);
-                changed = true;
-            }
-            if (!entry)
-            {
-                entry = &_createEntry(update.nativeMarkId, update.timestamp);
-                changed = true;
-            }
-            _currentSequence = entry->id.sequence;
-            if (entry->lifecycleState != CommandLifecycleState::Command ||
-                entry->executionResult != ExecutionResult::Running)
-            {
-                entry->lifecycleState = CommandLifecycleState::Command;
-                entry->executionResult = ExecutionResult::Running;
-                entry->trustedExitCode.reset();
-                entry->endTimestamp.reset();
                 changed = true;
             }
             break;

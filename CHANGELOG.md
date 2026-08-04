@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+Fixes for the five alpha2 field reports.
+
+### Fixed
+
+- Shell integration no longer prints stray `\` characters before every
+  prompt. The module's string terminator was written as two characters —
+  in PowerShell single quotes `'\\'` is a literal double backslash — so the
+  terminal consumed the well-formed sequence and printed the leftover
+  backslash: three before the first prompt (A, cwd, B) and four after a
+  command (D as well).
+- The Command Timeline now records exactly the typed command. The prompt
+  marks were written as console side effects while the prompt function ran,
+  and the host writes a prompt function's console output before its returned
+  text, so the command-start mark landed before the visible prompt and the
+  captured "command" included the whole prompt line. The marks are now
+  embedded in the returned prompt string in FinalTerm order, which also
+  fixes Load inserting the prompt path into the input line.
+- A shell-integrated pane no longer animates the Visual Progress bar while
+  sitting at an idle prompt. `133;B` means the user is composing input, so
+  it now hides the shell progress snapshot; only `133;C` (command executed)
+  starts the running bar.
+- The Timeline no longer shows a phantom `Command text unavailable` /
+  `Running` entry for the active prompt. A `133;B`-only mark is the user
+  composing input, not a command, and no longer creates an entry; the entry
+  materializes when the command executes.
+- Timeline rows no longer jump when moving the selection with the arrow
+  keys or hovering with the mouse. Selection-only updates now reuse the
+  existing rows instead of rebuilding every XAML element.
+- A module component blocked by antivirus at parse time (observed for
+  `Compatibility.ps1` under some engines) no longer spills a parse error
+  into the session. The component is skipped and recorded in diagnostics;
+  shell integration and the remaining commands still load.
+
 ## 1.3.0-alpha2 - 2026-08-04
 
 Second alpha prerelease: fixes for the four alpha1 field reports. Like alpha1,

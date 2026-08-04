@@ -326,6 +326,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool _commandTimelineHandleFocused{ false };
         std::array<bool, 256> _commandTimelineConsumedKeys{};
         std::optional<winTerm::CommandTimeline::CommandActionRequest> _commandTimelinePendingLoad;
+        std::vector<std::wstring> _commandTimelineRowSignatures;
 
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellLightAnimation{ nullptr };
         winrt::Windows::UI::Composition::ScalarKeyFrameAnimation _bellDarkAnimation{ nullptr };
