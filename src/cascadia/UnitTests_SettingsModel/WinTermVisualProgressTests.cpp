@@ -41,6 +41,8 @@ namespace SettingsModelUnitTests
         TEST_METHOD(RecognitionClassifiesAllProvidersOneCodeUnitAtATime);
         TEST_METHOD(RecognitionRejectsMalformedNumericAndInterruptedOutput);
         TEST_METHOD(RecognitionPreservesHighConfidenceOwnershipAndClearsGeneric);
+        TEST_METHOD(RecognitionIgnoresProductMentionsInListings);
+        TEST_METHOD(RecognitionClearsStaleRunningProviderAfterOrdinaryRecords);
         TEST_METHOD(RecognitionBootstrapsRichPipAndMavenResolver);
         TEST_METHOD(RecognitionHandlesGenericIndeterminateShapes);
         TEST_METHOD(RecognitionHandlesArbitraryProviderSplitsAndReset);
@@ -1008,7 +1010,16 @@ namespace SettingsModelUnitTests
             L"demo.bin 50%[====>     ] 512K 1.0MB/s eta 1s\r\x1b[2K",
             100,
             replacement);
-        VERIFY_IS_FALSE(laterWgetShape.progress.has_value());
+        // The stale shape is not reclaimed by wget. As the second consecutive
+        // record without a matching provider, it structurally clears the
+        // dangling wget bar instead of leaving it running.
+        VERIFY_IS_TRUE(laterWgetShape.progress.has_value());
+        if (laterWgetShape.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::None), static_cast<int>(laterWgetShape.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Hidden), static_cast<int>(laterWgetShape.progress->mode));
+            VERIFY_IS_FALSE(laterWgetShape.progress->visible);
+        }
         VERIFY_IS_FALSE(laterWgetShape.suppressInput);
 
         RecognitionEngine generic;
@@ -1029,6 +1040,75 @@ namespace SettingsModelUnitTests
             VERIFY_IS_FALSE(cleared.progress->visible);
         }
         VERIFY_IS_FALSE(cleared.suppressInput);
+    }
+
+    void WinTermVisualProgressTests::RecognitionIgnoresProductMentionsInListings()
+    {
+        // A directory listing is ordinary output. An entry that mentions a
+        // build tool by name, or a slashed date column, must not start a bar.
+        RecognitionEngine listing;
+        VERIFY_IS_FALSE(listing.Consume(L"d-----        2025/10/13     01:28                .gradle\n", 0).progress.has_value());
+        VERIFY_IS_FALSE(listing.Consume(L"d-----        2025/10/13     01:28                Downloads\n", 50).progress.has_value());
+        VERIFY_IS_FALSE(listing.Consume(L"-a----        2025/10/13     01:28            185 notes.ini\n", 100).progress.has_value());
+        VERIFY_IS_FALSE(listing.Consume(L"-a----        01/10/2025     01:28             46 setup.log\n", 150).progress.has_value());
+        VERIFY_IS_FALSE(listing.Consume(L"PS C:\\demo> cd \\\n", 200).progress.has_value());
+
+        // An established claim must carry per-record evidence to rematch; a
+        // later arbitrary record must not refresh the bar.
+        RecognitionEngine claimed;
+        const auto task = claimed.Consume(L"> Task :app:compileJava\n", 0);
+        VERIFY_IS_TRUE(task.progress.has_value());
+        if (task.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Gradle), static_cast<int>(task.progress->provider));
+            VERIFY_IS_TRUE(task.progress->visible);
+        }
+        VERIFY_IS_FALSE(claimed.Consume(L"PS C:\\demo> dir\n", 50).progress.has_value());
+
+        // The status meter keeps matching through its own real value.
+        const auto meter = claimed.Consume(L"<=========----> 75% EXECUTING [16s]\n", 100);
+        VERIFY_IS_TRUE(meter.progress.has_value());
+        if (meter.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Gradle), static_cast<int>(meter.progress->provider));
+            VERIFY_ARE_EQUAL(uint8_t{ 75 }, meter.progress->value);
+        }
+    }
+
+    void WinTermVisualProgressTests::RecognitionClearsStaleRunningProviderAfterOrdinaryRecords()
+    {
+        // A still-running provider bar tolerates one ordinary record, and the
+        // second consecutive ordinary record publishes a structural clear.
+        RecognitionEngine stale;
+        const auto claimed = stale.Consume(L"Downloading https://services.gradle.org/distributions/gradle-8.5-bin.zip\n", 0);
+        VERIFY_IS_TRUE(claimed.progress.has_value());
+        if (claimed.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::Gradle), static_cast<int>(claimed.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(claimed.progress->mode));
+            VERIFY_IS_TRUE(claimed.progress->visible);
+        }
+        VERIFY_IS_FALSE(stale.Consume(L"ordinary command output\n", 50).progress.has_value());
+        const auto cleared = stale.Consume(L"PS C:\\demo> dir\n", 100);
+        VERIFY_IS_TRUE(cleared.progress.has_value());
+        if (cleared.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressProvider::None), static_cast<int>(cleared.progress->provider));
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Hidden), static_cast<int>(cleared.progress->mode));
+            VERIFY_IS_FALSE(cleared.progress->visible);
+        }
+
+        // Success and Error are final results and persist across ordinary
+        // output until a later publication replaces them.
+        RecognitionEngine finished;
+        const auto success = finished.Consume(L"npm completed\n", 0);
+        VERIFY_IS_TRUE(success.progress.has_value());
+        if (success.progress)
+        {
+            VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Success), static_cast<int>(success.progress->status));
+        }
+        VERIFY_IS_FALSE(finished.Consume(L"ordinary command output\n", 50).progress.has_value());
+        VERIFY_IS_FALSE(finished.Consume(L"more ordinary command output\n", 100).progress.has_value());
     }
 
     void WinTermVisualProgressTests::RecognitionBootstrapsRichPipAndMavenResolver()

@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+Fixes for the four alpha1 field reports, ahead of the 1.3.0 beta.
+
+### Added
+
+- Automatic PowerShell shell integration. When a profile's commandline is a
+  bare `powershell.exe` or `pwsh.exe` invocation (optionally with `-NoLogo` or
+  `-NoExit`), winTerm now appends a `-NoExit -Command` fragment that imports
+  the packaged `winTerm.Shell` module, so OSC 133 marks — and therefore the
+  Command Timeline — work out of the box for the stock Windows PowerShell
+  profile. Any customized invocation launches unchanged, execution policy is
+  never altered, and an import failure leaves a working shell. The new
+  per-profile setting `"shellIntegration.autoInject"` (default `true`) turns
+  the rewrite off. This fixes typed commands never appearing in the Command
+  Timeline on a fresh install.
+
+### Fixed
+
+- The Command Timeline handle no longer covers terminal content. It now rests
+  as a 6-pixel strip flush against the terminal's left edge, in the manner of
+  an auto-hiding scrollbar, and widens to show its chevron on hover, keyboard
+  focus, or while the overlay is open.
+- Clicking the terminal area while the Command Timeline is open now
+  light-dismisses the overlay; the click still reaches the terminal.
+- The Visual Progress bar no longer keeps animating after ordinary output such
+  as a `dir` listing. Recognition of Gradle-style output now requires
+  per-record build-tool evidence instead of a bare product-name mention, an
+  established provider claim no longer rematches arbitrary later records, a
+  still-running provider bar structurally clears after two consecutive
+  ordinary records, and slashed dates such as `2025/10/13` are no longer read
+  as completed/total meters. Success and Error results still persist until a
+  later publication replaces them.
+
 ## 1.3.0-alpha1 - 2026-08-04
 
 First public prerelease of the Command Timeline. This is an alpha for local

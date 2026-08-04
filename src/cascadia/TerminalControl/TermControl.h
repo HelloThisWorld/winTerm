@@ -322,6 +322,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool _pointerPressedInBounds{ false };
         bool _commandTimelineOpen{ false };
         bool _updatingCommandTimelineSelection{ false };
+        bool _commandTimelineHandlePointerOver{ false };
+        bool _commandTimelineHandleFocused{ false };
         std::array<bool, 256> _commandTimelineConsumedKeys{};
         std::optional<winTerm::CommandTimeline::CommandActionRequest> _commandTimelinePendingLoad;
 
@@ -389,6 +391,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _MouseWheelHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _CommandTimelineWheelHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
         void _CommandTimelineHandleClick(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _CommandTimelineHandlePointerEntered(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _CommandTimelineHandlePointerExited(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+        void _CommandTimelineHandleGotFocus(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
+        void _CommandTimelineHandleLostFocus(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _CommandTimelineSelectionChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::SelectionChangedEventArgs& e);
         void _CommandTimelineSizeChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::SizeChangedEventArgs& e);
         void _CommandTimelineWheelSettled(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& e);
@@ -413,6 +419,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _refreshCommandTimeline();
         void _renderCommandTimeline(const winTerm::CommandTimeline::CommandTimelinePresentationSnapshot& presentation);
         void _closeCommandTimeline(bool returnFocus);
+        void _updateCommandTimelineHandleVisual();
         void _coreCommandTimelineChanged(const IInspectable& sender, const IInspectable& args);
 
         void _QuickFixButton_PointerEntered(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);

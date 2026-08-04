@@ -4,8 +4,9 @@ Last updated: 2026-08-04
 
 ## Repository state
 
-- Branch: `release/v1.3.0-alpha1`
-- Base branch: `main` at `ac760eab` (Command Timeline Phase 4, pull request #30)
+- Branch: `fix/alpha1-feedback`
+- Base branch: `main` at `ed707550` (1.3.0-alpha1 release metadata, pull
+  request #31)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
 - Application version: `1.3.0-alpha1`
@@ -47,13 +48,32 @@ prerelease suffix. The package version stays four-part numeric for MSIX and the
 Win32 resource fields, and the PowerShell module version stays numeric with the
 suffix carried in `PrivateData.PSData.Prerelease`.
 
+## Alpha1 field reports
+
+Local testing of `v1.3.0-alpha1` surfaced four issues, all addressed on this
+branch:
+
+1. The Timeline handle covered terminal content. It is now a thin auto-hiding
+   strip on the terminal's left edge that widens on hover, focus, or while the
+   overlay is open.
+2. Clicking the terminal area did not close an open Timeline. The overlay now
+   light-dismisses on a terminal press, which still reaches the terminal.
+3. A `dir` listing left the Visual Progress bar animating indefinitely. The
+   recognition engine no longer claims ownership from a bare product-name
+   mention, no longer rematches arbitrary records under an established claim,
+   structurally clears a still-running bar after two consecutive ordinary
+   records, and no longer reads slashed dates as meters.
+4. Typed commands never appeared in the Timeline because nothing imported the
+   packaged `winTerm.Shell` module. Bare PowerShell profile commandlines are
+   now rewritten at connection creation to import it, gated by the new
+   per-profile setting `"shellIntegration.autoInject"` (default `true`).
+
 ## Next steps
 
-1. Install `v1.3.0-alpha1` locally and exercise the Command Timeline.
-2. Fix anything the alpha testing surfaces.
-3. Cut `v1.3.0-beta1` on channel `beta`. The beta may be listed on the winTerm
+1. Re-test the four fixes locally on a fresh build.
+2. Cut `v1.3.0-beta1` on channel `beta`. The beta may be listed on the winTerm
    website alongside the stable v1.2.0 download.
-4. Promote to a stable `v1.3.0` only after beta testing, which is the point at
+3. Promote to a stable `v1.3.0` only after beta testing, which is the point at
    which Latest, WinGet, and the website stable slot move.
 
 ## Validation state

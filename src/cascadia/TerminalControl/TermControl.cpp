@@ -2003,6 +2003,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto point = args.GetCurrentPoint(*this);
         const auto type = ptr.PointerDeviceType();
 
+        // A press on the terminal area light-dismisses the Command Timeline.
+        // The press still continues into the terminal below, so the click
+        // also does whatever it would normally do there. Presses on the
+        // overlay itself never reach this handler.
+        if (_commandTimelineOpen && !_isPointOverCommandTimeline(point.Position()))
+        {
+            _closeCommandTimeline(false);
+        }
+
         // GH#19908: _focused can be true even when the search box has
         // keyboard focus, because GotFocus bubbles from the search box
         // child and _GotFocusHandler sets _focused=true. If the user
@@ -2771,6 +2780,48 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         ToggleCommandTimeline();
     }
 
+    // The handle rests as a thin strip on the terminal's left edge and only
+    // widens while it is hovered, focused, or the overlay is open, so it
+    // does not cover terminal content in normal use.
+    void TermControl::_updateCommandTimelineHandleVisual()
+    {
+        static constexpr double restingWidth{ 6.0 };
+        static constexpr double expandedWidth{ 20.0 };
+        const auto expanded = _commandTimelineOpen ||
+                              _commandTimelineHandlePointerOver ||
+                              _commandTimelineHandleFocused;
+        CommandTimelineHandle().Width(expanded ? expandedWidth : restingWidth);
+        CommandTimelineHandleIcon().Visibility(expanded ? Visibility::Visible : Visibility::Collapsed);
+    }
+
+    void TermControl::_CommandTimelineHandlePointerEntered(const IInspectable& /*sender*/,
+                                                           const Input::PointerRoutedEventArgs& /*args*/)
+    {
+        _commandTimelineHandlePointerOver = true;
+        _updateCommandTimelineHandleVisual();
+    }
+
+    void TermControl::_CommandTimelineHandlePointerExited(const IInspectable& /*sender*/,
+                                                          const Input::PointerRoutedEventArgs& /*args*/)
+    {
+        _commandTimelineHandlePointerOver = false;
+        _updateCommandTimelineHandleVisual();
+    }
+
+    void TermControl::_CommandTimelineHandleGotFocus(const IInspectable& /*sender*/,
+                                                     const RoutedEventArgs& /*args*/)
+    {
+        _commandTimelineHandleFocused = true;
+        _updateCommandTimelineHandleVisual();
+    }
+
+    void TermControl::_CommandTimelineHandleLostFocus(const IInspectable& /*sender*/,
+                                                      const RoutedEventArgs& /*args*/)
+    {
+        _commandTimelineHandleFocused = false;
+        _updateCommandTimelineHandleVisual();
+    }
+
     void TermControl::_CommandTimelineSelectionChanged(const IInspectable& /*sender*/,
                                                        const Controls::SelectionChangedEventArgs& /*args*/)
     {
@@ -3042,6 +3093,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         Windows::UI::Xaml::Automation::AutomationProperties::SetName(CommandTimelineHandle(), RS_(L"CommandTimelineOpen"));
         Controls::ToolTipService::SetToolTip(CommandTimelineHandle(), box_value(RS_(L"CommandTimelineOpen")));
         CommandTimelineHandleIcon().Glyph(L"\xE76C");
+        _updateCommandTimelineHandleVisual();
 
         if (returnFocus && !_IsClosing())
         {
@@ -3534,10 +3586,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         {
             _commandTimelineOpen = true;
             CommandTimelineOverlay().Visibility(Visibility::Visible);
-            CommandTimelineHandle().Margin({ 8, 0, 0, 0 });
             Windows::UI::Xaml::Automation::AutomationProperties::SetName(CommandTimelineHandle(), RS_(L"CommandTimelineClose"));
             Controls::ToolTipService::SetToolTip(CommandTimelineHandle(), box_value(RS_(L"CommandTimelineClose")));
             CommandTimelineHandleIcon().Glyph(L"\xE76B");
+            _updateCommandTimelineHandleVisual();
 
             const auto width = std::clamp(ActualWidth() * 0.42, 180.0, 360.0);
             CommandTimelineOverlay().Width(std::max(1.0, std::min(width, ActualWidth())));
