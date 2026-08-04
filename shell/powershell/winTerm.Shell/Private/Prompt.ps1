@@ -7,13 +7,19 @@ function Invoke-WinTermPrompt
     param()
 
     $lastSuccess = $?
+
+    # The marks are embedded in the returned prompt string rather than written
+    # as side effects. The console host writes a prompt function's console
+    # output before it writes the returned text, so a side-effect 133;B would
+    # land before the visible prompt and the command region would start at the
+    # prompt text instead of at the user's input.
+    $prefix = ''
     if ($script:WinTermHasPrompted)
     {
-        Write-WinTermOsc -Payload ('133;D;' + (Get-WinTermExitCode -LastSuccess $lastSuccess))
+        $prefix += Get-WinTermOscSequence -Payload ('133;D;' + (Get-WinTermExitCode -LastSuccess $lastSuccess))
     }
-
-    Write-WinTermOsc -Payload '133;A'
-    Send-WinTermCurrentDirectory
+    $prefix += Get-WinTermOscSequence -Payload '133;A'
+    $prefix += Get-WinTermCurrentDirectorySequence
 
     try
     {
@@ -25,9 +31,9 @@ function Invoke-WinTermPrompt
         $promptText = 'PS> '
     }
 
-    Write-WinTermOsc -Payload '133;B'
+    $suffix = Get-WinTermOscSequence -Payload '133;B'
     $script:WinTermHasPrompted = $true
-    return $promptText
+    return ($prefix + $promptText + $suffix)
 }
 
 function Test-WinTermPromptWrapper

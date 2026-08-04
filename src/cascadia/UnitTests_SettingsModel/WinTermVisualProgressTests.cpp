@@ -1868,7 +1868,12 @@ namespace SettingsModelUnitTests
     {
         ProgressStateMachine state;
         state.SetEnabled(true);
-        auto snapshot = state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1);
+        // Composing input at the prompt is not execution: 133;B must not
+        // show a bar, so an idle shell-integrated pane stays quiet.
+        VERIFY_IS_FALSE(state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1).has_value());
+        VERIFY_IS_FALSE(state.Current().visible);
+
+        auto snapshot = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
         VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(snapshot->mode));
 
         snapshot = state.ApplyShellLifecycle(ShellLifecycleState::CommandFinished, 0);
@@ -1877,6 +1882,10 @@ namespace SettingsModelUnitTests
 
         snapshot = state.ApplyShellLifecycle(ShellLifecycleState::Prompt, -1);
         VERIFY_IS_FALSE(snapshot->visible);
+
+        // The next idle prompt keeps the bar hidden even after 133;B.
+        VERIFY_IS_FALSE(state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1).has_value());
+        VERIFY_IS_FALSE(state.Current().visible);
     }
 
     void WinTermVisualProgressTests::EmergencyOverridePrecedesSetting()
@@ -1944,7 +1953,7 @@ namespace SettingsModelUnitTests
         VERIFY_IS_FALSE(reset->visible);
         VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Hidden), static_cast<int>(reset->mode));
 
-        const auto reused = state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1);
+        const auto reused = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
         VERIFY_IS_TRUE(reused.has_value());
         VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(reused->mode));
     }

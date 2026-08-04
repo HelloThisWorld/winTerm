@@ -2916,6 +2916,39 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         const auto list = CommandTimelineList();
+
+        // Selection-only updates must not rebuild the rows: recreating every
+        // XAML element on each arrow key or hover makes the visible items
+        // jump. When the rendered content is unchanged, only the selection
+        // moves.
+        const auto statusPresentationSignature = [](const winTerm::CommandTimeline::ExecutionResult result) noexcept {
+            return static_cast<wchar_t>(L'0' + static_cast<int>(result));
+        };
+        std::vector<std::wstring> signatures;
+        signatures.reserve(presentation.visibleEntries.size());
+        for (size_t slot = 0; slot < presentation.visibleEntries.size(); ++slot)
+        {
+            const auto& entry = presentation.visibleEntries[slot];
+            auto signature = entry.commandText;
+            signature.push_back(L'\x1f');
+            signature.push_back(statusPresentationSignature(entry.executionResult));
+            signature.push_back(L'\x1f');
+            signature.append(std::to_wstring(presentation.firstVisibleIndex + slot));
+            signature.push_back(L'\x1f');
+            signature.append(std::to_wstring(presentation.filteredEntryCount));
+            signatures.emplace_back(std::move(signature));
+        }
+        if (!signatures.empty() &&
+            signatures == _commandTimelineRowSignatures &&
+            list.Items().Size() == signatures.size())
+        {
+            _updatingCommandTimelineSelection = true;
+            list.SelectedIndex(gsl::narrow_cast<int>(presentation.selectedVisualSlot));
+            _updatingCommandTimelineSelection = false;
+            return;
+        }
+        _commandTimelineRowSignatures = std::move(signatures);
+
         _updatingCommandTimelineSelection = true;
         list.SelectedIndex(-1);
         list.Items().Clear();
@@ -3079,6 +3112,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         _commandTimelineOpen = false;
         _clearCommandTimelinePendingLoad();
+        _commandTimelineRowSignatures.clear();
         _updatingCommandTimelineSelection = true;
         // The query, the filtered projection, and every materialized row are
         // released together; nothing about a search survives a close.

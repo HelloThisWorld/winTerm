@@ -14,6 +14,11 @@ $script:WinTermSessionCompatibilityMode = $null
 $script:WinTermLastIntegrationError = $null
 $script:WinTermCompletionProvider = 'PowerShell native completion'
 
+# Shell integration must survive a blocked component file. Some antivirus
+# engines block individual script files at parse time; a failed dot-source is
+# recorded and that component is skipped, instead of spilling a parse error
+# into the user's session. Integration itself needs only the Private files.
+$script:WinTermFailedComponents = @()
 foreach ($relativePath in @(
         'Private\State.ps1',
         'Private\Protocol.ps1',
@@ -23,39 +28,75 @@ foreach ($relativePath in @(
         'Completion\CompatibilityCompletion.ps1'
     ))
 {
-    . (Join-Path $PSScriptRoot $relativePath)
-}
-
-$script:WinTermExportedCompatibilityCommands = @()
-foreach ($commandName in @('ll', 'la', 'which', 'touch', 'open'))
-{
-    if (-not (Test-WinTermExistingCommand -Name $commandName))
+    try
     {
-        $script:WinTermExportedCompatibilityCommands += $commandName
+        . (Join-Path $PSScriptRoot $relativePath) 2>$null
+    }
+    catch
+    {
+        $script:WinTermFailedComponents += $relativePath
+        $script:WinTermLastIntegrationError = 'A module component was blocked or failed to load and was skipped.'
     }
 }
 
-Register-WinTermCompatibilityCompletion
+# Only functions that actually loaded may be exported or invoked, so a
+# skipped component degrades that one capability and nothing else.
+function Test-WinTermModuleFunction
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name
+    )
 
-if (Test-WinTermInteractiveSession)
+    return $null -ne (Get-Command -Name $Name -CommandType Function -ErrorAction SilentlyContinue)
+}
+
+$script:WinTermExportedCompatibilityCommands = @()
+if (Test-WinTermModuleFunction -Name 'Test-WinTermExistingCommand')
+{
+    foreach ($commandName in @('ll', 'la', 'which', 'touch', 'open'))
+    {
+        if ((Test-WinTermModuleFunction -Name $commandName) -and
+            -not (Test-WinTermExistingCommand -Name $commandName))
+        {
+            $script:WinTermExportedCompatibilityCommands += $commandName
+        }
+    }
+}
+
+if (Test-WinTermModuleFunction -Name 'Register-WinTermCompatibilityCompletion')
+{
+    Register-WinTermCompatibilityCompletion
+}
+
+if ((Test-WinTermModuleFunction -Name 'Test-WinTermInteractiveSession') -and
+    (Test-WinTermModuleFunction -Name 'Enable-WinTermShellIntegration') -and
+    (Test-WinTermInteractiveSession))
 {
     Enable-WinTermShellIntegration | Out-Null
 }
 
 $ExecutionContext.SessionState.Module.OnRemove = {
-    Disable-WinTermShellIntegration | Out-Null
+    if ($null -ne (Get-Command -Name 'Disable-WinTermShellIntegration' -CommandType Function -ErrorAction SilentlyContinue))
+    {
+        Disable-WinTermShellIntegration | Out-Null
+    }
 }
 
-Export-ModuleMember -Function @(
-    'Get-WinTermShellDiagnostics',
-    'Test-WinTermShellIntegration',
-    'Enable-WinTermShellIntegration',
-    'Disable-WinTermShellIntegration',
-    'Get-WinTermCompatibilityMode',
-    'Set-WinTermCompatibilityMode'
-) -Variable @()
-
-if ($script:WinTermExportedCompatibilityCommands.Count -gt 0)
+$script:WinTermExportedFunctions = @()
+foreach ($functionName in @(
+        'Get-WinTermShellDiagnostics',
+        'Test-WinTermShellIntegration',
+        'Enable-WinTermShellIntegration',
+        'Disable-WinTermShellIntegration',
+        'Get-WinTermCompatibilityMode',
+        'Set-WinTermCompatibilityMode'
+    ))
 {
-    Export-ModuleMember -Function $script:WinTermExportedCompatibilityCommands -Variable @()
+    if (Test-WinTermModuleFunction -Name $functionName)
+    {
+        $script:WinTermExportedFunctions += $functionName
+    }
 }
+
+Export-ModuleMember -Function ($script:WinTermExportedFunctions + $script:WinTermExportedCompatibilityCommands) -Variable @()

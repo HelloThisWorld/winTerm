@@ -272,6 +272,11 @@ namespace winTerm::VisualProgress
                 _shellSnapshot.reset();
                 break;
             case ShellLifecycleState::CommandStart:
+                // OSC 133;B: the user is composing input at an interactive
+                // prompt. Nothing is executing, so an idle prompt must never
+                // animate a bar; only CommandExecuted starts one.
+                _shellSnapshot.reset();
+                break;
             case ShellLifecycleState::CommandExecuted:
                 _shellSnapshot = ProgressSnapshot{ ProgressMode::Indeterminate, ProgressStatus::Running, 0, true, ProgressSource::ShellIntegration, 0 };
                 break;

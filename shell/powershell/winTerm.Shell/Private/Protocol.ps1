@@ -1,7 +1,11 @@
 # Copyright (c) winTerm contributors.
 # Licensed under the MIT license.
 
-function Write-WinTermOsc
+# Returns the complete escape sequence for a payload, or an empty string when
+# the payload is not eligible. The string terminator is ESC followed by one
+# backslash; in PowerShell single quotes a backslash is already literal, so
+# '\' is exactly one character.
+function Get-WinTermOscSequence
 {
     [CmdletBinding()]
     param(
@@ -12,12 +16,29 @@ function Write-WinTermOsc
     if ($Payload.Length -eq 0 -or $Payload.Length -gt 8192 -or $Payload -match '[\x00-\x1F\x7F]')
     {
         $script:WinTermLastIntegrationError = 'An invalid shell integration payload was ignored.'
+        return ''
+    }
+
+    return ([char]27).ToString() + ']' + $Payload + [char]27 + '\'
+}
+
+function Write-WinTermOsc
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Payload
+    )
+
+    $sequence = Get-WinTermOscSequence -Payload $Payload
+    if ($sequence.Length -eq 0)
+    {
         return
     }
 
     try
     {
-        [Console]::Out.Write((([char]27).ToString() + ']' + $Payload + [char]27 + '\\'))
+        [Console]::Out.Write($sequence)
     }
     catch
     {
@@ -25,7 +46,9 @@ function Write-WinTermOsc
     }
 }
 
-function Send-WinTermCurrentDirectory
+# Returns the current-directory sequence, or an empty string when the current
+# location is not an eligible file-system path.
+function Get-WinTermCurrentDirectorySequence
 {
     [CmdletBinding()]
     param()
@@ -35,20 +58,42 @@ function Send-WinTermCurrentDirectory
         $location = Get-Location
         if ($location.Provider.Name -ne 'FileSystem')
         {
-            return
+            return ''
         }
 
         $path = $location.ProviderPath
         if ([string]::IsNullOrWhiteSpace($path) -or $path -match '[\x00-\x1F\x7F"]')
         {
-            return
+            return ''
         }
 
-        Write-WinTermOsc -Payload ('9;9;"' + $path + '"')
+        return Get-WinTermOscSequence -Payload ('9;9;"' + $path + '"')
     }
     catch
     {
         $script:WinTermLastIntegrationError = 'The current directory could not be reported.'
+        return ''
+    }
+}
+
+function Send-WinTermCurrentDirectory
+{
+    [CmdletBinding()]
+    param()
+
+    $sequence = Get-WinTermCurrentDirectorySequence
+    if ($sequence.Length -eq 0)
+    {
+        return
+    }
+
+    try
+    {
+        [Console]::Out.Write($sequence)
+    }
+    catch
+    {
+        $script:WinTermLastIntegrationError = 'The terminal did not accept a shell integration sequence.'
     }
 }
 
