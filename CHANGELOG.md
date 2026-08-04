@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.0-alpha4 - 2026-08-04
 
-Fixes for the three alpha3 field reports.
+Fourth alpha prerelease: fixes for the three alpha3 field reports. Like the
+previous alphas, this is published only as a tagged GitHub prerelease for
+local testing — GitHub Latest and the winTerm website continue to point at
+v1.2.0, and this version is not submitted to WinGet.
 
 ### Fixed
 
@@ -28,6 +31,12 @@ Fixes for the three alpha3 field reports.
 - The `Unknown` status now explains itself: hovering it shows that the shell
   did not report a result for this command, and that success and failure are
   shown only when shell integration reports them.
+
+### Changed
+
+- Advanced the package/file version to `1.3.0.3`. The application version is
+  `1.3.0-alpha4`, the PowerShell module stays `1.3.0` with prerelease suffix
+  `alpha4`, and the channel stays `alpha`.
 
 ## 1.3.0-alpha3 - 2026-08-04
 

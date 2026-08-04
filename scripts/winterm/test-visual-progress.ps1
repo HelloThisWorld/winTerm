@@ -1378,12 +1378,12 @@ try
 
     $version = $source.VersionMetadata | ConvertFrom-Json
     $expectedVersionValues = [ordered]@{
-        applicationVersion = '1.3.0-alpha3'
-        packageVersion = '1.3.0.2'
+        applicationVersion = '1.3.0-alpha4'
+        packageVersion = '1.3.0.3'
         moduleVersion = '1.3.0'
-        modulePrerelease = 'alpha3'
+        modulePrerelease = 'alpha4'
         channel = 'alpha'
-        tag = 'v1.3.0-alpha3'
+        tag = 'v1.3.0-alpha4'
         workspaceSchemaVersion = 2
         dockingModelVersion = 1
         shellProtocolVersion = 1
@@ -1398,39 +1398,39 @@ try
         }
     }
     $shellVersion = $source.ShellVersion | ConvertFrom-Json
-    if ($shellVersion.applicationVersion -ne '1.3.0-alpha3' -or $shellVersion.moduleVersion -ne '1.3.0' -or $shellVersion.protocolVersion -ne 1)
+    if ($shellVersion.applicationVersion -ne '1.3.0-alpha4' -or $shellVersion.moduleVersion -ne '1.3.0' -or $shellVersion.protocolVersion -ne 1)
     {
-        throw 'Shell version metadata does not match winTerm release 1.3.0-alpha3 with protocol version 1.'
+        throw 'Shell version metadata does not match winTerm release 1.3.0-alpha4 with protocol version 1.'
     }
     foreach ($surface in @(
-        @{ Content = $source.ReleaseMetadata; Value = 'ApplicationVersion{ L"1.3.0-alpha3" }'; Description = 'About release metadata' },
-        @{ Content = $source.PackageManifest; Value = 'Version="1.3.0.2"'; Description = 'MSIX package manifest' },
-        @{ Content = $source.HostResource; Value = 'FILEVERSION 1,3,0,2'; Description = 'Terminal host file version' },
-        @{ Content = $source.HostResource; Value = '"ProductVersion", "1.3.0-alpha3\0"'; Description = 'Terminal host display version' },
-        @{ Content = $source.ShimResource; Value = 'FILEVERSION 1,3,0,2'; Description = 'Shim file version' },
-        @{ Content = $source.ShimResource; Value = '"ProductVersion", "1.3.0-alpha3\0"'; Description = 'Shim display version' },
+        @{ Content = $source.ReleaseMetadata; Value = 'ApplicationVersion{ L"1.3.0-alpha4" }'; Description = 'About release metadata' },
+        @{ Content = $source.PackageManifest; Value = 'Version="1.3.0.3"'; Description = 'MSIX package manifest' },
+        @{ Content = $source.HostResource; Value = 'FILEVERSION 1,3,0,3'; Description = 'Terminal host file version' },
+        @{ Content = $source.HostResource; Value = '"ProductVersion", "1.3.0-alpha4\0"'; Description = 'Terminal host display version' },
+        @{ Content = $source.ShimResource; Value = 'FILEVERSION 1,3,0,3'; Description = 'Shim file version' },
+        @{ Content = $source.ShimResource; Value = '"ProductVersion", "1.3.0-alpha4\0"'; Description = 'Shim display version' },
         @{ Content = $source.CustomProps; Value = '<VersionMajor>1</VersionMajor>'; Description = 'Executable major version' },
         @{ Content = $source.CustomProps; Value = '<VersionMinor>3</VersionMinor>'; Description = 'Executable minor version' },
         @{ Content = $source.ShellModuleManifest; Value = "ModuleVersion = '1.3.0'"; Description = 'PowerShell module manifest' },
         @{ Content = $source.ShellModule; Value = "`$script:WinTermModuleVersion = '1.3.0'"; Description = 'PowerShell module runtime' },
         @{ Content = $source.PackageShellAssets; Value = "'shell\shared\version.json'"; Description = 'Canonical shell version metadata packaging' },
-        @{ Content = $source.WorkspaceSerializer; Value = '"1.3.0-alpha3"'; Description = 'Workspace application-version fallback' }
+        @{ Content = $source.WorkspaceSerializer; Value = '"1.3.0-alpha4"'; Description = 'Workspace application-version fallback' }
     ))
     {
         Assert-Contains $surface.Content $surface.Value $surface.Description
     }
     foreach ($required in @(
-        "applicationVersion -eq '1.3.0-alpha3'",
-        "packageVersion -eq '1.3.0.2'",
+        "applicationVersion -eq '1.3.0-alpha4'",
+        "packageVersion -eq '1.3.0.3'",
         "moduleVersion -eq '1.3.0'",
-        "tag -eq 'v1.3.0-alpha3'",
+        "tag -eq 'v1.3.0-alpha4'",
         "Workspace Schema version remains 2",
         "Docking Model version remains 1",
         "Shell Protocol version remains 1",
         "Theme Schema remains at version 1"
     ))
     {
-        Assert-Contains $source.VerifyVersion $required 'Authoritative v1.3.0-alpha3 version validation surface'
+        Assert-Contains $source.VerifyVersion $required 'Authoritative v1.3.0-alpha4 version validation surface'
     }
 
     $testBinary = Join-Path $root "bin\$Platform\$Configuration\UnitTests_SettingsModel\SettingsModel.Unit.Tests.dll"
