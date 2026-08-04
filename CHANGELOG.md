@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.3.0-beta1 - 2026-08-04
+
+First beta of the Command Timeline release. The feature content is identical
+to 1.3.0-alpha4, which passed local field testing; this release advances the
+channel from `alpha` to `beta`. The beta is published as a GitHub prerelease
+and is listed on the winTerm website next to the stable download. GitHub
+Latest and WinGet continue to point at v1.2.0 until a stable 1.3.0.
+
+### Changed
+
+- Advanced the channel to `beta`: application version `1.3.0-beta1`,
+  package/file version `1.3.0.4`, PowerShell module `1.3.0` with prerelease
+  suffix `beta1`.
+- Updated the README to cover the Command Timeline and automatic PowerShell
+  shell integration, and to present the stable and beta download channels.
+
+
 ## 1.3.0-alpha4 - 2026-08-04
 
 Fourth alpha prerelease: fixes for the three alpha3 field reports. Like the

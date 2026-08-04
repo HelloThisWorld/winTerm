@@ -33,8 +33,8 @@ foreach ($relativePath in $sourceAssets)
 
 $version = Get-Content -LiteralPath (Join-Path $repositoryRoot 'shell\shared\version.json') -Raw | ConvertFrom-Json
 if ($version.moduleVersion -ne '1.3.0' -or
-    $version.modulePrerelease -ne 'alpha4' -or
-    $version.applicationVersion -ne '1.3.0-alpha4' -or
+    $version.modulePrerelease -ne 'beta1' -or
+    $version.applicationVersion -ne '1.3.0-beta1' -or
     $version.protocolVersion -ne 1)
 {
     throw 'The winTerm Shell asset version metadata is invalid.'
