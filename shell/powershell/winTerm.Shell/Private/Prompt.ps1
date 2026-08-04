@@ -4,9 +4,19 @@
 function Invoke-WinTermPrompt
 {
     [CmdletBinding()]
-    param()
+    param(
+        # The caller's $? captured before any other command ran. The prompt
+        # wrapper must supply this because its own statements (Get-Module,
+        # the module-scoped call) reset $? to $true before this function
+        # could read it.
+        [object]$LastSuccess = $null
+    )
 
-    $lastSuccess = $?
+    if ($null -eq $LastSuccess)
+    {
+        $LastSuccess = $?
+    }
+    $lastSuccess = [bool]$LastSuccess
 
     # The marks are embedded in the returned prompt string rather than written
     # as side effects. The console host writes a prompt function's console
@@ -73,10 +83,14 @@ function Enable-WinTermShellIntegration
     $originalPrompt = Get-Command -Name prompt -CommandType Function -ErrorAction SilentlyContinue | Select-Object -First 1
     $script:WinTermOriginalPrompt = if ($null -ne $originalPrompt) { $originalPrompt.ScriptBlock } else { { 'PS> ' } }
     $script:WinTermPromptWrapper = {
+        # $? must be captured before any other statement: every command the
+        # wrapper runs (including Get-Module) would overwrite it and turn
+        # every finished command into a false success report.
+        $winTermLastSuccess = $?
         $module = Get-Module -Name 'winTerm.Shell'
         if ($null -ne $module)
         {
-            return & $module { Invoke-WinTermPrompt }
+            return & $module { param($s) Invoke-WinTermPrompt -LastSuccess $s } $winTermLastSuccess
         }
         return 'PS> '
     }
