@@ -4,21 +4,21 @@ Last updated: 2026-08-04
 
 ## Repository state
 
-- Branch: `release/v1.3.0-alpha3`
-- Base branch: `main` at `e0fd786c` (alpha2 field-report fixes, pull
-  request #34)
+- Branch: `release/v1.3.0-alpha4`
+- Base branch: `main` at `49ee5eb3` (alpha3 field-report fixes, pull
+  request #36)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0-alpha3`
-- Package/file version: `1.3.0.2`
-- PowerShell module version: `1.3.0` with prerelease suffix `alpha3`
+- Application version: `1.3.0-alpha4`
+- Package/file version: `1.3.0.3`
+- PowerShell module version: `1.3.0` with prerelease suffix `alpha4`
 - Release channel: `alpha`
-- Release tag: `v1.3.0-alpha3`
+- Release tag: `v1.3.0-alpha4`
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
 - Supported target: Windows 11 x64
 
-`v1.3.0-alpha3` follows `v1.3.0-alpha2` as a GitHub **prerelease** for local
-testing, carrying the five alpha2 field-report fixes. The release workflow marks any
+`v1.3.0-alpha4` follows `v1.3.0-alpha3` as a GitHub **prerelease** for local
+testing, carrying the three alpha3 field-report fixes. The release workflow marks any
 non-stable channel with `--prerelease` and `--latest=false`, so
 `/releases/latest` keeps resolving to v1.2.0. The alpha is deliberately not
 listed on the winTerm website and is skipped by the WinGet workflow.
@@ -47,6 +47,22 @@ a prerelease can never publish as Latest and a stable release can never carry a
 prerelease suffix. The package version stays four-part numeric for MSIX and the
 Win32 resource fields, and the PowerShell module version stays numeric with the
 suffix carried in `PrivateData.PSData.Prerelease`.
+
+## Alpha3 field reports
+
+Local testing of `v1.3.0-alpha3` surfaced three issues, all fixed on `main`
+through pull request #36:
+
+1. An antivirus alert on every new PowerShell tab: the `touch` command's raw
+   `File::Open` write plus same-file command dispatch read as a
+   write-then-execute pattern; creation now uses `New-Item` and the module
+   loads clean.
+2. Every completed command displayed `? Unknown`: the Enter keypress
+   heuristic never notified the lifecycle, so the capability chain never read
+   Full. Enter now reports the executed transition for shell-established
+   marks with non-empty input, restoring Running and the ✓/✕ results.
+3. Long commands were unreadable: rows now carry a full-command tooltip, and
+   the Unknown status explains itself on hover.
 
 ## Alpha2 field reports
 
@@ -90,8 +106,8 @@ through pull request #32:
 
 ## Next steps
 
-1. Install `v1.3.0-alpha3` locally and re-test the five fixes.
-2. Cut `v1.3.0-beta1` on channel `beta` once alpha3 passes local testing. The
+1. Install `v1.3.0-alpha4` locally and re-test the three fixes.
+2. Cut `v1.3.0-beta1` on channel `beta` once alpha4 passes local testing. The
    beta may be listed on the winTerm website alongside the stable v1.2.0
    download.
 3. Promote to a stable `v1.3.0` only after beta testing, which is the point at
