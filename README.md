@@ -4,12 +4,18 @@
 [![Windows CI](https://img.shields.io/github/actions/workflow/status/HelloThisWorld/winTerm/winterm-validation.yml?branch=main&label=Windows%20CI)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)
 [![Latest release](https://img.shields.io/github/v/release/HelloThisWorld/winTerm?display_name=tag&label=release)](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
-## Download the latest winTerm release
+## Download winTerm
 
-[**Open the latest release and download winTerm for x64**](https://github.com/HelloThisWorld/winTerm/releases/latest)
+[**Open the latest stable release and download winTerm for x64**](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
-The latest Release page provides the Setup EXE, Portable ZIP, release notes,
-and checksums together.
+The latest stable Release page provides the Setup EXE, Portable ZIP, release
+notes, and checksums together.
+
+A **beta** channel is also available for early access to the Command
+Timeline:
+[v1.3.0-beta1](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.3.0-beta1)
+is published as a GitHub prerelease with the same asset layout. Betas are for
+testing; the stable release above stays the recommended download.
 
 The installer is unsigned, so Windows may display Unknown Publisher or a
 SmartScreen warning. Download only from the official release above and verify
@@ -29,7 +35,8 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `1.2.0`. See the
+The current source version is `1.3.0-beta1`;
+the latest stable release is `1.2.0`. See the
 [latest official Release](https://github.com/HelloThisWorld/winTerm/releases/latest)
 for the complete published asset list and checksums.
 
@@ -43,6 +50,16 @@ See [installation guidance](docs/user/installation.md) and the
 
 ## Core features
 
+- a per-pane **Command Timeline** (`Ctrl+Tab`, or the thin handle on the
+  terminal's left edge): an in-memory list of the commands that pane has run,
+  built from OSC 133 shell integration only, with load-without-executing onto
+  the input line, literal case-insensitive filtering, copy command/output,
+  jump to output, and trustworthy ✓/✕/Running status that never guesses;
+- automatic PowerShell shell integration: a bare `powershell.exe` or
+  `pwsh.exe` profile imports the packaged `winTerm.Shell` module at startup
+  (per-profile setting `"shellIntegration.autoInject"`, default on), so
+  command marks work out of the box; customized commandlines are never
+  rewritten, and `cmd.exe` is never guessed at;
 - Top, Bottom, Left, and Right splits relative to the focused pane, retaining
   profile selection and transactional rollback;
 - border-drag pane resizing with continuous updates, minimum-size constraints,
@@ -87,8 +104,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.2.0 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.2.0 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.3.0-beta1 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.3.0-beta1 -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build
