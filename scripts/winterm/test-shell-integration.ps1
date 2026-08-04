@@ -108,6 +108,61 @@ function Test-PowerShellModule
     }
 }
 
+function Test-PowerShellPromptExitCodes
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$ModulePath
+    )
+
+    $originalSessionId = $env:WINTERM_SESSION_ID
+    $env:WINTERM_SESSION_ID = 'test-shell-integration'
+    $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('winterm-prompt-' + [guid]::NewGuid().ToString('N'))
+    $escape = [char]27
+
+    try
+    {
+        Import-Module $ModulePath -Force
+        New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
+        $enabled = Enable-WinTermShellIntegration -Force
+        Assert-Condition -Condition $enabled -Message 'Shell integration could not be enabled for the prompt exit code test.'
+
+        # The wrapper installed as the global prompt function must observe the
+        # $? produced by the statement directly before each prompt call, the
+        # same way the console host invokes it after a finished command line.
+        $firstPrompt = prompt
+        Assert-Condition -Condition $firstPrompt.Contains("$escape]133;A") -Message 'The first prompt did not emit a prompt-start mark.'
+        Assert-Condition -Condition (-not $firstPrompt.Contains("$escape]133;D")) -Message 'The first prompt emitted a finished mark before any command ran.'
+
+        $null = Get-Command -Name prompt
+        $successPrompt = prompt
+        Assert-Condition -Condition $successPrompt.Contains("$escape]133;D;0") -Message 'A successful command was not reported as exit code 0.'
+
+        & $env:ComSpec /c exit 0
+        Get-Item -LiteralPath (Join-Path $temporaryDirectory 'missing.txt') -ErrorAction SilentlyContinue
+        $cmdletFailurePrompt = prompt
+        Assert-Condition -Condition $cmdletFailurePrompt.Contains("$escape]133;D;1") -Message 'A failed cmdlet was not reported as exit code 1.'
+
+        & $env:ComSpec /c exit 5
+        $nativeFailurePrompt = prompt
+        Assert-Condition -Condition $nativeFailurePrompt.Contains("$escape]133;D;5") -Message 'A native command exit code was not propagated to the finished mark.'
+
+        $null = Get-Command -Name prompt
+        $recoveredPrompt = prompt
+        Assert-Condition -Condition $recoveredPrompt.Contains("$escape]133;D;0") -Message 'A success after a failure was not reported as exit code 0.'
+    }
+    finally
+    {
+        Disable-WinTermShellIntegration | Out-Null
+        Remove-Module -Name winTerm.Shell -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $temporaryDirectory)
+        {
+            Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
+        }
+        $env:WINTERM_SESSION_ID = $originalSessionId
+    }
+}
+
 function Test-PowerShellNativeCommandPrecedence
 {
     param(
@@ -181,6 +236,7 @@ $cmdInitPath = Join-Path $repositoryRoot 'shell\cmd\winterm-init.cmd'
 if ($Shell -in @('WindowsPowerShell', 'All'))
 {
     Test-PowerShellModule -ModulePath $modulePath
+    Test-PowerShellPromptExitCodes -ModulePath $modulePath
     Test-PowerShellNativeCommandPrecedence -ModulePath $modulePath
     Write-Host 'PASS: Windows PowerShell shell module' -ForegroundColor Green
 }
