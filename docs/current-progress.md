@@ -4,25 +4,27 @@ Last updated: 2026-08-04
 
 ## Repository state
 
-- Branch: `release/v1.3.0-beta1`
-- Base branch: `main` at `c089caeb` (1.3.0-alpha4 release metadata, pull
-  request #37)
+- Branch: `release/1.3.0-beta2`
+- Base branch: `main` at `a6ec9a415` (prompt exit code fix, pull request
+  #39)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0-beta1`
-- Package/file version: `1.3.0.4`
-- PowerShell module version: `1.3.0` with prerelease suffix `beta1`
+- Application version: `1.3.0-beta2`
+- Package/file version: `1.3.0.5`
+- PowerShell module version: `1.3.0` with prerelease suffix `beta2`
 - Release channel: `beta`
-- Release tag: `v1.3.0-beta1`
+- Release tag: `v1.3.0-beta2`
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
 - Supported target: Windows 11 x64
 
-`v1.3.0-beta1` is the first beta of the Command Timeline release, with
-feature content identical to `v1.3.0-alpha4`, which passed local field
-testing. The release workflow marks any non-stable channel with
-`--prerelease` and `--latest=false`, so `/releases/latest` keeps resolving to
-v1.2.0. Unlike the alphas, the beta is listed on the winTerm website next to
-the stable v1.2.0 download; it is still skipped by the WinGet workflow.
+`v1.3.0-beta2` is the second beta of the Command Timeline release. It fixes
+a beta1 defect found while producing the website screenshots: the PowerShell
+prompt wrapper reset `$?` before reading it, so every Timeline entry reported
+Succeeded and a failure mark could never appear. The release workflow marks
+any non-stable channel with `--prerelease` and `--latest=false`, so
+`/releases/latest` keeps resolving to v1.2.0. Like beta1, the beta is listed
+on the winTerm website next to the stable v1.2.0 download; it is still
+skipped by the WinGet workflow.
 
 ## Command Timeline status
 
@@ -48,6 +50,18 @@ a prerelease can never publish as Latest and a stable release can never carry a
 prerelease suffix. The package version stays four-part numeric for MSIX and the
 Win32 resource fields, and the PowerShell module version stays numeric with the
 suffix carried in `PrivateData.PSData.Prerelease`.
+
+## Beta1 findings
+
+Producing the sanitized website screenshots against the published beta1
+portable build surfaced one defect, fixed on `main` through pull request #39:
+
+1. Every Command Timeline entry reported `✓ Succeeded`, including commands
+   that failed. The prompt wrapper executed `Get-Module` before the prompt
+   function read `$?`, so the finished mark always carried exit code 0. The
+   wrapper now captures `$?` first and passes it through, and the shell
+   integration suite drives the installed wrapper end to end (first prompt,
+   success, cmdlet failure, native exit code, recovery).
 
 ## Alpha3 field reports
 

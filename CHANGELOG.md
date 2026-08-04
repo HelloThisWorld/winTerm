@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.0-beta2 - 2026-08-04
+
+Second beta of the Command Timeline release, fixing a failure-reporting
+defect found while capturing the beta1 screenshots. Like beta1, this is
+published as a GitHub prerelease; GitHub Latest and WinGet continue to
+point at v1.2.0 until a stable 1.3.0.
+
+### Fixed
+
+- Command Timeline entries no longer report every command as Succeeded.
+  The PowerShell prompt wrapper ran `Get-Module` before reading `$?`, so
+  the finished mark always carried exit code 0. The wrapper now captures
+  `$?` as its first statement and passes it into the prompt function, so
+  failed cmdlets report exit code 1 and native commands report their real
+  exit codes. The shell integration suite now drives the installed prompt
+  wrapper end to end and locks in the first-prompt, success, cmdlet
+  failure, native failure, and recovery sequences.
+
+
 ## 1.3.0-beta1 - 2026-08-04
 
 First beta of the Command Timeline release. The feature content is identical
