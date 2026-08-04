@@ -4,21 +4,21 @@ Last updated: 2026-08-04
 
 ## Repository state
 
-- Branch: `release/v1.3.0-alpha2`
-- Base branch: `main` at `18310e9f` (alpha1 field-report fixes, pull
-  request #32)
+- Branch: `release/v1.3.0-alpha3`
+- Base branch: `main` at `e0fd786c` (alpha2 field-report fixes, pull
+  request #34)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0-alpha2`
-- Package/file version: `1.3.0.1`
-- PowerShell module version: `1.3.0` with prerelease suffix `alpha2`
+- Application version: `1.3.0-alpha3`
+- Package/file version: `1.3.0.2`
+- PowerShell module version: `1.3.0` with prerelease suffix `alpha3`
 - Release channel: `alpha`
-- Release tag: `v1.3.0-alpha2`
+- Release tag: `v1.3.0-alpha3`
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
 - Supported target: Windows 11 x64
 
-`v1.3.0-alpha2` follows `v1.3.0-alpha1` as a GitHub **prerelease** for local
-testing, carrying the four field-report fixes. The release workflow marks any
+`v1.3.0-alpha3` follows `v1.3.0-alpha2` as a GitHub **prerelease** for local
+testing, carrying the five alpha2 field-report fixes. The release workflow marks any
 non-stable channel with `--prerelease` and `--latest=false`, so
 `/releases/latest` keeps resolving to v1.2.0. The alpha is deliberately not
 listed on the winTerm website and is skipped by the WinGet workflow.
@@ -48,10 +48,30 @@ prerelease suffix. The package version stays four-part numeric for MSIX and the
 Win32 resource fields, and the PowerShell module version stays numeric with the
 suffix carried in `PrivateData.PSData.Prerelease`.
 
+## Alpha2 field reports
+
+Local testing of `v1.3.0-alpha2` surfaced five issues, all fixed on `main`
+through pull request #34:
+
+1. Stray `\` characters before every prompt: the module's OSC terminator was
+   a two-character PowerShell string; it is now a single backslash.
+2. The Timeline captured the whole prompt line and Load inserted the prompt
+   path: the marks were console side effects; they are now embedded in the
+   returned prompt string in FinalTerm order.
+3. The Visual Progress bar animated at an idle integrated prompt: `133;B`
+   (composing input) no longer shows a bar; only `133;C` does.
+4. A phantom `Command text unavailable / Running` row for the active prompt:
+   a `133;B`-only mark no longer creates a Timeline entry.
+5. Rows jumped on arrow keys and hover: selection-only updates now reuse the
+   existing rows.
+
+An antivirus-blocked module component (seen with `Compatibility.ps1`) is now
+skipped silently and reported through diagnostics.
+
 ## Alpha1 field reports
 
-Local testing of `v1.3.0-alpha1` surfaced four issues, all addressed on this
-branch:
+Local testing of `v1.3.0-alpha1` surfaced four issues, all fixed on `main`
+through pull request #32:
 
 1. The Timeline handle covered terminal content. It is now a thin auto-hiding
    strip on the terminal's left edge that widens on hover, focus, or while the
@@ -70,8 +90,8 @@ branch:
 
 ## Next steps
 
-1. Install `v1.3.0-alpha2` locally and re-test the four fixes.
-2. Cut `v1.3.0-beta1` on channel `beta` once alpha2 passes local testing. The
+1. Install `v1.3.0-alpha3` locally and re-test the five fixes.
+2. Cut `v1.3.0-beta1` on channel `beta` once alpha3 passes local testing. The
    beta may be listed on the winTerm website alongside the stable v1.2.0
    download.
 3. Promote to a stable `v1.3.0` only after beta testing, which is the point at
