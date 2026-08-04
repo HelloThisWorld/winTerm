@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.0-alpha2 - 2026-08-04
 
-Fixes for the four alpha1 field reports, ahead of the 1.3.0 beta.
+Second alpha prerelease: fixes for the four alpha1 field reports. Like alpha1,
+this is published only as a tagged GitHub prerelease for local testing — GitHub
+Latest and the winTerm website continue to point at v1.2.0, and this version is
+not submitted to WinGet.
 
 ### Added
 
@@ -33,6 +36,13 @@ Fixes for the four alpha1 field reports, ahead of the 1.3.0 beta.
   ordinary records, and slashed dates such as `2025/10/13` are no longer read
   as completed/total meters. Success and Error results still persist until a
   later publication replaces them.
+
+### Changed
+
+- Advanced the package/file version to `1.3.0.1` so the alpha2 binaries are
+  distinguishable from alpha1 in `FILEVERSION`/`PRODUCTVERSION`. The
+  application version is `1.3.0-alpha2`, the PowerShell module stays `1.3.0`
+  with prerelease suffix `alpha2`, and the channel stays `alpha`.
 
 ## 1.3.0-alpha1 - 2026-08-04
 
