@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.0-alpha3 - 2026-08-04
 
-Fixes for the five alpha2 field reports.
+Third alpha prerelease: fixes for the five alpha2 field reports. Like the
+previous alphas, this is published only as a tagged GitHub prerelease for
+local testing — GitHub Latest and the winTerm website continue to point at
+v1.2.0, and this version is not submitted to WinGet.
 
 ### Fixed
 
@@ -34,6 +37,12 @@ Fixes for the five alpha2 field reports.
   `Compatibility.ps1` under some engines) no longer spills a parse error
   into the session. The component is skipped and recorded in diagnostics;
   shell integration and the remaining commands still load.
+
+### Changed
+
+- Advanced the package/file version to `1.3.0.2`. The application version is
+  `1.3.0-alpha3`, the PowerShell module stays `1.3.0` with prerelease suffix
+  `alpha3`, and the channel stays `alpha`.
 
 ## 1.3.0-alpha2 - 2026-08-04
 
