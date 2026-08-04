@@ -376,6 +376,9 @@
   <data name="CommandTimelineStatusUnknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
+  <data name="CommandTimelineStatusUnknownDetail" xml:space="preserve">
+    <value>The shell did not report a result for this command. Success and failure are shown only when shell integration reports them.</value>
+  </data>
   <data name="CommandTimelineCopyCommand" xml:space="preserve">
     <value>Copy command</value>
   </data>

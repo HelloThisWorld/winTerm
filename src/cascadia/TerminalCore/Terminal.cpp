@@ -772,6 +772,18 @@ TerminalInput::OutputType Terminal::SendCharEvent(const wchar_t ch, const WORD s
                 // This changed the scrollbar marks - raise a notification to update them
                 _NotifyScrollEvent();
             }
+            else if (!_mainBuffer->CurrentCommandTimelineCommand().empty())
+            {
+                // The shell established this mark through OSC 133 A/B, and
+                // this Enter keypress supplies the command-executed
+                // transition the shell itself does not report. Without this
+                // notification the lifecycle chain never observes the
+                // executed stage, the capability never reads Full, and every
+                // completed command presents as Unknown. A heuristic-only
+                // mark (createdMark above) stays buffer-local and reports
+                // nothing, and an empty input line starts no command.
+                NotifyShellIntegrationMark(::Microsoft::Console::VirtualTerminal::ShellIntegrationMarkKind::CommandExecuted, std::nullopt);
+            }
         }
     }
 

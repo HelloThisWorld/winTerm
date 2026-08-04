@@ -270,6 +270,7 @@ Assert-Contains -Content $resources -Values @(
     'CommandTimelineCopyOutput',
     'CommandTimelineJumpToOutput',
     'CommandTimelineOutputUnavailable',
+    'CommandTimelineStatusUnknownDetail',
     'CommandTimelineMultilineBlocked',
     'CommandTimelineConfirmLoad'
 ) -Failure 'Timeline entry-action localized strings are missing.'
