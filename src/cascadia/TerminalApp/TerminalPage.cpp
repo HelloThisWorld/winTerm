@@ -27,6 +27,7 @@
 #include "TerminalSettingsCache.h"
 #include "VisualProgressWindowCoordinator.h"
 #include "../../winterm/Design/DesignTokens.h"
+#include "../../winterm/Shell/AutoIntegration.h"
 
 #include "LaunchPositionRequest.g.cpp"
 #include "RenameWindowRequestedArgs.g.cpp"
@@ -1537,6 +1538,43 @@ namespace winrt::TerminalApp::implementation
     // - the terminal settings
     // Return value:
     // - the desired connection
+    // Rewrites a bare PowerShell profile commandline so the packaged
+    // winTerm.Shell module provides shell integration marks for that session.
+    // Anything the eligibility rules do not positively recognize launches
+    // unchanged; a missing packaged module disables the rewrite entirely.
+    static std::optional<std::wstring> _buildAutoIntegratedShellCommandline(const std::wstring_view commandline)
+    {
+        static const auto moduleManifestPath = []() -> std::wstring {
+            try
+            {
+                const std::filesystem::path root{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
+                auto candidate = root.parent_path() / L"ShellAssets" / L"powershell" / L"winTerm.Shell" / L"winTerm.Shell.psd1";
+                std::error_code ec;
+                if (std::filesystem::exists(candidate, ec))
+                {
+                    return candidate.wstring();
+                }
+            }
+            CATCH_LOG();
+            return {};
+        }();
+
+        if (moduleManifestPath.empty())
+        {
+            return std::nullopt;
+        }
+
+        GUID sessionId{};
+        if (FAILED(CoCreateGuid(&sessionId)))
+        {
+            return std::nullopt;
+        }
+
+        return winTerm::Shell::BuildAutoIntegratedPowerShellCommandline(commandline,
+                                                                        moduleManifestPath,
+                                                                        ::Microsoft::Console::Utils::GuidToString(sessionId));
+    }
+
     TerminalConnection::ITerminalConnection TerminalPage::_CreateConnectionFromSettings(Profile profile,
                                                                                         IControlSettings settings,
                                                                                         const bool inheritCursor)
@@ -1601,7 +1639,15 @@ namespace winrt::TerminalApp::implementation
             // restored the CWD to its original value.
             auto newWorkingDirectory{ _evaluatePathForCwd(settings.StartingDirectory()) };
             connection = TerminalConnection::ConptyConnection{};
-            valueSet = TerminalConnection::ConptyConnection::CreateSettings(settings.Commandline(),
+            auto commandline = settings.Commandline();
+            if (profile.AutoInjectShellIntegration())
+            {
+                if (const auto integrated = _buildAutoIntegratedShellCommandline(commandline))
+                {
+                    commandline = winrt::hstring{ *integrated };
+                }
+            }
+            valueSet = TerminalConnection::ConptyConnection::CreateSettings(commandline,
                                                                             newWorkingDirectory,
                                                                             settings.StartingTitle(),
                                                                             settingsInternal->ReloadEnvironmentVariables(),

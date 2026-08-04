@@ -500,6 +500,13 @@ namespace winTerm::VisualProgress
                 {
                     ++rightLast;
                 }
+                // A chained digit/digit/digit shape is a slashed date or a
+                // path segment, never a completed/total meter.
+                if ((leftFirst > 0 && value[leftFirst - 1] == L'/') ||
+                    (rightLast < value.size() && value[rightLast] == L'/'))
+                {
+                    continue;
+                }
                 uint64_t current{};
                 uint64_t total{};
                 if (_parseUnsigned(value, leftFirst, slash, current) &&
@@ -1366,8 +1373,11 @@ namespace winTerm::VisualProgress
 
         Match _matchGradle(const std::wstring_view line) const noexcept
         {
-            const auto anchor = _containsInsensitive(line, L"executing") ||
-                                _startsWithInsensitive(_trim(line), L"> task") ||
+            const auto taskLine = _startsWithInsensitive(_trim(line), L"> task");
+            const auto executingMeter = _containsInsensitive(line, L"executing") &&
+                                        _realProgress(line).has_value();
+            const auto anchor = executingMeter ||
+                                taskLine ||
                                 _containsInsensitive(line, L"gradle") ||
                                 _containsInsensitive(line, L"build successful") ||
                                 _containsInsensitive(line, L"build failed");
@@ -1383,9 +1393,29 @@ namespace winTerm::VisualProgress
             {
                 return { _makeProgress(ProgressProvider::Gradle, ProgressMode::Determinate, ProgressStatus::Success, 100, ProviderConfidence::High, 4), true, true };
             }
-            uint16_t stage = _containsInsensitive(line, L"download")        ? 2 :
-                             _startsWithInsensitive(_trim(line), L"> task") ? 3 :
-                                                                              1;
+            // Each record must carry build-tool evidence of its own: a status
+            // meter with a real value, a wrapper download, or a task line. A
+            // bare product mention, such as a directory listing entry that
+            // happens to contain the word, must not start or refresh a bar,
+            // and an established claim must not rematch on arbitrary later
+            // records.
+            uint16_t stage{};
+            if (_containsInsensitive(line, L"download") && _containsInsensitive(line, L"gradle"))
+            {
+                stage = 2;
+            }
+            else if (taskLine)
+            {
+                stage = 3;
+            }
+            else if (executingMeter)
+            {
+                stage = 1;
+            }
+            if (stage == 0)
+            {
+                return {};
+            }
             auto match = _runningMatch(ProgressProvider::Gradle, line, ProviderConfidence::High, stage);
             match.preserveOnly = true;
             return match;
@@ -1764,6 +1794,7 @@ namespace winTerm::VisualProgress
                 auto match = _recordOverflow || _recordMalformed ? Match{} : _recognize(line, call, transientRecord);
                 if (match.matched)
                 {
+                    _unmatchedRecordStreak = 0;
                     auto& progress = match.progress;
                     const auto preserveOnly = match.preserveOnly || _isPreserveOnly(line);
                     progress.transient = ending == RecordEnding::CarriageReturn || _recordHadEraseLine;
@@ -1825,7 +1856,14 @@ namespace winTerm::VisualProgress
                 else
                 {
                     call.onlySafeContent = false;
-                    if (_lastSeen && _lastSeen->visible && _lastSeen->provider == ProgressProvider::Generic)
+                    const auto lastVisible = _lastSeen && _lastSeen->visible;
+                    const auto lastWasTerminal = lastVisible &&
+                                                 (_lastSeen->status == ProgressStatus::Success ||
+                                                  _lastSeen->status == ProgressStatus::Error ||
+                                                  _lastSeen->status == ProgressStatus::Cancelled);
+                    const auto lastWasGeneric = lastVisible &&
+                                                _lastSeen->provider == ProgressProvider::Generic;
+                    if (lastWasGeneric)
                     {
                         // A structural clear is terminal-state exempt from the
                         // publication throttle and contains no output text.
@@ -1833,10 +1871,22 @@ namespace winTerm::VisualProgress
                     }
                     if (!match.pendingCandidate)
                     {
+                        // A progress-shaped record keeps a live claim; only a
+                        // plainly ordinary record advances toward the clear.
+                        _unmatchedRecordStreak = static_cast<uint8_t>(
+                            _unmatchedRecordStreak < 2 ? _unmatchedRecordStreak + 1 : 2);
+                        // A built-in provider tolerates one ordinary record so
+                        // an informational line inside a live meter stream does
+                        // not blank the bar, but a still-running bar whose
+                        // stream has moved on must not animate indefinitely.
+                        // Success and Error are final results and remain until
+                        // a later publication replaces them.
+                        if (lastVisible && !lastWasGeneric && !lastWasTerminal &&
+                            _unmatchedRecordStreak >= 2)
+                        {
+                            _rememberProgress(_providerClear());
+                        }
                         _resetGenericHeuristics();
-                    }
-                    if (!match.pendingCandidate)
-                    {
                         _clearProviderContext();
                     }
                 }
@@ -2146,6 +2196,7 @@ namespace winTerm::VisualProgress
             // output. The cursor is unknown until rendered output proves it.
             _columnKnown = false;
             _atColumnZero = false;
+            _unmatchedRecordStreak = 0;
             _clearProviderContext();
             _recentProgress = {};
             _recentProgressNext = 0;
@@ -2186,6 +2237,11 @@ namespace winTerm::VisualProgress
         uint64_t _genericTransientShapeValue{};
         uint16_t _genericTransientShapeLength{};
         uint8_t _genericTransientShapeStreak{};
+        // Consecutive non-empty records that matched no provider. Survives
+        // _clearProviderContext so the count can reach the structural-clear
+        // threshold across the context drop that the first ordinary record
+        // already performs.
+        uint8_t _unmatchedRecordStreak{};
         std::array<LayerState, DockerLayerCapacity> _dockerLayers{};
         std::array<StepState, BuildKitStepCapacity> _buildKitSteps{};
         std::array<ProviderProgress, RecentProgressCapacity> _recentProgress{};

@@ -1429,20 +1429,35 @@
             </Grid>
         </Border>
 
+        <!--
+            The handle rests as a thin strip on the terminal's left edge, in
+            the manner of an auto-hiding scrollbar, so it does not cover
+            terminal content. It widens on hover, keyboard focus, or while
+            the overlay is open; see _updateCommandTimelineHandleVisual.
+        -->
         <Button x:Name="CommandTimelineHandle"
                 x:Uid="CommandTimelineHandle"
-                Width="28"
-                Height="48"
-                Margin="8,0,0,0"
+                Width="6"
+                Height="64"
+                Margin="0"
                 Padding="0"
                 HorizontalAlignment="Left"
+                HorizontalContentAlignment="Center"
                 VerticalAlignment="Center"
+                VerticalContentAlignment="Center"
+                Background="{ThemeResource SystemControlBackgroundBaseLowBrush}"
+                BorderThickness="0"
                 Click="_CommandTimelineHandleClick"
-                CornerRadius="6">
+                CornerRadius="0,4,4,0"
+                GotFocus="_CommandTimelineHandleGotFocus"
+                LostFocus="_CommandTimelineHandleLostFocus"
+                PointerEntered="_CommandTimelineHandlePointerEntered"
+                PointerExited="_CommandTimelineHandlePointerExited">
             <FontIcon x:Name="CommandTimelineHandleIcon"
                       FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                      FontSize="12"
-                      Glyph="&#xE76C;" />
+                      FontSize="10"
+                      Glyph="&#xE76C;"
+                      Visibility="Collapsed" />
         </Button>
 
         <Grid x:Name="RendererFailedNotice"

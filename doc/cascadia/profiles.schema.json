@@ -2979,6 +2979,11 @@
           "description": "When set to true, prompts will automatically be marked.",
           "type": "boolean"
         },
+        "shellIntegration.autoInject": {
+          "default": true,
+          "description": "When set to true and the profile commandline is a bare PowerShell invocation, winTerm imports its packaged shell integration module at startup so command marks work without profile changes. Customized commandlines are never rewritten.",
+          "type": "boolean"
+        },
         "experimental.autoMarkPrompts": {
           "type": "boolean",
           "description": "[Deprecated] Replaced with the \"autoMarkPrompts\" setting.",

@@ -122,6 +122,7 @@ Author(s):
     X(Windows::Foundation::Collections::IVector<IMediaResource>, BellSound, "bellSound", nullptr)                                                              \
     X(bool, Elevate, "elevate", false)                                                                                                                         \
     X(bool, AutoMarkPrompts, "autoMarkPrompts", true)                                                                                                          \
+    X(bool, AutoInjectShellIntegration, "shellIntegration.autoInject", true)                                                                                   \
     X(bool, ShowMarks, "showMarksOnScrollbar", false)                                                                                                          \
     X(bool, RepositionCursorWithMouse, "experimental.repositionCursorWithMouse", false)                                                                        \
     X(bool, ReloadEnvironmentVariables, "compatibility.reloadEnvironmentVariables", true)                                                                      \

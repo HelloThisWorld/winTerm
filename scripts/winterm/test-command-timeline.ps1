@@ -186,10 +186,12 @@ if ($overlayStart -lt 0 -or $rendererNoticeStart -le $overlayStart) {
 $overlayXaml = $termControlXaml.Substring($overlayStart, $rendererNoticeStart - $overlayStart)
 Assert-Contains -Content $overlayXaml -Values @(
     'x:Name="CommandTimelineHandle"',
-    'Margin="8,0,0,0"',
+    'Width="6"',
+    'PointerEntered="_CommandTimelineHandlePointerEntered"',
+    'PointerExited="_CommandTimelineHandlePointerExited"',
     'x:Name="CommandTimelineList"',
     'SelectionMode="Single"'
-) -Failure 'The overlay handle, bounded list, or selection presentation is incomplete.'
+) -Failure 'The overlay auto-hiding handle, bounded list, or selection presentation is incomplete.'
 if ($overlayXaml.Contains('SwapChainPanel') -or $overlayXaml.Contains('ColumnDefinition') -or $overlayXaml.Contains('Storyboard')) {
     throw 'The Timeline overlay must not resize the terminal or add an independent animation loop.'
 }
@@ -207,11 +209,13 @@ Assert-Contains -Content $termControlSource -Values @(
     'GetTSFHandle().HasActiveComposition()',
     '_tryHandleCommandTimelineKey(vkey, modifiers, keyDown)',
     '_tryHandleCommandTimelineWheel(point.Position(), delta)',
+    '_commandTimelineOpen && !_isPointOverCommandTimeline(point.Position())',
+    '_updateCommandTimelineHandleVisual()',
     'TextTrimming::CharacterEllipsis',
     '_commandTimelineWheelSettleTimer.Stop()',
     'CommandTimelineList().Items().Clear()',
     'Focus(FocusState::Programmatic)'
-) -Failure 'Timeline input isolation, IME precedence, snapping, or close cleanup is incomplete.'
+) -Failure 'Timeline input isolation, IME precedence, light dismiss, or close cleanup is incomplete.'
 if ($termControlSource.IndexOf('_TryHandleKeyBinding(vkey, scanCode, modifiers)', [StringComparison]::Ordinal) -gt
     $termControlSource.IndexOf('_tryHandleCommandTimelineKey(vkey, modifiers, keyDown)', [StringComparison]::Ordinal)) {
     throw 'User-defined key bindings must retain precedence over bare Timeline navigation.'

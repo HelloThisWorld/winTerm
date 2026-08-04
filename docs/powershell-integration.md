@@ -1,8 +1,8 @@
 # PowerShell integration
 
-The packaged module is `ShellAssets\powershell\winTerm.Shell\winTerm.Shell.psd1`, version `1.0.2`. It supports PowerShell 7 and Windows PowerShell 5.1 with the same syntax.
+The packaged module is `ShellAssets\powershell\winTerm.Shell\winTerm.Shell.psd1`; its module version tracks the winTerm release. It supports PowerShell 7 and Windows PowerShell 5.1 with the same syntax.
 
-An explicit winTerm profile launcher must set these process-local variables before importing the module:
+A winTerm launcher must set these process-local variables before importing the module:
 
 ```powershell
 $env:WINTERM_SESSION_ID = '<opaque-session-id>'
@@ -11,6 +11,31 @@ Import-Module '<package-path>\ShellAssets\powershell\winTerm.Shell\winTerm.Shell
 ```
 
 The module does not add this block to `$PROFILE`. A launcher must preserve normal PowerShell execution policy; the module neither uses nor recommends `-ExecutionPolicy Bypass`. If policy prevents importing a module, PowerShell must still launch and diagnostics should report the failure and recommend a user-reviewed policy or installation remedy.
+
+## Automatic integration for bare PowerShell profiles
+
+winTerm performs the launcher steps automatically when a profile's commandline
+is a bare PowerShell invocation, so the Command Timeline and shell-lifecycle
+progress work out of the box for the stock Windows PowerShell profile. The
+rules are deliberately narrow and are implemented in
+`src/winterm/Shell/AutoIntegration.h`:
+
+- Only `powershell.exe` and `pwsh.exe` are recognized, by executable basename.
+- The only arguments tolerated on the original commandline are `-NoLogo` and
+  `-NoExit`. Any other argument — including `-Command`, `-File`,
+  `-EncodedCommand`, `-NoProfile`, or `-ExecutionPolicy` — means the user has
+  customized the invocation, and it launches unchanged.
+- The rewrite appends `-NoExit -Command` with a fragment that sets the two
+  session variables and imports the packaged module with
+  `-ErrorAction SilentlyContinue`. Execution policy is never altered, and an
+  import failure leaves a working shell without integration.
+- A commandline that already mentions the module is not rewritten again, so a
+  restarted connection stays stable.
+
+The per-profile setting `"shellIntegration.autoInject"` (default `true`)
+disables the rewrite when set to `false`. Because `-Command` is present on the
+rewritten invocation, PowerShell suppresses its startup banner; this is the
+standard behavior of every launcher-based shell integration.
 
 ## Prompt and marks
 
