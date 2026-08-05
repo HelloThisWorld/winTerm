@@ -370,6 +370,7 @@ private:
     void _UpdateVisualProgressFromTaskbar();
     void _UpdateVisualProgressFromShellIntegration();
     void _UpdateVisualProgressFromProvider();
+    void _ExpireVisualProgressShellLaunch(uint64_t launchGeneration) noexcept;
     void _ConfigureVisualProgressRecognition() noexcept;
     void _QueueVisualProgressUpdate(const winTerm::VisualProgress::ProgressSnapshot& snapshot);
     void _ScheduleVisualProgressUpdate();

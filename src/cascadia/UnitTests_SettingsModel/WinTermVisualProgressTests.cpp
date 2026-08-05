@@ -54,6 +54,10 @@ namespace SettingsModelUnitTests
         TEST_METHOD(SparkPoolsEnforcePaneAndGlobalCaps);
         TEST_METHOD(BackgroundAndHiddenPanesDoNotRequestSparkWork);
         TEST_METHOD(CommandCompletionClearsAtNextPrompt);
+        TEST_METHOD(ShellLaunchFallbackIsOneShotPerCommand);
+        TEST_METHOD(ShellLaunchExpirationIgnoresStaleGenerations);
+        TEST_METHOD(ExpiredShellLaunchDoesNotResurrectAfterOwnershipClears);
+        TEST_METHOD(ShellLaunchInvalidationOnResetDisableAndClose);
         TEST_METHOD(EmergencyOverridePrecedesSetting);
         TEST_METHOD(DisabledFeatureIgnoresEvents);
         TEST_METHOD(MultiplePanesRemainIndependent);
@@ -1886,6 +1890,169 @@ namespace SettingsModelUnitTests
         // The next idle prompt keeps the bar hidden even after 133;B.
         VERIFY_IS_FALSE(state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1).has_value());
         VERIFY_IS_FALSE(state.Current().visible);
+    }
+
+    void WinTermVisualProgressTests::ShellLaunchFallbackIsOneShotPerCommand()
+    {
+        ProgressStateMachine state;
+        state.SetEnabled(true);
+        state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1);
+
+        const auto launch = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        VERIFY_IS_TRUE(launch.has_value());
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressSource::ShellIntegration), static_cast<int>(launch->source));
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Indeterminate), static_cast<int>(launch->mode));
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Running), static_cast<int>(launch->status));
+        VERIFY_IS_TRUE(launch->launchGeneration != 0);
+
+        // Alternate-screen churn, rehydration, and reconnect re-broadcasts
+        // re-observe the same still-running command. The launch generation
+        // must not advance, so the one-shot cannot be re-armed.
+        VERIFY_IS_FALSE(state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1).has_value());
+        VERIFY_ARE_EQUAL(launch->launchGeneration, state.Current().launchGeneration);
+
+        // One traversal completed while the command keeps running: the
+        // fallback expires to Hidden -- never to Success -- and the Running
+        // status keeps the hidden snapshot free of cancellation semantics.
+        const auto expired = state.ExpireShellLaunch(launch->launchGeneration);
+        VERIFY_IS_TRUE(expired.has_value());
+        VERIFY_IS_FALSE(expired->visible);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Hidden), static_cast<int>(expired->mode));
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Running), static_cast<int>(expired->status));
+
+        // Long-running output and alternate-screen transitions after the
+        // expiration re-observe the same command and must not replay it, and
+        // a duplicate completion is inert.
+        VERIFY_IS_FALSE(state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1).has_value());
+        VERIFY_IS_FALSE(state.Current().visible);
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(launch->launchGeneration).has_value());
+
+        // The eventual real result still presents with unchanged semantics.
+        const auto finished = state.ApplyShellLifecycle(ShellLifecycleState::CommandFinished, 0);
+        VERIFY_IS_TRUE(finished.has_value());
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Success), static_cast<int>(finished->status));
+        VERIFY_ARE_EQUAL(uint8_t{ 100 }, finished->value);
+        VERIFY_IS_FALSE(state.ApplyShellLifecycle(ShellLifecycleState::Prompt, -1)->visible);
+    }
+
+    void WinTermVisualProgressTests::ShellLaunchExpirationIgnoresStaleGenerations()
+    {
+        ProgressStateMachine state;
+        state.SetEnabled(true);
+
+        const auto first = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        const auto firstGeneration = first->launchGeneration;
+
+        // A short command finishes before the traversal ends: completion
+        // supersedes the launch immediately and the late expiration is inert.
+        const auto finished = state.ApplyShellLifecycle(ShellLifecycleState::CommandFinished, 1);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Error), static_cast<int>(finished->status));
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(firstGeneration).has_value());
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Error), static_cast<int>(state.Current().status));
+
+        // The next command opens a new generation and allows one new launch.
+        state.ApplyShellLifecycle(ShellLifecycleState::Prompt, -1);
+        state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1);
+        const auto second = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        VERIFY_IS_TRUE(second.has_value());
+        VERIFY_IS_TRUE(second->launchGeneration != 0);
+        VERIFY_ARE_NOT_EQUAL(firstGeneration, second->launchGeneration);
+
+        // A stale completion captured for the earlier command can never hide
+        // the newer command's launch, and zero is never a valid generation.
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(firstGeneration).has_value());
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(0).has_value());
+        VERIFY_IS_TRUE(state.Current().visible);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Running), static_cast<int>(state.Current().status));
+
+        // The current generation expires exactly once.
+        VERIFY_IS_TRUE(state.ExpireShellLaunch(second->launchGeneration).has_value());
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(second->launchGeneration).has_value());
+    }
+
+    void WinTermVisualProgressTests::ExpiredShellLaunchDoesNotResurrectAfterOwnershipClears()
+    {
+        ProgressStateMachine state;
+        state.SetEnabled(true);
+        const auto launch = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+
+        // A recognized provider takes ownership while the launch is active.
+        const ProviderProgress provider{
+            ProgressProvider::Maven,
+            ProgressMode::Determinate,
+            ProgressStatus::Running,
+            40,
+            ProviderConfidence::High,
+            true,
+            false,
+            false,
+            2,
+            1,
+        };
+        const auto owned = state.ApplyProvider(provider);
+        VERIFY_IS_TRUE(owned.has_value());
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressSource::Provider), static_cast<int>(owned->source));
+
+        // The one-shot duration elapses in the background. Nothing visible
+        // changes, but the stored fallback must be expired -- not merely left
+        // unpainted -- so the later ownership release cannot resurrect it.
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(launch->launchGeneration).has_value());
+        const auto afterProvider = state.ResetProvider();
+        VERIFY_IS_TRUE(afterProvider.has_value());
+        VERIFY_IS_FALSE(afterProvider->visible);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressMode::Hidden), static_cast<int>(afterProvider->mode));
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Running), static_cast<int>(afterProvider->status));
+
+        // The same rule holds when explicit OSC 9;4 progress owned the bar
+        // while the launch expired underneath it.
+        state.ApplyShellLifecycle(ShellLifecycleState::Prompt, -1);
+        state.ApplyShellLifecycle(ShellLifecycleState::CommandStart, -1);
+        const auto second = state.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        const auto explicitProgress = state.ApplyTaskbar(3, 0);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressSource::Taskbar), static_cast<int>(explicitProgress->source));
+        VERIFY_IS_FALSE(state.ExpireShellLaunch(second->launchGeneration).has_value());
+        const auto afterExplicit = state.ApplyTaskbar(0, 0);
+        VERIFY_IS_TRUE(afterExplicit.has_value());
+        VERIFY_IS_FALSE(afterExplicit->visible);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Running), static_cast<int>(afterExplicit->status));
+
+        // A provider may still begin genuinely new work after the launch
+        // expired; only the expired shell fallback stays retired.
+        const auto reowned = state.ApplyProvider(provider);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressSource::Provider), static_cast<int>(reowned->source));
+        const auto cleared = state.ResetProvider();
+        VERIFY_IS_FALSE(cleared->visible);
+        VERIFY_ARE_EQUAL(static_cast<int>(ProgressStatus::Running), static_cast<int>(cleared->status));
+    }
+
+    void WinTermVisualProgressTests::ShellLaunchInvalidationOnResetDisableAndClose()
+    {
+        // Pane close and content detach reset the state machine; a pending
+        // completion captured before the reset must be stranded.
+        ProgressStateMachine detached;
+        detached.SetEnabled(true);
+        const auto detachedLaunch = detached.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        detached.Reset();
+        VERIFY_IS_FALSE(detached.ExpireShellLaunch(detachedLaunch->launchGeneration).has_value());
+        VERIFY_IS_FALSE(detached.Current().visible);
+
+        // Disabling Visual Progress strands pending completions, including
+        // across a later re-enable.
+        ProgressStateMachine disabled;
+        disabled.SetEnabled(true);
+        const auto disabledLaunch = disabled.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        disabled.SetEnabled(false);
+        VERIFY_IS_FALSE(disabled.ExpireShellLaunch(disabledLaunch->launchGeneration).has_value());
+        disabled.SetEnabled(true);
+        VERIFY_IS_FALSE(disabled.ExpireShellLaunch(disabledLaunch->launchGeneration).has_value());
+        VERIFY_IS_FALSE(disabled.Current().visible);
+
+        // Close strands pending completions permanently.
+        ProgressStateMachine closed;
+        closed.SetEnabled(true);
+        const auto closedLaunch = closed.ApplyShellLifecycle(ShellLifecycleState::CommandExecuted, -1);
+        closed.Close();
+        VERIFY_IS_FALSE(closed.ExpireShellLaunch(closedLaunch->launchGeneration).has_value());
     }
 
     void WinTermVisualProgressTests::EmergencyOverridePrecedesSetting()

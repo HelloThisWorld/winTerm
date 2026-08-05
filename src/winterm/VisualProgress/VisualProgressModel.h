@@ -134,6 +134,12 @@ namespace winTerm::VisualProgress
         bool transient{};
         bool suppressible{};
         uint16_t stage{};
+        // Identifies the OSC 133 command a Shell Integration launch fallback
+        // belongs to. Zero for every other source and shell state. The
+        // renderer captures it when the launch presentation starts and hands
+        // it back through ExpireShellLaunch, which makes stale one-shot
+        // completions inert.
+        uint64_t launchGeneration{};
 
         bool SamePresentation(const ProgressSnapshot& other) const noexcept
         {
@@ -146,7 +152,8 @@ namespace winTerm::VisualProgress
                    confidence == other.confidence &&
                    transient == other.transient &&
                    suppressible == other.suppressible &&
-                   stage == other.stage;
+                   stage == other.stage &&
+                   launchGeneration == other.launchGeneration;
         }
     };
 
@@ -173,6 +180,7 @@ namespace winTerm::VisualProgress
                 _explicitSnapshot = {};
                 _providerSnapshot.reset();
                 _shellSnapshot.reset();
+                _resetShellLaunchScope();
                 return _emit(HiddenSnapshot(ProgressStatus::Cancelled));
             }
             return std::nullopt;
@@ -254,7 +262,7 @@ namespace winTerm::VisualProgress
             }
 
             _providerSnapshot.reset();
-            return _explicitActive ? std::nullopt : _emit(_shellSnapshot.value_or(HiddenSnapshot()));
+            return _explicitActive ? std::nullopt : _emit(_fallbackSnapshot());
         }
 
         std::optional<ProgressSnapshot> ApplyShellLifecycle(const ShellLifecycleState state, const int64_t exitCode) noexcept
@@ -270,18 +278,35 @@ namespace winTerm::VisualProgress
             case ShellLifecycleState::Prompt:
                 _providerSnapshot.reset();
                 _shellSnapshot.reset();
+                _beginShellLaunchScope();
                 break;
             case ShellLifecycleState::CommandStart:
                 // OSC 133;B: the user is composing input at an interactive
                 // prompt. Nothing is executing, so an idle prompt must never
                 // animate a bar; only CommandExecuted starts one.
                 _shellSnapshot.reset();
+                _beginShellLaunchScope();
                 break;
             case ShellLifecycleState::CommandExecuted:
+                // The launch fallback is a bounded one-shot per command. A
+                // repeated CommandExecuted observation (pane rehydration,
+                // alternate-screen churn, reconnect re-broadcast) belongs to
+                // the same still-running command, so it must neither restart
+                // a consumed launch nor open a new launch generation.
+                if (_shellLifecycle == ShellLifecycleState::CommandExecuted)
+                {
+                    break;
+                }
+                _beginShellLaunchScope();
                 _shellSnapshot = ProgressSnapshot{ ProgressMode::Indeterminate, ProgressStatus::Running, 0, true, ProgressSource::ShellIntegration, 0 };
+                _shellSnapshot->launchGeneration = _shellLaunchGeneration;
                 break;
             case ShellLifecycleState::CommandFinished:
                 _providerSnapshot.reset();
+                // Completion supersedes the launch immediately and advances
+                // the launch scope, so a one-shot completion still in flight
+                // can never disturb this terminal presentation.
+                _beginShellLaunchScope();
                 _shellSnapshot = ProgressSnapshot{
                     ProgressMode::Determinate,
                     exitCode > 0 ? ProgressStatus::Error : ProgressStatus::Success,
@@ -296,6 +321,36 @@ namespace winTerm::VisualProgress
                 return std::nullopt;
             }
 
+            _shellLifecycle = state;
+            return _explicitActive ? std::nullopt : _emit(_fallbackSnapshot());
+        }
+
+        // Called when the renderer's one-shot launch presentation has run for
+        // one full traversal. The captured generation makes stale completions
+        // inert: a callback from an earlier command can never hide progress
+        // belonging to a newer command. Expiration clears the stored fallback
+        // even while a provider or explicit source owns the presentation, so
+        // a later ownership release cannot resurrect an expired launch.
+        std::optional<ProgressSnapshot> ExpireShellLaunch(const uint64_t generation) noexcept
+        {
+            std::scoped_lock lock{ _mutex };
+            if (!_enabled || _closed || generation == 0 ||
+                generation != _shellLaunchGeneration || _shellLaunchExpired)
+            {
+                return std::nullopt;
+            }
+            if (!_shellSnapshot ||
+                _shellSnapshot->source != ProgressSource::ShellIntegration ||
+                _shellSnapshot->mode != ProgressMode::Indeterminate ||
+                _shellSnapshot->status != ProgressStatus::Running)
+            {
+                // The launch fallback was already replaced; success, error,
+                // and cancelled presentations are never expired.
+                return std::nullopt;
+            }
+
+            _shellLaunchExpired = true;
+            _shellSnapshot.reset();
             return _explicitActive ? std::nullopt : _emit(_fallbackSnapshot());
         }
 
@@ -306,6 +361,7 @@ namespace winTerm::VisualProgress
             _explicitSnapshot = {};
             _providerSnapshot.reset();
             _shellSnapshot.reset();
+            _resetShellLaunchScope();
             return _emit(HiddenSnapshot());
         }
 
@@ -322,6 +378,7 @@ namespace winTerm::VisualProgress
             _explicitSnapshot = {};
             _providerSnapshot.reset();
             _shellSnapshot.reset();
+            _resetShellLaunchScope();
             return _emit(HiddenSnapshot(ProgressStatus::Cancelled));
         }
 
@@ -343,7 +400,35 @@ namespace winTerm::VisualProgress
             {
                 return *_providerSnapshot;
             }
-            return _shellSnapshot.value_or(HiddenSnapshot());
+            if (_shellSnapshot)
+            {
+                return *_shellSnapshot;
+            }
+            // An expired launch hides the bar while its command keeps
+            // running. Running status keeps that hidden snapshot silent;
+            // Cancelled would raise a fake interruption announcement through
+            // the accessibility policy even though nothing was interrupted.
+            if (_shellLifecycle == ShellLifecycleState::CommandExecuted && _shellLaunchExpired)
+            {
+                return HiddenSnapshot(ProgressStatus::Running);
+            }
+            return HiddenSnapshot();
+        }
+
+        // Every shell lifecycle transition opens a new launch scope: the
+        // generation advance strands completion callbacks captured for an
+        // earlier scope, and the cleared flag re-arms the one-shot for the
+        // next CommandExecuted.
+        void _beginShellLaunchScope() noexcept
+        {
+            ++_shellLaunchGeneration;
+            _shellLaunchExpired = false;
+        }
+
+        void _resetShellLaunchScope() noexcept
+        {
+            _beginShellLaunchScope();
+            _shellLifecycle = ShellLifecycleState::None;
         }
 
         uint8_t _meaningfulValue(const uint8_t value) const noexcept
@@ -370,7 +455,10 @@ namespace winTerm::VisualProgress
         bool _enabled{};
         bool _closed{};
         bool _explicitActive{};
+        bool _shellLaunchExpired{};
+        ShellLifecycleState _shellLifecycle{ ShellLifecycleState::None };
         uint64_t _sequence{};
+        uint64_t _shellLaunchGeneration{};
         ProgressSnapshot _current{};
         ProgressSnapshot _explicitSnapshot{};
         std::optional<ProgressSnapshot> _providerSnapshot;

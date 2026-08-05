@@ -52,10 +52,16 @@ namespace winTerm::VisualProgress
     {
     public:
         using FaultCallback = std::function<void()>;
+        // Reports that the one-shot Shell Integration launch presentation has
+        // run for one full traversal. The argument is the launch generation
+        // captured when that presentation started; the progress state machine
+        // uses it to discard stale completions.
+        using LaunchExpiredCallback = std::function<void(uint64_t)>;
 
         static std::shared_ptr<RainbowArcRenderer> TryCreate(
             const winrt::Windows::UI::Xaml::Controls::Grid& host,
-            FaultCallback faultCallback = {}) noexcept
+            FaultCallback faultCallback = {},
+            LaunchExpiredCallback launchExpiredCallback = {}) noexcept
         {
             if (!host)
             {
@@ -64,7 +70,7 @@ namespace winTerm::VisualProgress
 
             try
             {
-                auto renderer = std::shared_ptr<RainbowArcRenderer>{ new RainbowArcRenderer{ std::move(faultCallback) } };
+                auto renderer = std::shared_ptr<RainbowArcRenderer>{ new RainbowArcRenderer{ std::move(faultCallback), std::move(launchExpiredCallback) } };
                 if (!renderer->_initialize(host))
                 {
                     return nullptr;
@@ -106,6 +112,7 @@ namespace winTerm::VisualProgress
             _applyPerformanceDecision(_evaluatePerformancePolicy());
             auto plan = _renderState.Apply(snapshot, _environment, now);
             _applyWithDegradation(plan, true);
+            _synchronizeLaunchClock();
         }
 
         void SetPaneActive(const bool active) noexcept
@@ -220,6 +227,7 @@ namespace winTerm::VisualProgress
             }
             _closed = true;
             _faultCallback = {};
+            _launchExpiredCallback = {};
 
             try
             {
@@ -227,6 +235,7 @@ namespace winTerm::VisualProgress
                 _stopAllAnimations();
                 _releaseAllSparks();
                 _clearTerminalBatch();
+                _clearLaunchClock();
                 _renderState.Close();
 
                 if (_host)
@@ -306,9 +315,10 @@ namespace winTerm::VisualProgress
             bool ambient{};
         };
 
-        explicit RainbowArcRenderer(FaultCallback faultCallback) noexcept :
+        RainbowArcRenderer(FaultCallback faultCallback, LaunchExpiredCallback launchExpiredCallback) noexcept :
             _sparkPool{ _sharedSparkBudget },
-            _faultCallback{ std::move(faultCallback) }
+            _faultCallback{ std::move(faultCallback) },
+            _launchExpiredCallback{ std::move(launchExpiredCallback) }
         {
             // Visible is a safe presentation default. Focus deliberately
             // starts false so no continuous work or sparks begin before the
@@ -1410,22 +1420,40 @@ namespace winTerm::VisualProgress
             _cometTail.Brush(_cometBrush);
             _cometTail.Offset({ startX, 0.0f, 0.0f });
 
+            // The Shell Integration launch fallback is a bounded one-shot: its
+            // comet makes a single traversal and parks off-track, transparent.
+            // Every other indeterminate owner (explicit OSC 9;4, providers)
+            // keeps the continuous traversal. The launch clock, not this
+            // visual, publishes the Hidden snapshot that ends the launch.
+            const auto oneShotLaunch = _snapshot.source == ProgressSource::ShellIntegration &&
+                                       _snapshot.launchGeneration != 0;
+            const auto iterationBehavior = oneShotLaunch ?
+                                               WUC::AnimationIterationBehavior::Count :
+                                               WUC::AnimationIterationBehavior::Forever;
+
             _cometTailAnimation.InsertKeyFrame(0.0f, { startX, 0.0f, 0.0f });
             _cometTailAnimation.InsertKeyFrame(1.0f, { endX, 0.0f, 0.0f });
             _cometTailAnimation.Duration(_timeSpan(RainbowArcVisualConstants::IndeterminateCycleDuration));
-            _cometTailAnimation.IterationBehavior(WUC::AnimationIterationBehavior::Forever);
+            _cometTailAnimation.IterationBehavior(iterationBehavior);
 
             _cometHeadAnimation.InsertKeyFrame(0.0f, { RainbowArcVisualConstants::HorizontalInset, _headY, 0.0f });
             _cometHeadAnimation.InsertKeyFrame(1.0f, { RainbowArcVisualConstants::HorizontalInset + _trackWidth + tailWidth, _headY, 0.0f });
             _cometHeadAnimation.Duration(_timeSpan(RainbowArcVisualConstants::IndeterminateCycleDuration));
-            _cometHeadAnimation.IterationBehavior(WUC::AnimationIterationBehavior::Forever);
+            _cometHeadAnimation.IterationBehavior(iterationBehavior);
 
             _cometHeadOpacityAnimation.InsertKeyFrame(0.0f, 0.0f);
             _cometHeadOpacityAnimation.InsertKeyFrame(0.06f, 1.0f);
             _cometHeadOpacityAnimation.InsertKeyFrame(0.91f, 1.0f);
             _cometHeadOpacityAnimation.InsertKeyFrame(1.0f, 0.0f);
             _cometHeadOpacityAnimation.Duration(_timeSpan(RainbowArcVisualConstants::IndeterminateCycleDuration));
-            _cometHeadOpacityAnimation.IterationBehavior(WUC::AnimationIterationBehavior::Forever);
+            _cometHeadOpacityAnimation.IterationBehavior(iterationBehavior);
+
+            if (oneShotLaunch)
+            {
+                _cometTailAnimation.IterationCount(1);
+                _cometHeadAnimation.IterationCount(1);
+                _cometHeadOpacityAnimation.IterationCount(1);
+            }
 
             if (!_indeterminateRunning)
             {
@@ -1982,6 +2010,136 @@ namespace winTerm::VisualProgress
             _terminalBatch = nullptr;
         }
 
+        // The launch clock bounds the Shell Integration launch fallback to one
+        // comet traversal of wall time. It is a single one-shot composition
+        // animation on a private property set: no timer, no polling loop, and
+        // no coupling to the visible comet, whose animations stop and restart
+        // with focus, geometry, and performance changes. It keeps running when
+        // a provider or explicit source takes the presentation over, so the
+        // stored fallback still expires in the background; the state machine's
+        // generation checks decide whether a completion still matters.
+        void _synchronizeLaunchClock() noexcept
+        {
+            const auto launch = _snapshot.visible &&
+                                _snapshot.source == ProgressSource::ShellIntegration &&
+                                _snapshot.mode == ProgressMode::Indeterminate &&
+                                _snapshot.status == ProgressStatus::Running &&
+                                _snapshot.launchGeneration != 0;
+            if (launch)
+            {
+                if (_activeLaunchGeneration != _snapshot.launchGeneration)
+                {
+                    _startLaunchClock(_snapshot.launchGeneration);
+                }
+                return;
+            }
+
+            // Shell terminal presentations and hidden snapshots end the launch
+            // scope; any queued completion is already stale by generation.
+            if (_snapshot.source == ProgressSource::ShellIntegration || _snapshot.mode == ProgressMode::Hidden)
+            {
+                _clearLaunchClock();
+            }
+        }
+
+        void _startLaunchClock(const uint64_t launchGeneration) noexcept
+        {
+            _clearLaunchClock();
+            if (_closed || _faulted || !_compositor || !_launchExpiredCallback)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!_launchClockProperties)
+                {
+                    _launchClockProperties = _compositor.CreatePropertySet();
+                    _launchClockProperties.InsertScalar(L"Progress", 0.0f);
+                }
+                if (!_launchClockAnimation)
+                {
+                    _launchClockAnimation = _compositor.CreateScalarKeyFrameAnimation();
+                    _launchClockAnimation.InsertKeyFrame(1.0f, 1.0f);
+                    _launchClockAnimation.Duration(_timeSpan(RainbowArcVisualConstants::IndeterminateCycleDuration));
+                    _launchClockAnimation.IterationBehavior(WUC::AnimationIterationBehavior::Count);
+                    _launchClockAnimation.IterationCount(1);
+                }
+
+                _launchBatch = _compositor.CreateScopedBatch(WUC::CompositionBatchTypes::Animation);
+                _launchClockProperties.StartAnimation(L"Progress", _launchClockAnimation);
+                _launchBatch.End();
+                _activeLaunchGeneration = launchGeneration;
+
+                const auto weak = weak_from_this();
+                _launchBatchToken = _launchBatch.Completed([weak, launchGeneration](auto&&, auto&&) {
+                    if (const auto self = weak.lock())
+                    {
+                        self->_completeLaunchClock(launchGeneration);
+                    }
+                });
+                _launchBatchSubscribed = true;
+            }
+            catch (...)
+            {
+                // The clock only bounds a decorative fallback. Without it the
+                // fallback keeps its pre-existing lifetime, ending at the next
+                // shell lifecycle transition.
+                _clearLaunchClock();
+            }
+        }
+
+        void _completeLaunchClock(const uint64_t launchGeneration) noexcept
+        {
+            if (_closed || !_launchBatchSubscribed || _activeLaunchGeneration != launchGeneration)
+            {
+                return;
+            }
+            _clearLaunchClock();
+
+            const auto callback = _launchExpiredCallback;
+            if (callback)
+            {
+                try
+                {
+                    callback(launchGeneration);
+                }
+                catch (...)
+                {
+                    // Expiration is advisory and must remain fail-open.
+                }
+            }
+        }
+
+        void _clearLaunchClock() noexcept
+        {
+            // Invalidate first so a queued completion from a replaced batch is
+            // stale even when its replacement carries the same generation.
+            _activeLaunchGeneration = 0;
+            try
+            {
+                if (_launchBatchSubscribed && _launchBatch)
+                {
+                    _launchBatch.Completed(_launchBatchToken);
+                }
+            }
+            catch (...)
+            {
+            }
+            _launchBatchSubscribed = false;
+            _launchBatch = nullptr;
+            try
+            {
+                if (_launchClockProperties)
+                {
+                    _launchClockProperties.StopAnimation(L"Progress");
+                }
+            }
+            catch (...)
+            {
+            }
+        }
+
         void _stopStatusAnimations() noexcept
         {
             try
@@ -2209,6 +2367,9 @@ namespace winTerm::VisualProgress
         void _releaseCompositionHandles() noexcept
         {
             _clearTerminalBatch();
+            _clearLaunchClock();
+            _launchClockProperties = nullptr;
+            _launchClockAnimation = nullptr;
             _root = nullptr;
             _trackVisual = nullptr;
             _trackGeometry = nullptr;
@@ -2346,6 +2507,14 @@ namespace winTerm::VisualProgress
         uint64_t _activeTerminalBatchGeneration{};
         bool _terminalBatchSubscribed{};
         bool _terminalPresentationCompleted{};
+
+        LaunchExpiredCallback _launchExpiredCallback;
+        WUC::CompositionPropertySet _launchClockProperties{ nullptr };
+        WUC::ScalarKeyFrameAnimation _launchClockAnimation{ nullptr };
+        WUC::CompositionScopedBatch _launchBatch{ nullptr };
+        winrt::event_token _launchBatchToken{};
+        uint64_t _activeLaunchGeneration{};
+        bool _launchBatchSubscribed{};
 
         WUVM::UISettings _uiSettings{ nullptr };
         WUVM::AccessibilitySettings _accessibilitySettings{ nullptr };

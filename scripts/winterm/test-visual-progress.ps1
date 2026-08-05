@@ -248,6 +248,20 @@ try
     }
     Assert-NotMatches $model 'std::wstring(?!_view)|std::string(?!_view)|winrt::hstring' 'Normalized progress state text-retention boundary'
 
+    foreach ($required in @(
+        'uint64_t launchGeneration{}',
+        'launchGeneration == other.launchGeneration',
+        'std::optional<ProgressSnapshot> ExpireShellLaunch(const uint64_t generation) noexcept',
+        'generation != _shellLaunchGeneration || _shellLaunchExpired',
+        '_beginShellLaunchScope',
+        '_resetShellLaunchScope',
+        'HiddenSnapshot(ProgressStatus::Running)'
+    ))
+    {
+        Assert-Contains $model $required 'Bounded one-shot shell launch fallback policy'
+    }
+    Assert-Matches $model '(?s)case ShellLifecycleState::CommandExecuted:.*?if \(_shellLifecycle == ShellLifecycleState::CommandExecuted\)\s*\{\s*break;\s*\}' 'Idempotent CommandExecuted re-broadcast boundary'
+
     $providers = @(
         'DockerPull',
         'DockerBuildKit',
@@ -476,6 +490,24 @@ try
         Assert-NotContains $renderer $forbidden 'Authoritative XAML-Islands host-window lifecycle boundary'
     }
     Assert-NotMatches $renderer '_coreWindow\s*\.\s*(?:VisibilityChanged|Activated)\s*\(' 'Authoritative XAML-Islands host-window lifecycle boundary'
+
+    foreach ($required in @(
+        'using LaunchExpiredCallback = std::function<void(uint64_t)>',
+        '_synchronizeLaunchClock',
+        '_startLaunchClock',
+        '_completeLaunchClock',
+        '_clearLaunchClock',
+        '_launchClockProperties.StartAnimation(L"Progress", _launchClockAnimation)',
+        '_launchClockAnimation.Duration(_timeSpan(RainbowArcVisualConstants::IndeterminateCycleDuration))',
+        '_cometTailAnimation.IterationCount(1)',
+        '_cometHeadAnimation.IterationCount(1)',
+        '_cometHeadOpacityAnimation.IterationCount(1)'
+    ))
+    {
+        Assert-Contains $renderer $required 'Bounded one-shot shell launch clock'
+    }
+    Assert-Matches $renderer '(?s)const auto oneShotLaunch = _snapshot\.source == ProgressSource::ShellIntegration &&\s*_snapshot\.launchGeneration != 0;' 'One-shot launch comet source discrimination'
+    Assert-NotContains $renderer '1800' 'Launch timeout shares the indeterminate traversal constant instead of a raw duration'
 
     $paneVisualStart = $source.PaneCpp.IndexOf('void Pane::_SetVisualProgressEnabled', [System.StringComparison]::Ordinal)
     $paneVisualEnd = $source.PaneCpp.IndexOf('void Pane::_UpdatePaneHeader', $paneVisualStart, [System.StringComparison]::Ordinal)
@@ -749,6 +781,9 @@ try
     $taskbarProgress = $pane.Substring($taskbarProgressStart, $taskbarProgressEnd - $taskbarProgressStart)
     Assert-Contains $taskbarProgress 'ApplyTaskbar' 'OSC 9;4 taskbar-state progress remains active'
     Assert-NotContains $taskbarProgress '_visualProgressRecognizeCliProgress' 'OSC 9;4 independence from CLI recognition setting'
+
+    Assert-Matches $pane '(?s)RainbowArcRenderer::TryCreate\(.*?_OnVisualProgressRendererFault\(\);.*?\[weakThis\]\(const uint64_t launchGeneration\).*?_ExpireVisualProgressShellLaunch\(launchGeneration\);' 'Weak one-shot launch expiration callback registration'
+    Assert-Matches $pane '(?s)void Pane::_ExpireVisualProgressShellLaunch.*?ExpireShellLaunch\(launchGeneration\).*?_QueueVisualProgressUpdate' 'Launch expiration routed through the state machine and UI mailbox'
 
     $terminalPage = $source.TerminalPageCpp
     $registerStart = $terminalPage.IndexOf('void TerminalPage::_RegisterTabEvents', [System.StringComparison]::Ordinal)
@@ -1162,6 +1197,10 @@ try
         'SuppressDuplicateState',
         'ProviderProgressPrecedesShellLifecycle',
         'StandardProgressPrecedesProviderAndFallsBack',
+        'ShellLaunchFallbackIsOneShotPerCommand',
+        'ShellLaunchExpirationIgnoresStaleGenerations',
+        'ExpiredShellLaunchDoesNotResurrectAfterOwnershipClears',
+        'ShellLaunchInvalidationOnResetDisableAndClose',
         'ProviderStatePackingContainsOnlyStructuralFields',
         'RecognitionClassifiesProvidersAndGenericFallback',
         'RecognitionHandlesFragmentationAndMalformedInput',
@@ -1278,6 +1317,14 @@ try
         '[ValidateRange(0, 10000)]',
         'SoakIterations',
         'synthetic summary; must remain visible',
+        'long-running command one-shot launch',
+        'alternate screen during a long-running command',
+        "Send-ControlSequence '[?1049h'",
+        "Send-ControlSequence '[?1049l'",
+        'launch animation plays one traversal',
+        'expired launch fallback must not reappear',
+        'appears at most once',
+        'completion supersedes the launch animation immediately',
         'No files or external commands were used.'
     ))
     {
@@ -1317,6 +1364,12 @@ try
         'generic output is never suppressible',
         'alternate-screen output',
         'lifecycle-generation changes',
+        '## Bounded shell launch fallback',
+        'bounded launch indication',
+        'not intended to represent the entire execution',
+        'launch clock',
+        'command-generation-scoped state',
+        'cannot resurrect the expired',
         'does not upload or persist terminal content',
         'WINTERM_DISABLE_VISUAL_PROGRESS=1',
         'invoke-visual-progress-smoke.ps1',

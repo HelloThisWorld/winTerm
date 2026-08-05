@@ -32,6 +32,55 @@ Progress ownership follows this order:
 
 Generic heuristic recognition cannot override explicit progress or an owned built-in provider. Clearing explicit progress reveals the current valid provider or shell fallback. A new semantic prompt resets provider ownership and bounded parser state for that pane.
 
+## Bounded shell launch fallback
+
+The generic OSC 133 running state is a bounded launch indication, not a report
+of the whole execution. When `CommandExecuted` starts a command that has no
+explicit progress and no recognized provider, the indeterminate comet makes one
+traversal; the overlay then hides and releases its continuous animation
+resources. The fallback is not intended to represent the entire execution
+duration: a development server (FastAPI/uvicorn, Spring Boot, Node.js), a TUI
+such as k9s, vim, or top, `tail -f`, `kubectl port-forward`, and every other
+intentionally long-running process keeps printing output with no permanent
+decorative animation. Explicit OSC 9;4 progress and recognized CLI providers
+are unaffected: they remain active for their real progress lifecycle, and
+determinate values, provider stages, success, error, and cancelled
+presentations keep their existing semantics.
+
+The one-shot is command-generation-scoped state in the progress state machine,
+never a command-name or process-name heuristic:
+
+- Every shell lifecycle transition advances a monotonic launch generation.
+  `CommandExecuted` opens a new generation and publishes the launch fallback
+  carrying it. A repeated `CommandExecuted` observation of the same
+  still-running command (alternate-screen churn, pane rehydration, reconnect
+  re-broadcast) neither restarts a consumed launch nor opens a new generation,
+  so entering or leaving the Alternate Screen, resizing, focus and visibility
+  changes, tab switches, zoom, and renderer recreation cannot replay it.
+- The renderer bounds the launch with a launch clock: one one-shot compositor
+  animation on a private property set whose duration is the existing
+  1,800-millisecond indeterminate traversal. There is no timer, no polling
+  loop, and no CPU frame loop. The clock is decoupled from the visible comet,
+  so focus, geometry, and performance transitions cannot cut it short, and it
+  keeps running while a provider or explicit source owns the bar.
+- When the clock completes, the state machine expires the fallback only if the
+  captured generation is still current and the stored shell state is still the
+  running launch; stale completions from an earlier command are inert. The
+  expiration publishes a silent Hidden snapshot with Running status, so
+  accessibility announces neither a fake success nor a fake cancellation, and
+  a later provider or explicit-progress clear cannot resurrect the expired
+  fallback.
+- `CommandFinished` supersedes the launch immediately. Short commands keep
+  their existing completion, error, and cancellation presentations, and a
+  long-running command may still present its real result long after the
+  launch expired.
+
+Reduced Motion, High Contrast, and degraded static tiers keep the same logical
+one-shot lifecycle: the static launch presentation is bounded by the same
+clock without requiring continuous animation. Only the solid XAML fallback
+tier, where the compositor is unavailable, retains the pre-existing behavior
+of ending the fallback at the next shell lifecycle transition.
+
 ## Rainbow Arc Weld renderer
 
 The WinTerm-owned renderer is under `src/winterm/VisualProgress/`. Its renderer-independent state and constants are separated from the small Pane integration boundary so timing, status transitions, degradation, and resource budgets can be tested without XAML.
@@ -54,7 +103,7 @@ The centralized geometry uses a 10-DIP horizontal inset, an 8-DIP bottom inset, 
 
 The rainbow is a coherent red-to-orange-to-yellow-to-green-to-cyan-to-blue-to-violet-to-magenta gradient. Its cached brush moves on a 2,000-millisecond cycle and is never rebuilt per frame. Determinate updates normally interpolate for 220 milliseconds. A real regression uses an intentional 240-millisecond phase-reset transition; the renderer does not invent a monotonic value. Zero percent keeps the welding head inside the track, while the fill remains clipped and the bloom drawing space remains available at 100 percent.
 
-Indeterminate progress uses a welding-head comet with a continuous tail covering 25 percent of the track. It traverses the track in 1,800 milliseconds, fades cleanly at the right edge, and reappears at the left without showing a fabricated percentage.
+Indeterminate progress uses a welding-head comet with a continuous tail covering 25 percent of the track. It traverses the track in 1,800 milliseconds, fades cleanly at the right edge, and reappears at the left without showing a fabricated percentage. Explicit and provider indeterminate progress repeat the traversal continuously; the Shell Integration launch fallback runs it once and parks off-track, transparent, until the launch clock publishes the Hidden snapshot that ends the launch.
 
 ### Status presentations
 
@@ -213,7 +262,7 @@ winTerm pane:
 .\scripts\winterm\invoke-visual-progress-smoke.ps1
 ```
 
-The script uses only PowerShell output and OSC sequences. It requires no Docker, Node, Python, Maven, Gradle, provider CLI, network access, or download. It exercises determinate values at 0, 1, 50, 99, and 100 percent; a real regression; indeterminate, waiting, success, error, cancellation, and clear; and sanitized carriage-return samples for every built-in provider and the generic fallback.
+The script uses only PowerShell output and OSC sequences. It requires no Docker, Node, Python, Maven, Gradle, provider CLI, network access, or download. It exercises determinate values at 0, 1, 50, 99, and 100 percent; a real regression; indeterminate, waiting, success, error, cancellation, and clear; the one-shot launch fallback for a long-running command, including alternate-screen entry and re-entry that must not replay it; and sanitized carriage-return samples for every built-in provider and the generic fallback.
 
 For replacement testing, first run with
 `visualProgress.replaceRecognizedOutput` false and confirm every synthetic line
