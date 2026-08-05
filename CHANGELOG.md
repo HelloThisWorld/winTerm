@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Long-running commands no longer animate the Visual Progress rainbow bar
+  forever. The OSC 133 Shell Integration fallback published at
+  `CommandExecuted` used to stay in an indeterminate Running state until
+  `CommandFinished`, so development servers (FastAPI/uvicorn, Spring Boot,
+  Node.js), Alternate Screen applications (k9s, vim, top, htop), `tail -f`,
+  `kubectl port-forward`, and similar intentionally long-running processes
+  looped the comet animation for their whole lifetime. The fallback is now a
+  bounded one-shot launch indication: the comet makes one traversal (the
+  existing 1,800 ms cycle, driven by a one-shot compositor batch rather than
+  a timer or polling loop) and then the overlay hides and releases its
+  animation resources. The expiration is command-generation scoped, so stale
+  completions cannot affect a newer command, re-entering the Alternate Screen
+  or rehydrating a pane cannot replay a consumed launch, and an expired
+  fallback cannot resurrect after a CLI provider or explicit OSC 9;4 owner
+  clears. Explicit progress, recognized providers, short-lived commands, and
+  the success/error/cancelled result presentations keep their existing
+  behavior.
+
+
 ## 1.3.0-beta2 - 2026-08-04
 
 Second beta of the Command Timeline release, fixing a failure-reporting

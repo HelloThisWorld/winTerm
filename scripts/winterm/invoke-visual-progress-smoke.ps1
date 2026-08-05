@@ -34,6 +34,17 @@ function Send-Osc
     Wait-DemoStep
 }
 
+function Send-ControlSequence
+{
+    param(
+        [Parameter(Mandatory)]
+        [string]$Payload
+    )
+
+    [Console]::Write("$([char]27)$Payload")
+    Wait-DemoStep
+}
+
 function Write-TransientFrame
 {
     param(
@@ -180,6 +191,16 @@ Visual Progress manual checks:
 - Minimize, switch tabs, or deactivate the window to verify animation pauses or simplifies.
 - Rerun after disabling Windows animations to verify the static Reduced Motion fallback.
 - Rerun with a Windows contrast theme to verify the solid High Contrast fallback.
+- For real long-running processes (a FastAPI/uvicorn dev server, a Spring Boot service, a Node.js dev
+  server, `tail -f`, or `kubectl port-forward`), the launch animation plays one traversal and then
+  disappears; later log output must not bring it back, and stopping the process still shows the
+  normal terminal result presentation.
+- Real Maven/Gradle progress (for example a Spring Boot build) stays owned by the provider; once only
+  the long-running application remains, the expired launch fallback must not reappear.
+- For Alternate Screen applications (k9s, vim, top, htop), the launch animation appears at most once;
+  entering, leaving, and re-entering the Alternate Screen, resizing, or switching tabs must not
+  replay it, and exiting still produces the normal final state when available.
+- A short command keeps its current behavior: completion supersedes the launch animation immediately.
 '@
 
     foreach ($payload in @('9;4;1;0', '9;4;1;1', '9;4;1;50', '9;4;1;99', '9;4;1;100'))
@@ -227,6 +248,32 @@ Visual Progress manual checks:
     Send-Osc '133;D;1'
     Send-Osc '133;A'
     Send-Osc '9;4;0'
+
+    Write-Host 'Visual Progress fixture: long-running command one-shot launch'
+    Write-Host '  Expected: the launch animation plays one traversal, then the overlay disappears while output continues.'
+    Send-Osc '133;B'
+    Send-Osc '133;C'
+    for ($tick = 1; $tick -le 4; $tick++)
+    {
+        Write-Host "synthetic long-running service output tick $tick (no progress overlay expected after the first traversal)"
+        Wait-DemoStep
+    }
+    Write-Host 'Visual Progress fixture: the long-running command still reports its real result'
+    Send-Osc '133;D;0'
+    Send-Osc '133;A'
+
+    Write-Host 'Visual Progress fixture: alternate screen during a long-running command'
+    Write-Host '  Expected: entering, leaving, and re-entering the alternate screen does not replay the launch animation.'
+    Send-Osc '133;B'
+    Send-Osc '133;C'
+    Send-ControlSequence '[?1049h'
+    Write-Host 'synthetic alternate-screen application frame'
+    Send-ControlSequence '[?1049l'
+    Send-ControlSequence '[?1049h'
+    Write-Host 'synthetic alternate-screen application frame after re-entry'
+    Send-ControlSequence '[?1049l'
+    Send-Osc '133;D;0'
+    Send-Osc '133;A'
 
     Invoke-ProviderFixtures
     Invoke-BoundedSoak

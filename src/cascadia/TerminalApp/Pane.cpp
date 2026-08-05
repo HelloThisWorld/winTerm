@@ -2572,6 +2572,12 @@ void Pane::_CreateVisualProgressOverlay()
                 {
                     pane->_OnVisualProgressRendererFault();
                 }
+            },
+            [weakThis](const uint64_t launchGeneration) {
+                if (const auto pane = weakThis.lock())
+                {
+                    pane->_ExpireVisualProgressShellLaunch(launchGeneration);
+                }
             });
         const auto rendererReady = _visualProgressRenderer && !_visualProgressRenderer->Faulted();
         _visualProgressRendererReady.store(rendererReady, std::memory_order_release);
@@ -2684,6 +2690,30 @@ void Pane::_UpdateVisualProgressFromProvider()
         {
             _QueueVisualProgressUpdate(*snapshot);
         }
+    }
+}
+
+// Invoked on the UI thread when the renderer's one-shot launch clock
+// completes. The state machine decides under its own lock whether the
+// captured generation still identifies the current command; the resulting
+// snapshot is queued through the mailbox like every other progress update,
+// so no state-machine lock is ever held while renderer or XAML code runs.
+void Pane::_ExpireVisualProgressShellLaunch(const uint64_t launchGeneration) noexcept
+{
+    if (!_visualProgressEnabled.load(std::memory_order_acquire))
+    {
+        return;
+    }
+    try
+    {
+        if (const auto snapshot = _visualProgressState.ExpireShellLaunch(launchGeneration))
+        {
+            _QueueVisualProgressUpdate(*snapshot);
+        }
+    }
+    catch (...)
+    {
+        LOG_CAUGHT_EXCEPTION();
     }
 }
 
