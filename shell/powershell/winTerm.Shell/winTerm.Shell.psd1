@@ -12,7 +12,7 @@
     AliasesToExport = @()
     PrivateData = @{
         PSData = @{
-            Prerelease = 'beta2'
+            Prerelease = 'beta3'
             Tags = @('winTerm', 'terminal', 'shell-integration')
             ProjectUri = 'https://github.com/HelloThisWorld/winTerm'
             LicenseUri = 'https://github.com/HelloThisWorld/winTerm/blob/main/LICENSE'

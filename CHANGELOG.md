@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.0-beta3 - 2026-08-05
+
+Third beta of the Command Timeline release, fixing the beta2 field report
+that long-running commands animate the Visual Progress bar forever. Like the
+earlier betas, this is published as a GitHub prerelease; GitHub Latest and
+WinGet continue to point at v1.2.0 until a stable 1.3.0.
 
 ### Fixed
 
@@ -21,6 +26,11 @@
   clears. Explicit progress, recognized providers, short-lived commands, and
   the success/error/cancelled result presentations keep their existing
   behavior.
+
+### Changed
+
+- Advanced the beta: application version `1.3.0-beta3`, package/file version
+  `1.3.0.6`, PowerShell module `1.3.0` with prerelease suffix `beta3`.
 
 
 ## 1.3.0-beta2 - 2026-08-04

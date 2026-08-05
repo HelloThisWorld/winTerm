@@ -1,30 +1,33 @@
 # Current development progress
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 ## Repository state
 
-- Branch: `release/1.3.0-beta2`
-- Base branch: `main` at `a6ec9a415` (prompt exit code fix, pull request
-  #39)
+- Branch: `release/v1.3.0-beta3`
+- Base: `fix/visual-progress-shell-fallback-one-shot` at `baf6f8a87`
+  (one-shot launch fallback fix, pull request #41), based on `main` at
+  `39193206c` (1.3.0-beta2 release metadata, pull request #40)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0-beta2`
-- Package/file version: `1.3.0.5`
-- PowerShell module version: `1.3.0` with prerelease suffix `beta2`
+- Application version: `1.3.0-beta3`
+- Package/file version: `1.3.0.6`
+- PowerShell module version: `1.3.0` with prerelease suffix `beta3`
 - Release channel: `beta`
-- Release tag: `v1.3.0-beta2`
+- Release tag: `v1.3.0-beta3`
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
 - Supported target: Windows 11 x64
 
-`v1.3.0-beta2` is the second beta of the Command Timeline release. It fixes
-a beta1 defect found while producing the website screenshots: the PowerShell
-prompt wrapper reset `$?` before reading it, so every Timeline entry reported
-Succeeded and a failure mark could never appear. The release workflow marks
-any non-stable channel with `--prerelease` and `--latest=false`, so
-`/releases/latest` keeps resolving to v1.2.0. Like beta1, the beta is listed
-on the winTerm website next to the stable v1.2.0 download; it is still
-skipped by the WinGet workflow.
+`v1.3.0-beta3` is the third beta of the Command Timeline release. It fixes
+the beta2 field report that any long-running command — k9s, vim, top,
+FastAPI/uvicorn, Spring Boot, Node dev servers, `tail -f`,
+`kubectl port-forward` — kept the Visual Progress rainbow animation looping
+for its whole lifetime. The OSC 133 Shell Integration fallback is now a
+bounded one-shot launch indication scoped by a shell command generation. The
+release workflow marks any non-stable channel with `--prerelease` and
+`--latest=false`, so `/releases/latest` keeps resolving to v1.2.0. Like the
+earlier betas, it is listed on the winTerm website next to the stable v1.2.0
+download and is skipped by the WinGet workflow.
 
 ## Command Timeline status
 
@@ -50,6 +53,24 @@ a prerelease can never publish as Latest and a stable release can never carry a
 prerelease suffix. The package version stays four-part numeric for MSIX and the
 Win32 resource fields, and the PowerShell module version stays numeric with the
 suffix carried in `PrivateData.PSData.Prerelease`.
+
+## Beta2 findings
+
+Field testing the published beta2 build with long-running processes surfaced
+one defect, fixed through pull request #41 and carried by this release
+branch:
+
+1. The Shell Integration fallback animated forever for any command that
+   intentionally stays running (Alternate Screen TUIs, development servers,
+   `tail -f`). The fallback is now a bounded one-shot launch indication: the
+   comet plays one 1,800 ms traversal driven by a one-shot compositor batch
+   (no timer, no polling loop), then the overlay hides with a silent
+   Hidden/Running snapshot. The expiration is command-generation scoped, so
+   stale completions cannot affect a newer command, alternate-screen churn
+   cannot replay a consumed launch, and an expired fallback cannot resurrect
+   after a provider or explicit OSC 9;4 owner clears. Explicit progress,
+   recognized providers, short commands, and the result presentations are
+   unchanged.
 
 ## Beta1 findings
 
