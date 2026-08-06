@@ -145,6 +145,23 @@ try
     Assert-Condition ((Get-Text 'README.md').Contains("current source version is ``$($version.applicationVersion)``")) 'README source version matches release metadata'
     Assert-Condition ((Get-Text 'README.md').Contains('latest stable release is `1.2.0`')) 'README retains public Latest 1.2.0'
 
+    # The Japanese README is a maintained counterpart, not a marketing summary:
+    # both files must link to each other, the translation must point at the
+    # Japanese website, and it must mirror the same release facts and the same
+    # signing and non-affiliation disclosures as the English original.
+    $readmeJa = Get-Text 'README.ja.md'
+    Assert-Condition ((Get-Text 'README.md').Contains('[日本語](README.ja.md)')) 'README links to the Japanese README'
+    Assert-Condition ($readmeJa.Contains('[English](README.md)')) 'Japanese README links back to the English README'
+    Assert-Condition ($readmeJa.Contains('https://winterm.dev/ja/')) 'Japanese README links to the Japanese website'
+    Assert-Condition ($readmeJa.Contains("現在のソースバージョンは ``$($version.applicationVersion)``")) 'Japanese README source version matches release metadata'
+    Assert-Condition ($readmeJa.Contains('最新の安定版リリースは `1.2.0`')) 'Japanese README retains public Latest 1.2.0'
+    Assert-Condition ($readmeJa.Contains('SHA256SUMS.txt')) 'Japanese README retains the checksum filename'
+    Assert-Condition ($readmeJa.Contains('SmartScreen')) 'Japanese README retains the unsigned-installer disclosure'
+    Assert-Condition ($readmeJa.Contains('Authenticode署名されていません')) 'Japanese README retains the current signing status'
+    Assert-Condition ($readmeJa.Contains('Free code signing provided by SignPath.io, certificate by SignPath Foundation.')) 'Japanese README retains the exact SignPath attribution'
+    Assert-Condition ($readmeJa.Contains('Microsoftによる提供・承認・支援を受けたものでもありません')) 'Japanese README retains the Microsoft non-affiliation disclaimer'
+    Assert-Condition ($readmeJa.Contains('release-1.25@1cea42d433253d95c4487a3037db48197b5e72f4')) 'Japanese README retains the pinned upstream baseline'
+
     if ($RequireTag)
     {
         $tag = (& git describe --tags --exact-match 2>$null).Trim()

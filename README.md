@@ -1,3 +1,5 @@
+English | [日本語](README.ja.md)
+
 # winTerm
 
 [![Validation](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml/badge.svg)](https://github.com/HelloThisWorld/winTerm/actions/workflows/winterm-validation.yml)

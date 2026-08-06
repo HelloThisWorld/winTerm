@@ -28,6 +28,7 @@ function Test-WinTermDocumentationPath
         'CONTRIBUTING.md',
         'PRIVACY.md',
         'README.md',
+        'README.ja.md',
         'SECURITY.md',
         'SUPPORT.md'
     )

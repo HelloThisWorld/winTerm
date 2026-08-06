@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+Documentation-only work. No application code, resource, or version file
+changed, and no release was produced.
+
+### Documentation
+
+- Added `README.ja.md`, a Japanese counterpart to the English README that
+  mirrors the same download channels, distribution formats, core features,
+  portable-mode behavior, build and test commands, privacy statement, code
+  signing policy, and license and upstream notices. Commands, filenames,
+  executable names, JSON setting names, version strings, the pinned upstream
+  baseline, and release URLs are preserved verbatim, and the unsigned
+  installer, SmartScreen, checksum, current signing status, and Microsoft
+  non-affiliation disclosures are carried over in full. Links to
+  English-only documentation are labelled as such, and the translation states
+  that winTerm-specific new features still display some English text.
+- Added a language selector to the top of both README files: `README.md`
+  links to `README.ja.md` and `README.ja.md` links back to `README.md` and
+  to the Japanese website at <https://winterm.dev/ja/>.
+- Extended `scripts/winterm/verify-version.ps1` so documentation validation
+  covers the Japanese README: the two language links, the website link, the
+  source and stable version references, the checksum filename, the
+  unsigned-installer and current signing-status disclosures, the exact
+  SignPath attribution, the Microsoft non-affiliation disclaimer, and the
+  pinned upstream baseline.
+- Added `README.ja.md` to the conservative documentation allowlist in
+  `scripts/winterm/ci/ChangeClassification.psm1`, so translation-only
+  changes classify as `docs-only` and never request a native build.
+
+
 ## 1.3.0-beta3 - 2026-08-05
 
 Third beta of the Command Timeline release, fixing the beta2 field report
