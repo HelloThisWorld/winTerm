@@ -145,6 +145,45 @@ try
     Assert-Condition ((Get-Text 'README.md').Contains("current source version is ``$($version.applicationVersion)``")) 'README source version matches release metadata'
     Assert-Condition ((Get-Text 'README.md').Contains('latest stable release is `1.2.0`')) 'README retains public Latest 1.2.0'
 
+    # The Japanese README is a maintained counterpart, not a marketing summary:
+    # both files must link to each other, the translation must point at the
+    # Japanese website, and it must mirror the same release facts and the same
+    # signing and non-affiliation disclosures as the English original.
+    #
+    # Every assertion below is written with ASCII literals only. Every other
+    # PowerShell file in this repository is pure ASCII, and a BOM-less script
+    # carrying non-ASCII string literals is decoded with the runner's active
+    # code page by Parser::ParseFile, which corrupts the literals and fails the
+    # syntax gate on some hosts. The Japanese prose is therefore verified
+    # structurally: by the ASCII tokens embedded in it, and by a direct check
+    # that the file really is UTF-8 encoded Japanese.
+    $readmeJa = Get-Text 'README.ja.md'
+    Assert-Condition ((Get-Text 'README.md').Contains('](README.ja.md)')) 'README links to the Japanese README'
+    Assert-Condition ($readmeJa.Contains('[English](README.md)')) 'Japanese README links back to the English README'
+    Assert-Condition ($readmeJa.Contains('https://winterm.dev/ja/')) 'Japanese README links to the Japanese website'
+    Assert-Condition ($readmeJa.Contains("``$($version.applicationVersion)``")) 'Japanese README source version matches release metadata'
+    Assert-Condition ($readmeJa.Contains('`1.2.0`')) 'Japanese README retains public Latest 1.2.0'
+    Assert-Condition ($readmeJa.Contains('winTerm-<version>-setup-x64.exe')) 'Japanese README retains the installer asset pattern'
+    Assert-Condition ($readmeJa.Contains('winTerm-<version>-portable-x64.zip')) 'Japanese README retains the portable asset pattern'
+    Assert-Condition ($readmeJa.Contains('SHA256SUMS.txt')) 'Japanese README retains the checksum filename'
+    Assert-Condition ($readmeJa.Contains('SmartScreen')) 'Japanese README retains the unsigned-installer disclosure'
+    Assert-Condition ($readmeJa.Contains('Authenticode')) 'Japanese README retains the current signing status'
+    Assert-Condition ($readmeJa.Contains('Free code signing provided by SignPath.io, certificate by SignPath Foundation.')) 'Japanese README retains the exact SignPath attribution'
+    Assert-Condition ($readmeJa.Contains('Microsoft')) 'Japanese README retains the Microsoft non-affiliation disclaimer'
+    Assert-Condition ($readmeJa.Contains('portable.marker')) 'Japanese README retains the portable-mode marker filename'
+    Assert-Condition ($readmeJa.Contains('release-1.25@1cea42d433253d95c4487a3037db48197b5e72f4')) 'Japanese README retains the pinned upstream baseline'
+
+    # The translation must actually be Japanese and must be stored as UTF-8, so
+    # an English copy or a mis-encoded file cannot pass the checks above.
+    $readmeJaBytes = [System.IO.File]::ReadAllBytes((Join-Path $script:repositoryRoot 'README.ja.md'))
+    Assert-Condition (-not ($readmeJaBytes.Length -ge 3 -and $readmeJaBytes[0] -eq 0xEF -and $readmeJaBytes[1] -eq 0xBB -and $readmeJaBytes[2] -eq 0xBF)) 'Japanese README has no UTF-8 BOM'
+    $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
+    $readmeJaText = $null
+    try { $readmeJaText = $strictUtf8.GetString($readmeJaBytes) } catch { $readmeJaText = $null }
+    Assert-Condition ($null -ne $readmeJaText) 'Japanese README is valid UTF-8'
+    $cjkCount = @($readmeJaText.ToCharArray() | Where-Object { ($_ -ge [char]0x3040 -and $_ -le [char]0x30FF) -or ($_ -ge [char]0x4E00 -and $_ -le [char]0x9FFF) }).Count
+    Assert-Condition ($cjkCount -gt 500) "Japanese README contains Japanese prose ($cjkCount kana and kanji characters)"
+
     if ($RequireTag)
     {
         $tag = (& git describe --tags --exact-match 2>$null).Trim()
