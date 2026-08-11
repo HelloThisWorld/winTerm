@@ -38,6 +38,10 @@ namespace ControlUnitTests
         TEST_METHOD(TestClearAll);
         TEST_METHOD(TestReadEntireBuffer);
 
+        TEST_METHOD(TestSearchHighlightsAllMatches);
+        TEST_METHOD(TestSearchNavigationAndClear);
+        TEST_METHOD(TestSearchStateIsolatedPerCore);
+
         TEST_METHOD(TestSelectCommandSimple);
         TEST_METHOD(TestSelectOutputSimple);
         TEST_METHOD(TestCommandContext);
@@ -367,6 +371,160 @@ namespace ControlUnitTests
         Log::Comment(L"Check the buffer contents");
         VERIFY_ARE_EQUAL(L"This is some text\r\nwith varying amounts\r\nof whitespace\r\n",
                          core->ReadEntireBuffer());
+    }
+
+    void ControlCoreTests::TestSearchHighlightsAllMatches()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto core = createCore(*settings, *conn);
+        VERIFY_IS_NOT_NULL(core);
+        _standardInit(core);
+
+        const auto search = [&core](const winrt::hstring& text, const bool caseSensitive = false) {
+            return core->Search(Control::SearchRequest{
+                .Text = text,
+                .GoForward = true,
+                .CaseSensitive = caseSensitive,
+                .RegularExpression = false,
+                .ExecuteSearch = false,
+                .ScrollIntoView = false,
+                .ScrollOffset = 0,
+            });
+        };
+
+        Log::Comment(L"Print a buffer with two matches");
+        conn->WriteInput(winrt_wstring_to_array_view(L"foo\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"bar\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+
+        Log::Comment(L"A reset-only search, the live-typing path, collects every match");
+        auto results = search(L"error");
+        VERIFY_ARE_EQUAL(2, results.TotalMatches);
+        VERIFY_ARE_EQUAL(0, results.CurrentMatch);
+        VERIFY_IS_FALSE(results.SearchRegexInvalid);
+
+        Log::Comment(L"Every match span reaches the highlight state, not only the current one");
+        const auto& rows = core->SearchResultRows();
+        VERIFY_ARE_EQUAL(2u, rows.size());
+        VERIFY_ARE_EQUAL(0, rows[0].start.x);
+        VERIFY_ARE_EQUAL(1, rows[0].start.y);
+        VERIFY_ARE_EQUAL(4, rows[0].end.x);
+        VERIFY_ARE_EQUAL(1, rows[0].end.y);
+        VERIFY_ARE_EQUAL(0, rows[1].start.x);
+        VERIFY_ARE_EQUAL(3, rows[1].start.y);
+
+        Log::Comment(L"The default search is case-insensitive");
+        results = search(L"ERROR");
+        VERIFY_ARE_EQUAL(2, results.TotalMatches);
+
+        Log::Comment(L"A case-sensitive search of the same needle matches nothing");
+        results = search(L"ERROR", true);
+        VERIFY_ARE_EQUAL(0, results.TotalMatches);
+        VERIFY_IS_TRUE(core->SearchResultRows().empty());
+
+        Log::Comment(L"A needle with no matches leaves no highlight state behind");
+        results = search(L"does-not-exist");
+        VERIFY_ARE_EQUAL(0, results.TotalMatches);
+        VERIFY_IS_TRUE(core->SearchResultRows().empty());
+
+        Log::Comment(L"An empty needle produces no matches and no highlights");
+        results = search(L"");
+        VERIFY_ARE_EQUAL(0, results.TotalMatches);
+        VERIFY_IS_TRUE(core->SearchResultRows().empty());
+    }
+
+    void ControlCoreTests::TestSearchNavigationAndClear()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto core = createCore(*settings, *conn);
+        VERIFY_IS_NOT_NULL(core);
+        _standardInit(core);
+
+        const auto search = [&core](const winrt::hstring& text, const bool goForward, const bool executeSearch) {
+            return core->Search(Control::SearchRequest{
+                .Text = text,
+                .GoForward = goForward,
+                .CaseSensitive = false,
+                .RegularExpression = false,
+                .ExecuteSearch = executeSearch,
+                .ScrollIntoView = false,
+                .ScrollOffset = 0,
+            });
+        };
+
+        Log::Comment(L"Print a buffer with two matches");
+        conn->WriteInput(winrt_wstring_to_array_view(L"foo\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"bar\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+
+        Log::Comment(L"Live typing focuses the first match without stepping");
+        auto results = search(L"error", true, false);
+        VERIFY_ARE_EQUAL(2, results.TotalMatches);
+        VERIFY_ARE_EQUAL(0, results.CurrentMatch);
+
+        Log::Comment(L"Enter moves to the next match");
+        results = search(L"error", true, true);
+        VERIFY_ARE_EQUAL(1, results.CurrentMatch);
+
+        Log::Comment(L"Enter on the last match wraps around to the first");
+        results = search(L"error", true, true);
+        VERIFY_ARE_EQUAL(0, results.CurrentMatch);
+
+        Log::Comment(L"Shift+Enter moves backward and wraps to the last match");
+        results = search(L"error", false, true);
+        VERIFY_ARE_EQUAL(1, results.CurrentMatch);
+
+        Log::Comment(L"Closing the search clears every highlight span");
+        core->ClearSearch();
+        VERIFY_IS_TRUE(core->SearchResultRows().empty());
+    }
+
+    void ControlCoreTests::TestSearchStateIsolatedPerCore()
+    {
+        auto [settingsA, connA] = _createSettingsAndConnection();
+        auto coreA = createCore(*settingsA, *connA);
+        VERIFY_IS_NOT_NULL(coreA);
+        _standardInit(coreA);
+
+        auto [settingsB, connB] = _createSettingsAndConnection();
+        auto coreB = createCore(*settingsB, *connB);
+        VERIFY_IS_NOT_NULL(coreB);
+        _standardInit(coreB);
+
+        const auto search = [](auto& core, const winrt::hstring& text) {
+            return core->Search(Control::SearchRequest{
+                .Text = text,
+                .GoForward = true,
+                .CaseSensitive = false,
+                .RegularExpression = false,
+                .ExecuteSearch = false,
+                .ScrollIntoView = false,
+                .ScrollOffset = 0,
+            });
+        };
+
+        Log::Comment(L"Two panes hold different content");
+        connA->WriteInput(winrt_wstring_to_array_view(L"ERROR A1\r\nERROR A2\r\n"));
+        connB->WriteInput(winrt_wstring_to_array_view(L"ERROR B1\r\n"));
+
+        Log::Comment(L"Searching the active pane never creates state in the sibling");
+        const auto resultsB = search(coreB, L"ERROR");
+        VERIFY_ARE_EQUAL(1, resultsB.TotalMatches);
+        VERIFY_ARE_EQUAL(1u, coreB->SearchResultRows().size());
+        VERIFY_IS_TRUE(coreA->SearchResultRows().empty());
+
+        Log::Comment(L"Each core keeps its own independent result set");
+        const auto resultsA = search(coreA, L"ERROR");
+        VERIFY_ARE_EQUAL(2, resultsA.TotalMatches);
+        VERIFY_ARE_EQUAL(2u, coreA->SearchResultRows().size());
+        VERIFY_ARE_EQUAL(1u, coreB->SearchResultRows().size());
+
+        Log::Comment(L"Clearing one core's search leaves the sibling untouched");
+        coreB->ClearSearch();
+        VERIFY_IS_TRUE(coreB->SearchResultRows().empty());
+        VERIFY_ARE_EQUAL(2u, coreA->SearchResultRows().size());
     }
 
     static void _writePrompt(const winrt::com_ptr<MockConnection>& conn, const std::wstring_view& path)

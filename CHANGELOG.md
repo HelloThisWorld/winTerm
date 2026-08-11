@@ -1,9 +1,34 @@
 # Changelog
 
-## Unreleased
+## 1.3.1 - 2026-08-11
 
-Documentation-only work. No application code, resource, or version file
-changed, and no release was produced.
+Engineering checkpoint for the Pane Search roadmap, Phase 1: active-pane
+search. Like the v1.2.1 through v1.2.4 checkpoints, this version marks merged
+development work only. It is not a published release and produces no
+downloadable artifacts; GitHub Latest and WinGet keep pointing at the stable
+v1.2.0, and v1.3.0-beta3 remains the newest published prerelease.
+
+### Added
+
+- Added `Ctrl+F` as the default Find shortcut. It targets the active pane
+  only: the action resolves the focused pane through the tab's existing pane
+  model and opens the search box as an overlay inside that pane's terminal
+  control, so sibling panes, other tabs, and the Command Timeline are never
+  searched and never show foreign search state. `Ctrl+Shift+F` stays bound as
+  a compatibility alias, and both chords remain ordinary remappable
+  keybindings — a profile that needs a literal `^F` for a terminal
+  application can unbind `ctrl+f` and keep reaching Find through
+  `Ctrl+Shift+F` or the Command Palette.
+- The search experience is carried entirely by the existing Microsoft
+  Terminal search pipeline — search box control, buffer searcher, and
+  renderer highlights — now validated for winTerm: typing searches the active
+  pane's full text buffer including scrollback live on every keystroke, all
+  matches are highlighted at once, `Enter` and `Shift+Enter` step forward and
+  backward with wrap-around, an empty query shows no highlights, and `Esc` or
+  the close button clears the search state and returns focus to the terminal.
+  Text typed into the search box is never sent to the shell, and a closed
+  search performs no recurring background work. No second search engine,
+  index, or buffer copy was introduced.
 
 ### Documentation
 

@@ -42,6 +42,7 @@ namespace SettingsModelUnitTests
         TEST_METHOD(KeybindingsWithoutVkey);
         TEST_METHOD(ControlCIsReservedForTerminalInput);
         TEST_METHOD(CommandTimelineDefaultShortcutsAndUserOverride);
+        TEST_METHOD(FindDefaultShortcutsAndUserOverride);
     };
 
     void KeyBindingsTests::KeyChords()
@@ -183,6 +184,40 @@ namespace SettingsModelUnitTests
         VERIFY_IS_NOT_NULL(overridden);
         VERIFY_ARE_EQUAL(static_cast<int>(ShortcutAction::PasteText),
                          static_cast<int>(overridden.ActionAndArgs().Action()));
+    }
+
+    void KeyBindingsTests::FindDefaultShortcutsAndUserOverride()
+    {
+        const auto settings = CascadiaSettings::LoadDefaults();
+        const auto actionMap = settings.ActionMap();
+        const auto verifyAction = [&](const KeyChord& chord, const ShortcutAction expected) {
+            const auto command = actionMap.GetActionByKeyChord(chord);
+            VERIFY_IS_NOT_NULL(command);
+            VERIFY_ARE_EQUAL(static_cast<int>(expected), static_cast<int>(command.ActionAndArgs().Action()));
+        };
+
+        // Ctrl+F is winTerm's primary Find chord; Ctrl+Shift+F stays bound as
+        // the upstream-compatible alias. Both resolve to the same action.
+        verifyAction(KeyChord{ true, false, false, false, static_cast<int>('F'), 0 }, ShortcutAction::Find);
+        verifyAction(KeyChord{ true, false, true, false, static_cast<int>('F'), 0 }, ShortcutAction::Find);
+
+        // A user layer can reclaim raw Ctrl+F for a terminal application by
+        // unbinding it, and the alias keeps Find reachable.
+        auto layered = winrt::make_self<implementation::ActionMap>();
+        layered->LayerJson(VerifyParseSucceeded(R"([
+            { "command": "find", "keys": "ctrl+f" },
+            { "command": "find", "keys": "ctrl+shift+f" }
+        ])"),
+                           OriginTag::InBox);
+        layered->LayerJson(VerifyParseSucceeded(R"([
+            { "command": "unbound", "keys": "ctrl+f" }
+        ])"),
+                           OriginTag::User);
+        VERIFY_IS_NULL(layered->GetActionByKeyChord(KeyChord{ true, false, false, false, static_cast<int>('F'), 0 }));
+        const auto aliasCommand = layered->GetActionByKeyChord(KeyChord{ true, false, true, false, static_cast<int>('F'), 0 });
+        VERIFY_IS_NOT_NULL(aliasCommand);
+        VERIFY_ARE_EQUAL(static_cast<int>(ShortcutAction::Find),
+                         static_cast<int>(aliasCommand.ActionAndArgs().Action()));
     }
 
     void KeyBindingsTests::LayerKeybindings()

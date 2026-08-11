@@ -1,33 +1,47 @@
 # Current development progress
 
-Last updated: 2026-08-05
+Last updated: 2026-08-11
 
 ## Repository state
 
-- Branch: `release/v1.3.0-beta3`
-- Base: `fix/visual-progress-shell-fallback-one-shot` at `baf6f8a87`
-  (one-shot launch fallback fix, pull request #41), based on `main` at
-  `39193206c` (1.3.0-beta2 release metadata, pull request #40)
+- Branch: `feature/v1.3.1-pane-search-phase1`, based on `main` at
+  `4753fba68` (Japanese README, pull request #43)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0-beta3`
-- Package/file version: `1.3.0.6`
-- PowerShell module version: `1.3.0` with prerelease suffix `beta3`
-- Release channel: `beta`
-- Release tag: `v1.3.0-beta3`
+- Application version: `1.3.1`
+- Package/file version: `1.3.1.0`
+- PowerShell module version: `1.3.1` with no prerelease suffix
+- Release channel: `stable` (engineering checkpoint; nothing is published)
+- Checkpoint tag: `v1.3.1`, listed with the v1.2.x checkpoint tags in the
+  release workflow so a pushed checkpoint tag runs quick validation only and
+  can never produce release artifacts
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
+- Newest published prerelease: `v1.3.0-beta3` on the beta channel
 - Supported target: Windows 11 x64
 
-`v1.3.0-beta3` is the third beta of the Command Timeline release. It fixes
-the beta2 field report that any long-running command — k9s, vim, top,
-FastAPI/uvicorn, Spring Boot, Node dev servers, `tail -f`,
-`kubectl port-forward` — kept the Visual Progress rainbow animation looping
-for its whole lifetime. The OSC 133 Shell Integration fallback is now a
-bounded one-shot launch indication scoped by a shell command generation. The
-release workflow marks any non-stable channel with `--prerelease` and
-`--latest=false`, so `/releases/latest` keeps resolving to v1.2.0. Like the
-earlier betas, it is listed on the winTerm website next to the stable v1.2.0
-download and is skipped by the WinGet workflow.
+`v1.3.1` is an engineering checkpoint, the first of the Pane Search roadmap
+toward v1.4. Like the v1.2.1 through v1.2.4 Command Timeline checkpoints, it
+is a source/development version only: no GitHub Release, website slot, or
+WinGet update is produced, and `/releases/latest` keeps resolving to v1.2.0.
+
+## Pane Search status (v1.4 roadmap)
+
+Phase 1 — active-pane search — is complete in this checkpoint. `Ctrl+F` (and
+the retained `Ctrl+Shift+F` alias) opens the existing Microsoft Terminal
+search box inside the focused pane only. The implementation reuses the
+mature upstream pipeline end to end — `SearchBoxControl`,
+`ControlCore::Search`, `Search`/`TextBuffer::SearchText`, and renderer
+search highlights — with no second search engine, no index, and no buffer
+duplication. Live search on every keystroke highlights all matches across
+the pane's scrollback, Enter/Shift+Enter navigate with wrap-around, Esc
+clears the state, search-box input never reaches the shell, and each
+terminal control keeps its own search state so split panes stay isolated.
+
+Deferred to later phases: the winTerm-specific search UI redesign and
+scrollbar overview markers (Phase 2), and performance work such as
+debouncing or large-scrollback optimization (Phase 3). Final integration is
+planned as `1.4.0-alpha`, with promotion to beta only after manual user
+validation.
 
 ## Command Timeline status
 
@@ -142,11 +156,14 @@ through pull request #32:
 
 ## Next steps
 
-1. Update the winTerm website: dual stable/beta download columns, refreshed
-   sanitized screenshots, the Tools navigation dropdown, and the logo link.
-2. Collect beta feedback.
-3. Promote to a stable `v1.3.0` only after beta testing, which is the point at
-   which Latest, WinGet, and the website stable slot move.
+1. Pane Search Phase 2 (`1.3.2`): winTerm-specific search UI and scrollbar
+   overview markers.
+2. Pane Search Phase 3 (`1.3.3`): performance investigation and hardening.
+3. Final integration checkpoint `1.4.0-alpha`, then manual user validation
+   before any beta promotion.
+4. Collect Command Timeline beta feedback; promote a stable `v1.3.0` only
+   after beta testing, which is the point at which Latest, WinGet, and the
+   website stable slot move.
 
 ## Validation state
 

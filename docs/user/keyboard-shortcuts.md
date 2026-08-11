@@ -25,6 +25,27 @@ while it owns pointer capture.
 Pane movement commands are not available in winTerm 1.1. A legacy custom
 `movePane` action can still be parsed safely but is disabled.
 
+## Search
+
+| Shortcut | Behavior |
+| --- | --- |
+| `Ctrl+F` | Open search in the focused pane |
+| `Ctrl+Shift+F` | Open search in the focused pane (compatibility alias) |
+
+Search always targets the active pane. The search box opens as an overlay
+inside that pane without resizing terminal content, and the input field is
+focused immediately. Typing searches the pane's buffer and scrollback as you
+type and highlights every match at once. `Enter` moves to the next match and
+`Shift+Enter` to the previous one, wrapping around at either end. `Esc` or
+the close button dismisses the search box, clears the highlights, and
+returns focus to the terminal. Text typed into the search box never reaches
+the shell.
+
+Both chords are ordinary configurable keybindings. A terminal application
+that needs a literal `Ctrl+F` keystroke can reclaim it by unbinding the
+default (`{ "command": "unbound", "keys": "ctrl+f" }` in settings); Find
+stays reachable through `Ctrl+Shift+F` or the Command Palette.
+
 ## Command Timeline
 
 | Shortcut | Behavior |
