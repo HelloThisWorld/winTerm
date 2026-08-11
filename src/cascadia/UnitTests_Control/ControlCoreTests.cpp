@@ -409,7 +409,7 @@ namespace ControlUnitTests
         VERIFY_ARE_EQUAL(2u, rows.size());
         VERIFY_ARE_EQUAL(0, rows[0].start.x);
         VERIFY_ARE_EQUAL(1, rows[0].start.y);
-        VERIFY_ARE_EQUAL(4, rows[0].end.x);
+        VERIFY_ARE_EQUAL(5, rows[0].end.x); // the end column is exclusive
         VERIFY_ARE_EQUAL(1, rows[0].end.y);
         VERIFY_ARE_EQUAL(0, rows[1].start.x);
         VERIFY_ARE_EQUAL(3, rows[1].start.y);

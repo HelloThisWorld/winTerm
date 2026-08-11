@@ -202,11 +202,13 @@ namespace SettingsModelUnitTests
         verifyAction(KeyChord{ true, false, true, false, static_cast<int>('F'), 0 }, ShortcutAction::Find);
 
         // A user layer can reclaim raw Ctrl+F for a terminal application by
-        // unbinding it, and the alias keeps Find reachable.
+        // unbinding it, and the alias keeps Find reachable. The in-box layer
+        // mirrors the defaults.json shape: one action, two keybindings.
         auto layered = winrt::make_self<implementation::ActionMap>();
         layered->LayerJson(VerifyParseSucceeded(R"([
-            { "command": "find", "keys": "ctrl+f" },
-            { "command": "find", "keys": "ctrl+shift+f" }
+            { "command": "find", "id": "Terminal.FindText" },
+            { "keys": "ctrl+f", "id": "Terminal.FindText" },
+            { "keys": "ctrl+shift+f", "id": "Terminal.FindText" }
         ])"),
                            OriginTag::InBox);
         layered->LayerJson(VerifyParseSucceeded(R"([
