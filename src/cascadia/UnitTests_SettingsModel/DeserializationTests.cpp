@@ -2156,7 +2156,12 @@ namespace SettingsModelUnitTests
         const auto actionMap = winrt::get_self<implementation::ActionMap>(settings->GlobalSettings().ActionMap());
         const auto actionsByName = actionMap->NameMap();
         VERIFY_IS_NOT_NULL(actionsByName.TryLookup(L"Test Action"));
-        VERIFY_IS_NULL(actionMap->GetActionByKeyChord({ VirtualKeyModifiers::Control, static_cast<int32_t>('F'), 0 }));
+
+        // The fragment's "keys" field must be ignored: Ctrl+F still resolves
+        // to the in-box Find binding, not to the fragment's action.
+        const auto ctrlF = actionMap->GetActionByKeyChord({ VirtualKeyModifiers::Control, static_cast<int32_t>('F'), 0 });
+        VERIFY_IS_NOT_NULL(ctrlF);
+        VERIFY_ARE_EQUAL(static_cast<int>(ShortcutAction::Find), static_cast<int>(ctrlF.ActionAndArgs().Action()));
     }
 
     void DeserializationTests::FragmentActionNested()

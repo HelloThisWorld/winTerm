@@ -1031,6 +1031,8 @@
         { "keys": "ctrl+,", "id": "Terminal.OpenSettingsUI" },
         { "keys": "ctrl+shift+,", "id": "Terminal.OpenSettingsFile" },
         { "keys": "ctrl+alt+,", "id": "Terminal.OpenDefaultSettingsFile" },
+        // Find is Ctrl+F; Ctrl+Shift+F is kept as a compatibility alias.
+        { "keys": "ctrl+f", "id": "Terminal.FindText" },
         { "keys": "ctrl+shift+f", "id": "Terminal.FindText" },
         { "keys": "ctrl+shift+p", "id": "Terminal.ToggleCommandPalette" },
         { "keys": "win+sc(41)", "id": "Terminal.QuakeMode" },
