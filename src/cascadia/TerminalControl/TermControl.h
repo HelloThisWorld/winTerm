@@ -4,6 +4,7 @@
 #pragma once
 
 #include "SearchBoxControl.h"
+#include "SearchUxHelpers.h"
 #include "TermControl.g.h"
 #include "../../buffer/out/search.h"
 #include "../../cascadia/TerminalCore/Terminal.hpp"
@@ -309,6 +310,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         std::shared_ptr<ThrottledFunc<ScrollBarUpdate>> _updateScrollBar;
         std::shared_ptr<ThrottledFunc<>> _updateCommandTimeline;
+        // Coalesces live-typing searches. The callback reads the search box's
+        // current state at fire time, so the latest query always wins and a
+        // stale queued query can never overwrite newer results. Pane-local by
+        // construction: every TermControl owns its own instance.
+        std::shared_ptr<ThrottledFunc<>> _deferredSearch;
 
         bool _isInternalScrollBarUpdate;
 
@@ -336,6 +342,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         winrt::hstring _restorePath;
         bool _showMarksInScrollbar{ false };
         bool _scrollBarCanvasVisible{ false };
+        // Inputs of the last painted scrollbar mark bitmap; nullopt when the
+        // canvas is collapsed or was never painted. Scroll updates that leave
+        // these unchanged skip the repaint entirely.
+        std::optional<winTerm::Control::SearchUx::ScrollbarMarkPaintState> _lastScrollBarMarkPaint;
 
         bool _isBackgroundLight{ false };
         bool _detached{ false };
@@ -477,6 +487,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _coreRaisedNotice(const IInspectable& s, const Control::NoticeEventArgs& args);
         void _coreWarningBell(const IInspectable& sender, const IInspectable& args);
         void _coreOutputIdle(const IInspectable& sender, const IInspectable& args);
+        void _coreSearchRefreshNeeded(const IInspectable& sender, const IInspectable& args);
+        void _runLiveSearch();
 
         winrt::Windows::Foundation::Point _toPosInDips(const Core::Point terminalCellPos);
         void _throttledUpdateScrollbar(const ScrollBarUpdate& update);
@@ -510,6 +522,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Control::ControlCore::RaiseNotice_revoker RaiseNotice;
             Control::ControlCore::HoveredHyperlinkChanged_revoker HoveredHyperlinkChanged;
             Control::ControlCore::OutputIdle_revoker OutputIdle;
+            Control::ControlCore::SearchRefreshNeeded_revoker SearchRefreshNeeded;
             Control::ControlCore::UpdateSelectionMarkers_revoker UpdateSelectionMarkers;
             Control::ControlCore::OpenHyperlink_revoker coreOpenHyperlink;
             Control::ControlCore::TitleChanged_revoker TitleChanged;

@@ -4,22 +4,22 @@ Last updated: 2026-08-12
 
 ## Repository state
 
-- Branch: `feature/v1.3.2-pane-search-phase2`, based on `main` at
-  `8015963ad` (Pane Search Phase 1 checkpoint, pull request #44)
+- Branch: `feature/v1.3.3-pane-search-phase3`, based on `main` at
+  `97ecb7e85` (Pane Search Phase 2 checkpoint, pull request #45)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.2`
-- Package/file version: `1.3.2.0`
-- PowerShell module version: `1.3.2` with no prerelease suffix
+- Application version: `1.3.3`
+- Package/file version: `1.3.3.0`
+- PowerShell module version: `1.3.3` with no prerelease suffix
 - Release channel: `stable` (engineering checkpoint; nothing is published)
-- Checkpoint tag: `v1.3.2`, listed with the earlier checkpoint tags in the
+- Checkpoint tag: `v1.3.3`, listed with the earlier checkpoint tags in the
   release workflow so a pushed checkpoint tag runs quick validation only and
   can never produce release artifacts
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
 - Newest published prerelease: `v1.3.0-beta3` on the beta channel
 - Supported target: Windows 11 x64
 
-`v1.3.2` is an engineering checkpoint, the second of the Pane Search roadmap
+`v1.3.3` is an engineering checkpoint, the third of the Pane Search roadmap
 toward v1.4. Like the v1.2.1 through v1.2.4 Command Timeline checkpoints, it
 is a source/development version only: no GitHub Release, website slot, or
 WinGet update is produced, and `/releases/latest` keeps resolving to v1.2.0.
@@ -28,9 +28,10 @@ WinGet update is produced, and `/releases/latest` keeps resolving to v1.2.0.
 
 - Phase 1 — active-pane search — complete at `1.3.1`.
 - Phase 2 — search UX and scrollbar overview — complete at `1.3.2`.
-- Phase 3 — performance investigation and hardening — next, at `1.3.3`.
+- Phase 3 — performance and edge-case hardening — complete at `1.3.3`.
 - Final integration — `1.4.0-alpha`, promoted to beta only after manual
-  user validation.
+  user validation. Starting `1.4.0-alpha` requires a separate instruction;
+  it is not begun automatically.
 
 Phase 1 made `Ctrl+F` (with the retained `Ctrl+Shift+F` alias) open the
 existing Microsoft Terminal search box inside the focused pane only,
@@ -55,8 +56,25 @@ only through the existing throttled scrollbar update path — no timers, no
 polling. Split panes keep fully isolated search state, including their
 overview markers.
 
-Deferred to Phase 3: performance work such as debouncing, large-scrollback
-optimization, and search-related edge-case hardening.
+Phase 3 hardened that experience for real terminal workloads without adding
+any new search engine, index, or persistent state. Live typing is coalesced
+per pane (50 ms, leading immediate + trailing latest, reading the search
+box's state at fire time so the latest query always wins and navigation can
+never act on a stale query). An open search now converges during sustained
+output: the debounced OutputIdle refresh is complemented by a non-debounced
+500 ms cap armed only while a search is active, so `tail -f`-style streams
+no longer freeze the counter, highlights, or overview — and search closed
+still means zero recurring search work. The scrollbar mark bitmap repaints
+only when its inputs change, so plain scrolling with large result sets no
+longer re-enumerates occurrences. Edge cases were fixed deterministically:
+pane resize no longer converts pre-reflow spans into a stray selection,
+main/alt buffer switches drop the other buffer's highlight spans immediately
+(search keeps following the active buffer), and closing search releases the
+terminal-side span copy. Regression tests cover mutation invalidation,
+match-anchor stability during appended output, scrollback eviction, reflow,
+alternate-screen transitions, generation/arming semantics, repaint-signature
+contracts, wide-character spans (CJK, Korean, accented Latin, emoji), and a
+log-only scan benchmark (`WINTERM_SEARCH_BENCH_LINES` scales it locally).
 
 ## Command Timeline status
 
@@ -171,10 +189,10 @@ through pull request #32:
 
 ## Next steps
 
-1. Pane Search Phase 3 (`1.3.3`): performance investigation and hardening.
-2. Final integration checkpoint `1.4.0-alpha`, then manual user validation
-   before any beta promotion.
-3. Collect Command Timeline beta feedback; promote a stable `v1.3.0` only
+1. Final integration checkpoint `1.4.0-alpha`, then manual user validation
+   before any beta promotion. This stage requires a separate instruction
+   from the user; do not begin it automatically.
+2. Collect Command Timeline beta feedback; promote a stable `v1.3.0` only
    after beta testing, which is the point at which Latest, WinGet, and the
    website stable slot move.
 

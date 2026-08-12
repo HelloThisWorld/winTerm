@@ -254,6 +254,12 @@ void Terminal::UseAlternateScreenBuffer(const TextAttribute& attrs)
 
     ClearSelection();
 
+    // Any stored search highlights refer to the main buffer; rendering them
+    // against the alt buffer would paint coordinates from the wrong buffer.
+    // The next search refresh recomputes them against the active buffer.
+    SetSearchHighlights({});
+    SetSearchHighlightFocused(0);
+
     // Create a new alt buffer
     _altBuffer = std::make_unique<TextBuffer>(_altBufferSize,
                                               attrs,
@@ -307,6 +313,12 @@ void Terminal::UseMainScreenBuffer()
     }
 
     ClearSelection();
+
+    // The stored search highlights were computed against the alt buffer;
+    // drop them so they cannot paint onto the main buffer. The next search
+    // refresh recomputes them against the active buffer.
+    SetSearchHighlights({});
+    SetSearchHighlightFocused(0);
 
     _mainBuffer->SetAsActiveBuffer(true);
 

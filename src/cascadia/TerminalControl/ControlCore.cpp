@@ -32,6 +32,13 @@ using namespace winrt::Windows::ApplicationModel::DataTransfer;
 
 namespace winrt::Microsoft::Terminal::Control::implementation
 {
+    // Upper bound on how stale an open search may become while output
+    // streams continuously. OutputIdle (100ms, debounced) never fires under
+    // sustained output; this companion interval is not debounced, so an
+    // active search re-converges at most this often. Each refresh is a full
+    // buffer scan, so the interval deliberately stays coarse.
+    constexpr std::chrono::milliseconds SearchMidOutputRefreshInterval{ 500 };
+
     static winrt::Microsoft::Terminal::Core::OptionalColor OptionalFromColor(const til::color& c) noexcept
     {
         Core::OptionalColor result;
@@ -241,6 +248,27 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 _terminal->UpdatePatternsUnderLock();
             });
 
+        // Companion to outputIdle for an open search: outputIdle is debounced,
+        // so sustained output starves it and a live search would never see new
+        // matches. This one is throttled without debounce (fires at most once
+        // per interval while being poked) and is only armed from the output
+        // handler while a search is active. TermControl re-checks the search
+        // box state on the UI thread, so a trailing fire after the search
+        // closed is a no-op.
+        shared->midOutputSearchRefresh = std::make_unique<til::throttled_func<>>(
+            til::throttled_func_options{
+                .delay = SearchMidOutputRefreshInterval,
+                .trailing = true,
+            },
+            [weakThis = get_weak(), dispatcher = _dispatcher]() {
+                dispatcher.TryEnqueue(DispatcherQueuePriority::Normal, [weakThis]() {
+                    if (const auto self = weakThis.get(); self && !self->_IsClosing())
+                    {
+                        self->SearchRefreshNeeded.raise(*self, nullptr);
+                    }
+                });
+            });
+
         // If you rapidly show/hide Windows Terminal, something about GotFocus()/LostFocus() gets broken.
         // We'll then receive easily 10+ such calls from WinUI the next time the application is shown.
         shared->focusChanged = std::make_unique<til::throttled_func<bool>>(
@@ -334,6 +362,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // we're re-attached to a new control (on a possibly new UI thread).
         const auto shared = _shared.lock();
         shared->outputIdle.reset();
+        shared->midOutputSearchRefresh.reset();
         shared->updateScrollBar.reset();
     }
 
@@ -1314,7 +1343,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         // TermControl will call Search() once the OutputIdle even fires after 100ms.
         // Until then we need to hide the now-stale search results from the renderer.
-        ClearSearch();
+        // Never select the focused result here: the spans predate the reflow and
+        // no longer describe this buffer's geometry.
+        _clearSearchImpl(false);
         const auto shared = _shared.lock_shared();
         if (shared->outputIdle)
         {
@@ -2240,7 +2271,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
             _terminal->SetSearchHighlightFocused(gsl::narrow<size_t>(std::max<ptrdiff_t>(0, _searcher.CurrentMatch())));
             _renderer->TriggerSearchHighlight(oldResults);
+            _searchGeneration++;
         }
+
+        // A non-empty query means mid-output refreshes must stay armed; an
+        // empty one returns the connection thread to the zero-cost path.
+        _searchActive.store(!request.Text.empty(), std::memory_order_relaxed);
 
         if (request.ScrollIntoView)
         {
@@ -2283,27 +2319,59 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return -1;
     }
 
+    // Monotonic identity of the search state. Consumers that only need to know
+    // "did the result set, the focused match, or the cleared state change"
+    // (the scrollbar overview) can compare this instead of result vectors.
+    uint64_t ControlCore::SearchStateGeneration() const noexcept
+    {
+        return _searchGeneration;
+    }
+
+    // Identity of the current buffer content. Any mutation changes it: output,
+    // scrollback eviction, and resize/reflow (each new TextBuffer starts in
+    // its own id-space), as does switching the main/alt buffer.
+    uint64_t ControlCore::BufferMutationId() const
+    {
+        const auto lock = _terminal->LockForReading();
+        return _terminal->GetTextBuffer().GetLastMutationId();
+    }
+
     void ControlCore::ClearSearch()
+    {
+        _clearSearchImpl(true);
+    }
+
+    // `selectFocusedResult` turns the focused match into a selection (GH#19358)
+    // so that closing the search box keeps the user's place in the buffer.
+    // Invalidation paths (resize/reflow) must pass false: at that point the
+    // stored spans describe the pre-reflow buffer, and converting them against
+    // the new buffer's geometry would select arbitrary coordinates.
+    void ControlCore::_clearSearchImpl(const bool selectFocusedResult)
     {
         const auto lock = _terminal->LockForWriting();
 
         // GH #19358: select the focused search result before clearing search
-        if (const auto focusedSearchResult = _terminal->GetSearchHighlightFocused())
+        if (selectFocusedResult)
         {
-            // search results are buffer-relative, whereas the selection functions expect viewport-relative coordinates
-            const auto scrollOffset{ _terminal->GetScrollOffset() };
-            const auto startPos = til::point{ focusedSearchResult->start.x, focusedSearchResult->start.y - scrollOffset };
-            const auto endPos = til::point{ focusedSearchResult->end.x, focusedSearchResult->end.y - scrollOffset };
+            if (const auto focusedSearchResult = _terminal->GetSearchHighlightFocused())
+            {
+                // search results are buffer-relative, whereas the selection functions expect viewport-relative coordinates
+                const auto scrollOffset{ _terminal->GetScrollOffset() };
+                const auto startPos = til::point{ focusedSearchResult->start.x, focusedSearchResult->start.y - scrollOffset };
+                const auto endPos = til::point{ focusedSearchResult->end.x, focusedSearchResult->end.y - scrollOffset };
 
-            _terminal->SetSelectionAnchor(startPos);
-            _terminal->SetSelectionEnd(endPos);
-            _renderer->TriggerSelection();
+                _terminal->SetSelectionAnchor(startPos);
+                _terminal->SetSelectionEnd(endPos);
+                _renderer->TriggerSelection();
+            }
         }
 
         _terminal->SetSearchHighlights({});
         _terminal->SetSearchHighlightFocused(0);
         _renderer->TriggerSearchHighlight(_searcher.Results());
         _searcher = {};
+        _searchGeneration++;
+        _searchActive.store(false, std::memory_order_relaxed);
     }
 
     void ControlCore::Close()
@@ -3077,6 +3145,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             if (shared->outputIdle)
             {
                 (*shared->outputIdle)();
+            }
+
+            // outputIdle above is debounced, so sustained output postpones it
+            // indefinitely. While a search is active, additionally poke the
+            // non-debounced refresh cap so the open search converges against
+            // the mutating buffer. Search closed costs one relaxed load here.
+            if (_searchActive.load(std::memory_order_relaxed) && shared->midOutputSearchRefresh)
+            {
+                (*shared->midOutputSearchRefresh)();
             }
         }
         catch (...)
