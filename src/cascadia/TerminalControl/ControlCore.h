@@ -255,6 +255,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         SearchResults Search(const SearchRequest& request);
         const std::vector<til::point_span>& SearchResultRows() const noexcept;
+        til::CoordType SearchCurrentMatchRow() const noexcept;
         void ClearSearch();
 
         void LeftClickOnTerminal(const til::point terminalPosition,

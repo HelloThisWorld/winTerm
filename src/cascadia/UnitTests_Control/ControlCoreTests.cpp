@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "../TerminalControl/EventArgs.h"
 #include "../TerminalControl/ControlCore.h"
+#include "../TerminalControl/SearchUxHelpers.h"
 #include "MockControlSettings.h"
 #include "MockConnection.h"
 #include "../../inc/TestUtils.h"
@@ -41,6 +42,11 @@ namespace ControlUnitTests
         TEST_METHOD(TestSearchHighlightsAllMatches);
         TEST_METHOD(TestSearchNavigationAndClear);
         TEST_METHOD(TestSearchStateIsolatedPerCore);
+
+        TEST_METHOD(TestSearchInvalidRegexNoStaleResults);
+        TEST_METHOD(TestSearchCurrentMatchRowTracksNavigation);
+        TEST_METHOD(TestSearchSameRowOccurrences);
+        TEST_METHOD(TestSearchUxHelperContracts);
 
         TEST_METHOD(TestSelectCommandSimple);
         TEST_METHOD(TestSelectOutputSimple);
@@ -525,6 +531,173 @@ namespace ControlUnitTests
         coreB->ClearSearch();
         VERIFY_IS_TRUE(coreB->SearchResultRows().empty());
         VERIFY_ARE_EQUAL(2u, coreA->SearchResultRows().size());
+    }
+
+    void ControlCoreTests::TestSearchInvalidRegexNoStaleResults()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto core = createCore(*settings, *conn);
+        VERIFY_IS_NOT_NULL(core);
+        _standardInit(core);
+
+        const auto search = [&core](const winrt::hstring& text, const bool regularExpression) {
+            return core->Search(Control::SearchRequest{
+                .Text = text,
+                .GoForward = true,
+                .CaseSensitive = false,
+                .RegularExpression = regularExpression,
+                .ExecuteSearch = false,
+                .ScrollIntoView = false,
+                .ScrollOffset = 0,
+            });
+        };
+
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+
+        Log::Comment(L"A valid search finds matches");
+        auto results = search(L"error", false);
+        VERIFY_ARE_EQUAL(2, results.TotalMatches);
+        VERIFY_IS_FALSE(results.SearchRegexInvalid);
+
+        Log::Comment(L"An invalid regex reports the error and drops the previous results");
+        results = search(L"[", true);
+        VERIFY_IS_TRUE(results.SearchRegexInvalid);
+        VERIFY_ARE_EQUAL(0, results.TotalMatches);
+        VERIFY_IS_TRUE(core->SearchResultRows().empty());
+
+        Log::Comment(L"Fixing the expression recovers the matches");
+        results = search(L"error", true);
+        VERIFY_IS_FALSE(results.SearchRegexInvalid);
+        VERIFY_ARE_EQUAL(2, results.TotalMatches);
+        VERIFY_ARE_EQUAL(2u, core->SearchResultRows().size());
+    }
+
+    void ControlCoreTests::TestSearchCurrentMatchRowTracksNavigation()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto core = createCore(*settings, *conn);
+        VERIFY_IS_NOT_NULL(core);
+        _standardInit(core);
+
+        const auto search = [&core](const bool goForward, const bool executeSearch) {
+            return core->Search(Control::SearchRequest{
+                .Text = L"error",
+                .GoForward = goForward,
+                .CaseSensitive = false,
+                .RegularExpression = false,
+                .ExecuteSearch = executeSearch,
+                .ScrollIntoView = false,
+                .ScrollOffset = 0,
+            });
+        };
+
+        Log::Comment(L"With no search at all there is no current row");
+        VERIFY_ARE_EQUAL(-1, core->SearchCurrentMatchRow());
+
+        conn->WriteInput(winrt_wstring_to_array_view(L"foo\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"bar\r\n"));
+        conn->WriteInput(winrt_wstring_to_array_view(L"error\r\n"));
+
+        Log::Comment(L"Live typing focuses the first match's row");
+        auto results = search(true, false);
+        VERIFY_ARE_EQUAL(2, results.TotalMatches);
+        VERIFY_ARE_EQUAL(1, core->SearchCurrentMatchRow());
+
+        Log::Comment(L"Navigation moves the current row with the search core");
+        search(true, true);
+        VERIFY_ARE_EQUAL(3, core->SearchCurrentMatchRow());
+
+        Log::Comment(L"Wrap-around returns to the first row");
+        search(true, true);
+        VERIFY_ARE_EQUAL(1, core->SearchCurrentMatchRow());
+
+        Log::Comment(L"Clearing the search clears the current row");
+        core->ClearSearch();
+        VERIFY_ARE_EQUAL(-1, core->SearchCurrentMatchRow());
+    }
+
+    void ControlCoreTests::TestSearchSameRowOccurrences()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        auto core = createCore(*settings, *conn);
+        VERIFY_IS_NOT_NULL(core);
+        _standardInit(core);
+
+        conn->WriteInput(winrt_wstring_to_array_view(L"ERROR foo ERROR bar ERROR\r\n"));
+
+        Log::Comment(L"The counter stays occurrence-based");
+        const auto results = core->Search(Control::SearchRequest{
+            .Text = L"ERROR",
+            .GoForward = true,
+            .CaseSensitive = false,
+            .RegularExpression = false,
+            .ExecuteSearch = false,
+            .ScrollIntoView = false,
+            .ScrollOffset = 0,
+        });
+        VERIFY_ARE_EQUAL(3, results.TotalMatches);
+        VERIFY_ARE_EQUAL(3u, core->SearchResultRows().size());
+
+        Log::Comment(L"The scrollbar overview reports one row for all three occurrences");
+        size_t distinctRows = 0;
+        til::CoordType reportedRow = -1;
+        winTerm::Control::SearchUx::ForEachDistinctSearchRow(core->SearchResultRows(), [&](const auto row) {
+            ++distinctRows;
+            reportedRow = row;
+        });
+        VERIFY_ARE_EQUAL(1u, distinctRows);
+        VERIFY_ARE_EQUAL(0, reportedRow);
+    }
+
+    void ControlCoreTests::TestSearchUxHelperContracts()
+    {
+        using namespace winTerm::Control::SearchUx;
+
+        Log::Comment(L"Unmeasured hosts keep the full layout");
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Normal == SearchBoxLayoutStateForWidth(0.0));
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Normal == SearchBoxLayoutStateForWidth(-1.0));
+
+        Log::Comment(L"Narrow panes drop secondary controls monotonically");
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Minimal == SearchBoxLayoutStateForWidth(1.0));
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Minimal == SearchBoxLayoutStateForWidth(SearchBoxMinimalLayoutThreshold - 0.5));
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Compact == SearchBoxLayoutStateForWidth(SearchBoxMinimalLayoutThreshold));
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Compact == SearchBoxLayoutStateForWidth(SearchBoxCompactLayoutThreshold - 0.5));
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Normal == SearchBoxLayoutStateForWidth(SearchBoxCompactLayoutThreshold));
+        VERIFY_IS_TRUE(SearchBoxLayoutState::Normal == SearchBoxLayoutStateForWidth(10000.0));
+
+        Log::Comment(L"State names match the XAML visual states");
+        VERIFY_IS_TRUE(SearchBoxLayoutStateName(SearchBoxLayoutState::Normal) == std::wstring_view{ L"NormalLayout" });
+        VERIFY_IS_TRUE(SearchBoxLayoutStateName(SearchBoxLayoutState::Compact) == std::wstring_view{ L"CompactLayout" });
+        VERIFY_IS_TRUE(SearchBoxLayoutStateName(SearchBoxLayoutState::Minimal) == std::wstring_view{ L"MinimalLayout" });
+
+        Log::Comment(L"The mark surface renders for generic marks, search marks, or both");
+        VERIFY_IS_FALSE(ShouldRenderScrollbarMarkSurface(false, false));
+        VERIFY_IS_TRUE(ShouldRenderScrollbarMarkSurface(false, true));
+        VERIFY_IS_TRUE(ShouldRenderScrollbarMarkSurface(true, false));
+        VERIFY_IS_TRUE(ShouldRenderScrollbarMarkSurface(true, true));
+
+        Log::Comment(L"Distinct-row enumeration handles empty and multi-row collections");
+        struct FakeSpan
+        {
+            struct
+            {
+                int y;
+            } start;
+        };
+        const std::vector<FakeSpan> empty{};
+        size_t count = 0;
+        ForEachDistinctSearchRow(empty, [&](const auto) { ++count; });
+        VERIFY_ARE_EQUAL(0u, count);
+
+        const std::vector<FakeSpan> spans{ { { 2 } }, { { 2 } }, { { 5 } }, { { 5 } }, { { 9 } } };
+        std::vector<int> rows;
+        ForEachDistinctSearchRow(spans, [&](const auto row) { rows.push_back(row); });
+        VERIFY_ARE_EQUAL(3u, rows.size());
+        VERIFY_ARE_EQUAL(2, rows[0]);
+        VERIFY_ARE_EQUAL(5, rows[1]);
+        VERIFY_ARE_EQUAL(9, rows[2]);
     }
 
     static void _writePrompt(const winrt::com_ptr<MockConnection>& conn, const std::wstring_view& path)
