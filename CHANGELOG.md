@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.3.2 - 2026-08-12
+
+Engineering checkpoint for the Pane Search roadmap, Phase 2: search UX and
+the scrollbar search overview. Like the earlier checkpoints, this version
+marks merged development work only: it is not a published release and
+produces no downloadable artifacts; GitHub Latest and WinGet keep pointing
+at the stable v1.2.0, and v1.3.0-beta3 remains the newest published
+prerelease.
+
+### Changed
+
+- Restyled the pane-local search box to the winTerm compact overlay
+  language: a search glyph leads the input, the `current / total` match
+  counter sits beside it, and the case-sensitivity, regular-expression,
+  previous, next, and close controls follow at winTerm chrome density with
+  theme-aware system brushes, so the box matches dark, light, and
+  high-contrast themes. The counter keeps the existing localized status
+  semantics unchanged — `m/n`, "No results", the bounded `999+`/`?`
+  presentations, and the invalid-regex message — and continues to come from
+  the search core rather than a second count. In narrow panes the box now
+  degrades gracefully through width-driven layout states: secondary toggles
+  collapse first, then the status and the navigation arrows, keeping the
+  input and the close button usable; hidden toggles retain their state, and
+  the search itself stays fully functional at any pane width. All controls
+  keep their existing accessible names, tooltips, and screen-reader
+  announcements.
+
+### Added
+
+- The scrollbar now shows a search overview while search is open: one
+  right-aligned marker per buffer row containing a match, mapped across the
+  full scrollback range, with the row of the current match drawn at double
+  width so it stands out without extra colors or animation. The overview
+  reuses the existing scrollbar mark bitmap and the existing search results
+  — the counter stays occurrence-based while the overview deduplicates
+  same-row matches — and refreshes only through the existing throttled
+  scrollbar update path on typing, navigation, buffer changes, and close.
+- Search overview markers no longer depend on the `showMarksOnScrollbar`
+  setting: they render whenever search is open, while generic shell and
+  command marks keep obeying `ShowMarks` (default off) exactly as before.
+  The two categories share the surface and coexist when both are enabled,
+  closing search removes only the search markers, and a scrollbar the user
+  configured to be hidden stays hidden — search then simply runs without
+  the overview. Split panes keep fully isolated search state, including
+  their overview markers.
+
 ## 1.3.1 - 2026-08-11
 
 Engineering checkpoint for the Pane Search roadmap, Phase 1: active-pane

@@ -1245,7 +1245,7 @@
     -->
 
     <Grid x:Name="RootGrid"
-          SizeChanged="_CommandTimelineSizeChanged">
+          SizeChanged="_RootGridSizeChanged">
         <Grid.Lights>
             <local:VisualBellLight x:Name="BellLight" />
         </Grid.Lights>

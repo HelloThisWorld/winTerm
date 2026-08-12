@@ -335,6 +335,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         winrt::Windows::UI::Xaml::Controls::SwapChainPanel::LayoutUpdated_revoker _layoutUpdatedRevoker;
         winrt::hstring _restorePath;
         bool _showMarksInScrollbar{ false };
+        bool _scrollBarCanvasVisible{ false };
 
         bool _isBackgroundLight{ false };
         bool _detached{ false };
@@ -397,7 +398,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _CommandTimelineHandleGotFocus(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _CommandTimelineHandleLostFocus(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::RoutedEventArgs& e);
         void _CommandTimelineSelectionChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::SelectionChangedEventArgs& e);
-        void _CommandTimelineSizeChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::SizeChangedEventArgs& e);
+        void _RootGridSizeChanged(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::SizeChangedEventArgs& e);
         void _CommandTimelineWheelSettled(const Windows::Foundation::IInspectable& sender, const Windows::Foundation::IInspectable& e);
         void _ScrollbarChangeHandler(const Windows::Foundation::IInspectable& sender, const Windows::UI::Xaml::Controls::Primitives::RangeBaseValueChangedEventArgs& e);
 
@@ -479,6 +480,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         winrt::Windows::Foundation::Point _toPosInDips(const Core::Point terminalCellPos);
         void _throttledUpdateScrollbar(const ScrollBarUpdate& update);
+        void _collapseScrollBarCanvas();
+        void _requestScrollBarMarksRefresh();
 
         void _pasteTextWithBroadcast(const winrt::hstring& text);
 

@@ -2268,6 +2268,21 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return _searcher.Results();
     }
 
+    // Returns the buffer row of the currently focused search match, or -1
+    // when there is no current match. The searcher stays the source of truth
+    // for the focused index; this only projects it onto a row for the
+    // scrollbar overview.
+    til::CoordType ControlCore::SearchCurrentMatchRow() const noexcept
+    {
+        const auto index = _searcher.CurrentMatch();
+        const auto& results = _searcher.Results();
+        if (index >= 0 && gsl::narrow_cast<size_t>(index) < results.size())
+        {
+            return til::at(results, gsl::narrow_cast<size_t>(index)).start.y;
+        }
+        return -1;
+    }
+
     void ControlCore::ClearSearch()
     {
         const auto lock = _terminal->LockForWriting();
