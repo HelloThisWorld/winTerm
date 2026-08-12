@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.3.3 - 2026-08-12
+
+Engineering checkpoint for the Pane Search roadmap, Phase 3: performance and
+edge-case hardening. Like the earlier checkpoints, this version marks merged
+development work only: it is not a published release and produces no
+downloadable artifacts; GitHub Latest and WinGet keep pointing at the stable
+v1.2.0, and v1.3.0-beta3 remains the newest published prerelease.
+
+### Changed
+
+- Live-typing searches are now coalesced per pane. Each executed search scans
+  the entire scrollback on the UI thread, and previously every keystroke ran
+  one such scan synchronously. Keystrokes arriving within 50 ms now collapse
+  into a single trailing search; the leading keystroke still searches
+  immediately, so a single keypress is as responsive as before. The coalesced
+  callback reads the search box's state at fire time, so the latest query
+  always wins and a stale queued query can never overwrite newer results.
+  Navigation (Enter, Shift+Enter, the arrow buttons) keeps executing
+  synchronously with the box's current text and therefore can never act on a
+  stale query. Deleting the query clears highlights, overview markers, and
+  status immediately, and a pending coalesced search after Esc finds the box
+  closed and does nothing.
+- An open search now converges while output streams continuously. The
+  existing OutputIdle refresh is debounced (it fires only after 100 ms of
+  quiet), so sustained output such as `tail -f` starved it and froze the
+  match counter, highlights, and overview markers indefinitely. While a
+  search is active, a companion non-debounced throttle now refreshes the
+  search at most once per 500 ms during sustained output; quiet terminals
+  keep using the existing OutputIdle path unchanged. The throttle is armed
+  only from the output handler while a search is active — with search closed
+  the output path pays one relaxed atomic load and schedules nothing.
+- The scrollbar mark bitmap now repaints only when one of its inputs changes
+  (geometry, mark categories, search state, pip color, or — while generic
+  marks render — the buffer). Its content is independent of the thumb
+  position, yet every throttled scroll tick used to re-enumerate the full
+  occurrence list and all mark rows to repaint an identical bitmap; plain
+  scrolling with a large result set now skips that work entirely.
+
+### Fixed
+
+- Resizing a pane with an active search no longer creates a stray selection.
+  The resize invalidation reused the search-close path, which converts the
+  focused match into a selection (GH#19358); after a reflow those stored
+  spans describe the pre-reflow buffer, so the resize could select arbitrary
+  coordinates and skew the recomputed current match. The close path keeps
+  selecting the focused result; the resize path now only invalidates.
+- Switching between the main and alternate screen buffers now drops stored
+  search highlight spans immediately. They were computed against the other
+  buffer, and the renderer could paint them at wrong positions for up to one
+  refresh interval after entering or leaving a full-screen application.
+  Search itself keeps following the active buffer, recomputing against the
+  alternate screen while it is engaged and against the main buffer after it
+  ends.
+- Clearing the search now releases the terminal-side highlight span copy
+  instead of retaining its capacity until the next search; with very high
+  match counts that memory previously stayed allocated after Esc.
+
+### Added
+
+- Deterministic regression coverage for the hardened edges: buffer mutation
+  invalidation and post-output count refresh, focused-match anchoring while
+  matches are appended, scrollback-eviction safety with a tiny history,
+  reflow invalidation with the no-stray-selection guarantee, alternate-screen
+  transitions, search-state generation and mid-output arming semantics,
+  scrollbar repaint-signature contracts, and wide-character span widths
+  (Traditional and Simplified Chinese, Japanese, Korean, accented Latin, and
+  emoji). A search-scan smoke benchmark logs per-query scan cost for common,
+  rare, no-match, regex, and invalid-regex queries without asserting on wall
+  clock, and scales up locally through `WINTERM_SEARCH_BENCH_LINES`.
+
 ## 1.3.2 - 2026-08-12
 
 Engineering checkpoint for the Pane Search roadmap, Phase 2: search UX and

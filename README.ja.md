@@ -38,7 +38,7 @@ Microsoft、Windows、Windows Terminalのロゴも使用していません。
 - `winTerm-<version>-setup-x64.exe` — 現在のユーザー、または全ユーザーへのインストール用;
 - `winTerm-<version>-portable-x64.zip` — 展開してそのまま実行する用。
 
-現在のソースバージョンは `1.3.2` で、
+現在のソースバージョンは `1.3.3` で、
 最新の安定版リリースは `1.2.0` です。公開されている資産の一覧とチェックサムの全体は、
 [最新の公式リリース](https://github.com/HelloThisWorld/winTerm/releases/latest)
 を参照してください。
@@ -111,8 +111,8 @@ PowerShell 7と、[ビルド手順（英語）](docs/build.md)に記載された
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.3.2 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.3.2 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.3.3 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.3.3 -Platform x64
 ```
 
 アンパッケージ形式の生成処理では、統合されたリソースインデックスを作るための

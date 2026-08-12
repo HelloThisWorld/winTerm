@@ -23,7 +23,7 @@ try
         "- 'v*'",
         'checkpoint-validation:',
         'Validate engineering checkpoint',
-        '["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2"]',
+        '["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2","v1.3.3"]',
         'verify-version.ps1 -RequireTag',
         'test.ps1 -Suite Smoke',
         'contents: write',
@@ -63,7 +63,7 @@ try
         }
     }
 
-    $checkpointGuard = 'contains(fromJSON(''["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2"]''), github.ref_name)'
+    $checkpointGuard = 'contains(fromJSON(''["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2","v1.3.3"]''), github.ref_name)'
     if ([regex]::Matches($workflow, [regex]::Escape($checkpointGuard)).Count -ne 4)
     {
         throw 'Release workflow must guard the checkpoint validation and all three full release jobs.'

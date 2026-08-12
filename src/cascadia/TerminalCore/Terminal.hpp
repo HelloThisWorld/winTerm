@@ -260,7 +260,7 @@ public:
     void SetSearchMissingCommandCallback(std::function<void(std::wstring_view, const til::CoordType)> pfn) noexcept;
     void SetClearQuickFixCallback(std::function<void()> pfn) noexcept;
     void SetWindowSizeChangedCallback(std::function<void(int32_t, int32_t)> pfn) noexcept;
-    void SetSearchHighlights(const std::vector<til::point_span>& highlights) noexcept;
+    void SetSearchHighlights(std::vector<til::point_span> highlights) noexcept;
     void SetSearchHighlightFocused(size_t focusedIdx) noexcept;
     void ScrollToSearchHighlight(til::CoordType searchScrollOffset);
 

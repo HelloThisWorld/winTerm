@@ -79,4 +79,65 @@ namespace winTerm::Control::SearchUx
             }
         }
     }
+
+    // Everything the scrollbar mark bitmap's content depends on. The bitmap
+    // is repainted only when one of these inputs changes; a scroll update
+    // that merely moves the thumb repaints nothing, which keeps scrolling
+    // cheap with very large result sets. The search core stays the source of
+    // truth — this is an identity of its state, not a copy of it.
+    struct ScrollbarMarkPaintState
+    {
+        double maximum{ 0 };
+        double viewportSize{ 0 };
+        int32_t widthPx{ 0 };
+        int32_t heightPx{ 0 };
+        bool genericMarks{ false };
+        bool searchMarks{ false };
+        uint64_t searchGeneration{ 0 };
+        uint64_t bufferMutationId{ 0 };
+        uint32_t searchPipColor{ 0 };
+
+        friend constexpr bool operator==(const ScrollbarMarkPaintState&, const ScrollbarMarkPaintState&) noexcept = default;
+    };
+
+    // Builds the paint state for one update. Inputs only participate while
+    // the category that consumes them renders: the buffer mutation id backs
+    // the generic marks (their content derives from buffer rows), and the pip
+    // color backs the search overview (searchGeneration covers its rows).
+    // Without this rule, an alt-screen application mutating the buffer would
+    // force a repaint per throttle tick even though the overview cannot
+    // change.
+    constexpr ScrollbarMarkPaintState MakeScrollbarMarkPaintState(const double maximum,
+                                                                  const double viewportSize,
+                                                                  const int32_t widthPx,
+                                                                  const int32_t heightPx,
+                                                                  const bool genericMarks,
+                                                                  const bool searchMarks,
+                                                                  const uint64_t searchGeneration,
+                                                                  const uint64_t bufferMutationId,
+                                                                  const uint32_t searchPipColor) noexcept
+    {
+        return ScrollbarMarkPaintState{
+            .maximum = maximum,
+            .viewportSize = viewportSize,
+            .widthPx = widthPx,
+            .heightPx = heightPx,
+            .genericMarks = genericMarks,
+            .searchMarks = searchMarks,
+            .searchGeneration = searchGeneration,
+            .bufferMutationId = genericMarks ? bufferMutationId : 0,
+            .searchPipColor = searchMarks ? searchPipColor : 0,
+        };
+    }
+
+    // A repaint is needed when there is no previously painted state (first
+    // paint, or the canvas was collapsed/invalidated) or when any input
+    // changed. `hasPrevious`/`previous` mirror std::optional without forcing
+    // the header to include it.
+    constexpr bool ShouldRepaintScrollbarMarks(const bool hasPrevious,
+                                               const ScrollbarMarkPaintState& previous,
+                                               const ScrollbarMarkPaintState& next) noexcept
+    {
+        return !hasPrevious || !(previous == next);
+    }
 }
