@@ -15,10 +15,10 @@
 最新の安定版リリースページには、インストーラー（Setup EXE）、ポータブルZIP、
 リリースノート、チェックサムがまとめて掲載されています。
 
-Command Timelineを先行して試せる**ベータ版**のチャンネルもあります。
-[v1.3.0-beta3](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.3.0-beta3)
+Pane Search（ペイン検索）を先行して試せる**アルファ版**のプレリリースもあります。
+[v1.4.0-alpha](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.4.0-alpha)
 はGitHubのプレリリースとして公開されており、資産の構成は安定版と同じです。
-ベータ版は動作確認を目的とした配布のため、通常の利用には上記の安定版を推奨します。
+プレリリースは動作確認を目的とした配布のため、通常の利用には上記の安定版を推奨します。
 
 インストーラーは署名されていないため、Windowsに「不明な発行元」または
 SmartScreenの警告が表示される場合があります。必ず上記の公式リリースから
@@ -38,7 +38,7 @@ Microsoft、Windows、Windows Terminalのロゴも使用していません。
 - `winTerm-<version>-setup-x64.exe` — 現在のユーザー、または全ユーザーへのインストール用;
 - `winTerm-<version>-portable-x64.zip` — 展開してそのまま実行する用。
 
-現在のソースバージョンは `1.3.3` で、
+現在のソースバージョンは `1.4.0-alpha` で、
 最新の安定版リリースは `1.2.0` です。公開されている資産の一覧とチェックサムの全体は、
 [最新の公式リリース](https://github.com/HelloThisWorld/winTerm/releases/latest)
 を参照してください。
@@ -111,8 +111,8 @@ PowerShell 7と、[ビルド手順（英語）](docs/build.md)に記載された
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.3.3 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.3.3 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.4.0-alpha -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.4.0-alpha -Platform x64
 ```
 
 アンパッケージ形式の生成処理では、統合されたリソースインデックスを作るための
