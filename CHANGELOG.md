@@ -1,27 +1,209 @@
 # Changelog
 
-## 1.3.0 - 2026-08-13
+## 1.4.0-alpha - 2026-08-13
 
-Stable release of the **Command Timeline** and **Visual Progress**
-generation, promoting the field-tested v1.3.0-beta3 build to the stable
-channel. This release moves GitHub Latest from v1.2.0 to v1.3.0; the
-content is identical to v1.3.0-beta3 apart from the stable version
-metadata (package version `1.3.0.7`, no prerelease suffix).
+Alpha prerelease: the integration candidate of the Pane Search release,
+bundling the v1.3.1, v1.3.2, and v1.3.3 engineering checkpoints on top of
+v1.3.0-beta3 for manual validation. Published as a GitHub prerelease with
+the standard asset layout; GitHub Latest and WinGet keep pointing at the
+stable v1.2.0, and this alpha replaces v1.3.0-beta3 as the newest published
+prerelease. A `PASS` verdict from manual testing promotes this build to
+`1.4.0-beta`; a `FAIL` produces a fixed `1.4.1-alpha`.
 
-Highlights since v1.2.0:
+### Added
 
-- The per-pane **Command Timeline** (`Ctrl+Tab` or the left-edge handle):
-  an in-memory list of the commands a pane has run, built exclusively from
-  OSC 133 shell integration, with load-without-executing, literal
-  case-insensitive filtering, copy command/output, jump to output, and
-  trustworthy ✓/✕/Running status that never guesses. No persistent
-  history, no output cache, no telemetry.
-- Automatic PowerShell shell integration: bare `powershell.exe`/`pwsh.exe`
-  profiles import the packaged `winTerm.Shell` module at startup
-  (per-profile `"shellIntegration.autoInject"`, default on).
-- Visual Progress hardening from three alphas and three betas of field
-  testing, including the bounded one-shot launch fallback so long-running
-  commands (TUIs, dev servers, `tail -f`) never animate forever.
+- Pane Search, end to end: `Ctrl+F` opens Find in the active pane only
+  (`Ctrl+Shift+F` retained as a remappable alias), with live search over
+  the pane's entire scrollback, all-match highlighting, `Enter` /
+  `Shift+Enter` navigation with wrap-around, case-sensitive and regex
+  modes, and full input isolation from the shell (Phase 1, v1.3.1); the
+  winTerm compact search box with the `current / total` counter and
+  width-adaptive layouts, plus the scrollbar search overview with one
+  marker per matching row and current-match emphasis, independent of the
+  `ShowMarks` setting (Phase 2, v1.3.2); and performance/edge-case
+  hardening — per-pane typing coalescing, mid-output refresh convergence,
+  scrollbar repaint signatures, resize/reflow and alternate-screen safety,
+  eviction and Unicode coverage (Phase 3, v1.3.3).
+
+### Changed
+
+- Executable metadata major.minor advances to `1.4`; the release channel
+  switches to `alpha` with package version `1.4.0.0` and module prerelease
+  suffix `alpha`. The `v1.4.0-alpha` tag runs the full guarded release
+  pipeline (build, compiled tests, artifact generation, draft asset
+  round-trip testing) before the prerelease is published.
+
+## 1.3.3 - 2026-08-12
+
+Engineering checkpoint for the Pane Search roadmap, Phase 3: performance and
+edge-case hardening. Like the earlier checkpoints, this version marks merged
+development work only: it is not a published release and produces no
+downloadable artifacts; GitHub Latest and WinGet keep pointing at the stable
+v1.2.0, and v1.3.0-beta3 remains the newest published prerelease.
+
+### Changed
+
+- Live-typing searches are now coalesced per pane. Each executed search scans
+  the entire scrollback on the UI thread, and previously every keystroke ran
+  one such scan synchronously. Keystrokes arriving within 50 ms now collapse
+  into a single trailing search; the leading keystroke still searches
+  immediately, so a single keypress is as responsive as before. The coalesced
+  callback reads the search box's state at fire time, so the latest query
+  always wins and a stale queued query can never overwrite newer results.
+  Navigation (Enter, Shift+Enter, the arrow buttons) keeps executing
+  synchronously with the box's current text and therefore can never act on a
+  stale query. Deleting the query clears highlights, overview markers, and
+  status immediately, and a pending coalesced search after Esc finds the box
+  closed and does nothing.
+- An open search now converges while output streams continuously. The
+  existing OutputIdle refresh is debounced (it fires only after 100 ms of
+  quiet), so sustained output such as `tail -f` starved it and froze the
+  match counter, highlights, and overview markers indefinitely. While a
+  search is active, a companion non-debounced throttle now refreshes the
+  search at most once per 500 ms during sustained output; quiet terminals
+  keep using the existing OutputIdle path unchanged. The throttle is armed
+  only from the output handler while a search is active — with search closed
+  the output path pays one relaxed atomic load and schedules nothing.
+- The scrollbar mark bitmap now repaints only when one of its inputs changes
+  (geometry, mark categories, search state, pip color, or — while generic
+  marks render — the buffer). Its content is independent of the thumb
+  position, yet every throttled scroll tick used to re-enumerate the full
+  occurrence list and all mark rows to repaint an identical bitmap; plain
+  scrolling with a large result set now skips that work entirely.
+
+### Fixed
+
+- Resizing a pane with an active search no longer creates a stray selection.
+  The resize invalidation reused the search-close path, which converts the
+  focused match into a selection (GH#19358); after a reflow those stored
+  spans describe the pre-reflow buffer, so the resize could select arbitrary
+  coordinates and skew the recomputed current match. The close path keeps
+  selecting the focused result; the resize path now only invalidates.
+- Switching between the main and alternate screen buffers now drops stored
+  search highlight spans immediately. They were computed against the other
+  buffer, and the renderer could paint them at wrong positions for up to one
+  refresh interval after entering or leaving a full-screen application.
+  Search itself keeps following the active buffer, recomputing against the
+  alternate screen while it is engaged and against the main buffer after it
+  ends.
+- Clearing the search now releases the terminal-side highlight span copy
+  instead of retaining its capacity until the next search; with very high
+  match counts that memory previously stayed allocated after Esc.
+
+### Added
+
+- Deterministic regression coverage for the hardened edges: buffer mutation
+  invalidation and post-output count refresh, focused-match anchoring while
+  matches are appended, scrollback-eviction safety with a tiny history,
+  reflow invalidation with the no-stray-selection guarantee, alternate-screen
+  transitions, search-state generation and mid-output arming semantics,
+  scrollbar repaint-signature contracts, and wide-character span widths
+  (Traditional and Simplified Chinese, Japanese, Korean, accented Latin, and
+  emoji). A search-scan smoke benchmark logs per-query scan cost for common,
+  rare, no-match, regex, and invalid-regex queries without asserting on wall
+  clock, and scales up locally through `WINTERM_SEARCH_BENCH_LINES`.
+
+## 1.3.2 - 2026-08-12
+
+Engineering checkpoint for the Pane Search roadmap, Phase 2: search UX and
+the scrollbar search overview. Like the earlier checkpoints, this version
+marks merged development work only: it is not a published release and
+produces no downloadable artifacts; GitHub Latest and WinGet keep pointing
+at the stable v1.2.0, and v1.3.0-beta3 remains the newest published
+prerelease.
+
+### Changed
+
+- Restyled the pane-local search box to the winTerm compact overlay
+  language: a search glyph leads the input, the `current / total` match
+  counter sits beside it, and the case-sensitivity, regular-expression,
+  previous, next, and close controls follow at winTerm chrome density with
+  theme-aware system brushes, so the box matches dark, light, and
+  high-contrast themes. The counter keeps the existing localized status
+  semantics unchanged — `m/n`, "No results", the bounded `999+`/`?`
+  presentations, and the invalid-regex message — and continues to come from
+  the search core rather than a second count. In narrow panes the box now
+  degrades gracefully through width-driven layout states: secondary toggles
+  collapse first, then the status and the navigation arrows, keeping the
+  input and the close button usable; hidden toggles retain their state, and
+  the search itself stays fully functional at any pane width. All controls
+  keep their existing accessible names, tooltips, and screen-reader
+  announcements.
+
+### Added
+
+- The scrollbar now shows a search overview while search is open: one
+  right-aligned marker per buffer row containing a match, mapped across the
+  full scrollback range, with the row of the current match drawn at double
+  width so it stands out without extra colors or animation. The overview
+  reuses the existing scrollbar mark bitmap and the existing search results
+  — the counter stays occurrence-based while the overview deduplicates
+  same-row matches — and refreshes only through the existing throttled
+  scrollbar update path on typing, navigation, buffer changes, and close.
+- Search overview markers no longer depend on the `showMarksOnScrollbar`
+  setting: they render whenever search is open, while generic shell and
+  command marks keep obeying `ShowMarks` (default off) exactly as before.
+  The two categories share the surface and coexist when both are enabled,
+  closing search removes only the search markers, and a scrollbar the user
+  configured to be hidden stays hidden — search then simply runs without
+  the overview. Split panes keep fully isolated search state, including
+  their overview markers.
+
+## 1.3.1 - 2026-08-11
+
+Engineering checkpoint for the Pane Search roadmap, Phase 1: active-pane
+search. Like the v1.2.1 through v1.2.4 checkpoints, this version marks merged
+development work only. It is not a published release and produces no
+downloadable artifacts; GitHub Latest and WinGet keep pointing at the stable
+v1.2.0, and v1.3.0-beta3 remains the newest published prerelease.
+
+### Added
+
+- Added `Ctrl+F` as the default Find shortcut. It targets the active pane
+  only: the action resolves the focused pane through the tab's existing pane
+  model and opens the search box as an overlay inside that pane's terminal
+  control, so sibling panes, other tabs, and the Command Timeline are never
+  searched and never show foreign search state. `Ctrl+Shift+F` stays bound as
+  a compatibility alias, and both chords remain ordinary remappable
+  keybindings — a profile that needs a literal `^F` for a terminal
+  application can unbind `ctrl+f` and keep reaching Find through
+  `Ctrl+Shift+F` or the Command Palette.
+- The search experience is carried entirely by the existing Microsoft
+  Terminal search pipeline — search box control, buffer searcher, and
+  renderer highlights — now validated for winTerm: typing searches the active
+  pane's full text buffer including scrollback live on every keystroke, all
+  matches are highlighted at once, `Enter` and `Shift+Enter` step forward and
+  backward with wrap-around, an empty query shows no highlights, and `Esc` or
+  the close button clears the search state and returns focus to the terminal.
+  Text typed into the search box is never sent to the shell, and a closed
+  search performs no recurring background work. No second search engine,
+  index, or buffer copy was introduced.
+
+### Documentation
+
+- Added `README.ja.md`, a Japanese counterpart to the English README that
+  mirrors the same download channels, distribution formats, core features,
+  portable-mode behavior, build and test commands, privacy statement, code
+  signing policy, and license and upstream notices. Commands, filenames,
+  executable names, JSON setting names, version strings, the pinned upstream
+  baseline, and release URLs are preserved verbatim, and the unsigned
+  installer, SmartScreen, checksum, current signing status, and Microsoft
+  non-affiliation disclosures are carried over in full. Links to
+  English-only documentation are labelled as such, and the translation states
+  that winTerm-specific new features still display some English text.
+- Added a language selector to the top of both README files: `README.md`
+  links to `README.ja.md` and `README.ja.md` links back to `README.md` and
+  to the Japanese website at <https://winterm.dev/ja/>.
+- Extended `scripts/winterm/verify-version.ps1` so documentation validation
+  covers the Japanese README: the two language links, the website link, the
+  source and stable version references, the checksum filename, the
+  unsigned-installer and current signing-status disclosures, the exact
+  SignPath attribution, the Microsoft non-affiliation disclaimer, and the
+  pinned upstream baseline.
+- Added `README.ja.md` to the conservative documentation allowlist in
+  `scripts/winterm/ci/ChangeClassification.psm1`, so translation-only
+  changes classify as `docs-only` and never request a native build.
+
 
 ## 1.3.0-beta3 - 2026-08-05
 

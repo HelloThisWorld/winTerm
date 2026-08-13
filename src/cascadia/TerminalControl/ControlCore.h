@@ -255,6 +255,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         SearchResults Search(const SearchRequest& request);
         const std::vector<til::point_span>& SearchResultRows() const noexcept;
+        til::CoordType SearchCurrentMatchRow() const noexcept;
+        uint64_t SearchStateGeneration() const noexcept;
+        uint64_t BufferMutationId() const;
         void ClearSearch();
 
         void LeftClickOnTerminal(const til::point terminalPosition,
@@ -321,6 +324,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::typed_event<IInspectable, Control::NoticeEventArgs> RaiseNotice;
         til::typed_event<IInspectable, Control::TransparencyChangedEventArgs> TransparencyChanged;
         til::typed_event<> OutputIdle;
+        til::typed_event<> SearchRefreshNeeded;
         til::typed_event<IInspectable, Control::ShowWindowArgs> ShowWindowChanged;
         til::typed_event<IInspectable, Control::UpdateSelectionMarkersEventArgs> UpdateSelectionMarkers;
         til::typed_event<IInspectable, Control::OpenHyperlinkEventArgs> OpenHyperlink;
@@ -339,6 +343,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         struct SharedState
         {
             std::unique_ptr<til::throttled_func<>> outputIdle;
+            std::unique_ptr<til::throttled_func<>> midOutputSearchRefresh;
             std::unique_ptr<til::throttled_func<bool>> focusChanged;
             std::shared_ptr<ThrottledFunc<Control::ScrollPositionChangedArgs>> updateScrollBar;
         };
@@ -349,6 +354,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool _setFontSizeUnderLock(float fontSize);
         void _updateFont();
         void _refreshSizeUnderLock();
+        void _clearSearchImpl(bool selectFocusedResult);
         void _updateSelectionUI();
         bool _shouldTryUpdateSelection(const WORD vkey);
 
@@ -453,6 +459,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::point _contextMenuBufferPosition{ 0, 0 };
         Windows::Foundation::Collections::IVector<hstring> _cachedQuickFixes{ nullptr };
         ::Search _searcher;
+        // Bumped whenever the search result set, the focused match, or the
+        // cleared state changes. Cheap identity for consumers (the scrollbar
+        // overview) that need to know "did search state change" without
+        // comparing result vectors.
+        uint64_t _searchGeneration{ 0 };
+        // True while a non-empty query is active. Read from the connection
+        // thread to decide whether mid-output search refreshes need to be
+        // scheduled at all; search closed must mean zero recurring work.
+        std::atomic<bool> _searchActive{ false };
         std::optional<interval_tree::IntervalTree<til::point, size_t>::interval> _lastHoveredInterval;
         std::optional<wchar_t> _leadingSurrogate;
         std::optional<til::point> _lastHoveredCell;

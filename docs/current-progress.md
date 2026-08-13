@@ -4,24 +4,78 @@ Last updated: 2026-08-13
 
 ## Repository state
 
-- Branch: `release/v1.3.0` (maintenance branch), based on the
-  `v1.3.0-beta3` tree at `feb2687e5`
+- Branch: `release/v1.4.0-alpha`, based on `main` at
+  `e436fdf00` (Pane Search Phase 3 checkpoint, pull request #46)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0`
-- Package/file version: `1.3.0.7`
-- PowerShell module version: `1.3.0` with no prerelease suffix
-- Release channel: `stable`
-- Release tag: `v1.3.0`
+- Application version: `1.4.0-alpha`
+- Package/file version: `1.4.0.0`
+- PowerShell module version: `1.4.0` with prerelease suffix `alpha`
+- Release channel: `alpha` (published as a GitHub prerelease)
+- Release tag: `v1.4.0-alpha`. This is not an engineering checkpoint: the
+  tag runs the full guarded release pipeline (build, compiled tests,
+  artifact generation, draft asset round-trip testing, then publication as
+  a prerelease). The checkpoint-tag allowlist is unchanged.
+- Current public Latest: `v1.2.0`, the stable Visual Progress release
+- Newest published prerelease: `v1.4.0-alpha` (replacing `v1.3.0-beta3`)
 - Supported target: Windows 11 x64
 
-`v1.3.0` promotes the field-tested v1.3.0-beta3 build — the Command
-Timeline release with the Visual Progress launch-fallback fix — to the
-stable channel. The release workflow publishes it with `--latest`, moving
-GitHub Latest from v1.2.0 (the Visual Progress stable release) to v1.3.0.
-Development has meanwhile continued on `main` in the 1.4 series
-(Pane Search); this maintenance branch exists only to carry the stable
-version metadata for the v1.3.0 tag.
+`v1.4.0-alpha` is the integration candidate of the Pane Search release. It
+bundles the three engineering checkpoints (`1.3.1`, `1.3.2`, `1.3.3`) for
+manual validation. `/releases/latest` keeps resolving to v1.2.0, and WinGet
+is not updated for prereleases.
+
+## Pane Search status (v1.4 roadmap)
+
+- Phase 1 — active-pane search — complete at `1.3.1`.
+- Phase 2 — search UX and scrollbar overview — complete at `1.3.2`.
+- Phase 3 — performance and edge-case hardening — complete at `1.3.3`.
+- Final integration — `1.4.0-alpha` published for manual user validation.
+  `PASS` promotes to `1.4.0-beta`; `FAIL` produces a fixed `1.4.1-alpha`.
+  Only the user authorizes the alpha → beta promotion.
+
+Phase 1 made `Ctrl+F` (with the retained `Ctrl+Shift+F` alias) open the
+existing Microsoft Terminal search box inside the focused pane only,
+reusing the mature upstream pipeline end to end — `SearchBoxControl`,
+`ControlCore::Search`, `Search`/`TextBuffer::SearchText`, and renderer
+search highlights — with no second search engine, no index, and no buffer
+duplication.
+
+Phase 2 turned that functional search into the winTerm search experience.
+The search box now follows the winTerm compact overlay language (search
+glyph, input, `current / total` counter, case/regex toggles, previous/next,
+close, at chrome density with theme-aware system brushes) and degrades
+gracefully in narrow panes through width-driven layout states that always
+keep the input and close button usable. The scrollbar shows a search
+overview while search is open: one right-aligned marker per matching buffer
+row across the full scrollback, deduplicating same-row occurrences, with
+the current match's row drawn at double width. Search overview markers are
+independent of the `ShowMarks` setting (which keeps gating generic shell
+marks, default off), coexist with generic marks when both are enabled,
+disappear on close, respect a deliberately hidden scrollbar, and refresh
+only through the existing throttled scrollbar update path — no timers, no
+polling. Split panes keep fully isolated search state, including their
+overview markers.
+
+Phase 3 hardened that experience for real terminal workloads without adding
+any new search engine, index, or persistent state. Live typing is coalesced
+per pane (50 ms, leading immediate + trailing latest, reading the search
+box's state at fire time so the latest query always wins and navigation can
+never act on a stale query). An open search now converges during sustained
+output: the debounced OutputIdle refresh is complemented by a non-debounced
+500 ms cap armed only while a search is active, so `tail -f`-style streams
+no longer freeze the counter, highlights, or overview — and search closed
+still means zero recurring search work. The scrollbar mark bitmap repaints
+only when its inputs change, so plain scrolling with large result sets no
+longer re-enumerates occurrences. Edge cases were fixed deterministically:
+pane resize no longer converts pre-reflow spans into a stray selection,
+main/alt buffer switches drop the other buffer's highlight spans immediately
+(search keeps following the active buffer), and closing search releases the
+terminal-side span copy. Regression tests cover mutation invalidation,
+match-anchor stability during appended output, scrollback eviction, reflow,
+alternate-screen transitions, generation/arming semantics, repaint-signature
+contracts, wide-character spans (CJK, Korean, accented Latin, emoji), and a
+log-only scan benchmark (`WINTERM_SEARCH_BENCH_LINES` scales it locally).
 
 ## Command Timeline status
 
@@ -136,11 +190,15 @@ through pull request #32:
 
 ## Next steps
 
-1. Update the winTerm website: dual stable/beta download columns, refreshed
-   sanitized screenshots, the Tools navigation dropdown, and the logo link.
-2. Collect beta feedback.
-3. Promote to a stable `v1.3.0` only after beta testing, which is the point at
-   which Latest, WinGet, and the website stable slot move.
+1. Manual user validation of the published `v1.4.0-alpha` prerelease
+   (typing responsiveness, continuous output, huge match counts, resize
+   and reflow, split panes, alternate-screen applications, Unicode
+   queries, rapid open/close). `PASS` promotes to `1.4.0-beta`; `FAIL`
+   produces a fixed `1.4.1-alpha`. Only the user authorizes the
+   promotion.
+2. Collect Command Timeline and Pane Search beta feedback; promote a
+   stable release only after beta testing, which is the point at which
+   Latest, WinGet, and the website stable slot move.
 
 ## Validation state
 

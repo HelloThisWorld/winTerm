@@ -241,6 +241,34 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     }
 
     // Method Description:
+    // - Adapts the layout to the width the hosting pane can offer. Narrow
+    //   panes drop secondary controls so the input and the close button stay
+    //   usable; see SearchUxHelpers.h for the thresholds.
+    // Arguments:
+    // - availableWidth: the hosting pane's width in DIPs
+    void SearchBoxControl::SetAvailableWidth(const double availableWidth)
+    {
+        _ApplyLayoutState(winTerm::Control::SearchUx::SearchBoxLayoutStateForWidth(availableWidth));
+    }
+
+    void SearchBoxControl::_ApplyLayoutState(const winTerm::Control::SearchUx::SearchBoxLayoutState state)
+    {
+        if (state == _layoutState)
+        {
+            return;
+        }
+        _layoutState = state;
+        VisualStateManager::GoToState(*this, winrt::hstring{ winTerm::Control::SearchUx::SearchBoxLayoutStateName(state) }, false);
+
+        // The layout states change the control's desired size, so the clip
+        // rect and the slide-animation start point must follow.
+        if (_initialized)
+        {
+            _UpdateSizeDependents();
+        }
+    }
+
+    // Method Description:
     // - Handler for pressing Enter on TextBox, trigger
     //   text search
     // Arguments:

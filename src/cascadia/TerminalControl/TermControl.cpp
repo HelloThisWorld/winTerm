@@ -7,6 +7,7 @@
 #include <inputpaneinterop.h>
 
 #include "TermControlAutomationPeer.h"
+#include "SearchUxHelpers.h"
 #include "../../renderer/atlas/AtlasEngine.h"
 #include "../../tsf/Handle.h"
 
@@ -32,6 +33,13 @@ constexpr const auto ScrollBarUpdateInterval = std::chrono::milliseconds(8);
 
 // Coalesce bursts of OSC 133 and reflow notifications into one visible-list update.
 constexpr const auto CommandTimelineUpdateInterval = std::chrono::milliseconds(16);
+
+// Rate limit for live-typing searches. Every executed search is a full
+// scrollback scan on the UI thread, so keystrokes arriving faster than this
+// collapse into one trailing search that reads the box's latest state. The
+// leading edge still fires immediately, keeping single keystrokes as
+// responsive as an unthrottled search.
+constexpr const auto SearchTypingCoalesceInterval = std::chrono::milliseconds(50);
 
 // A short debounce marks the end of high-precision wheel/trackpad input and
 // discards any partial-row remainder without running a continuous animation.
@@ -319,6 +327,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _revokers.RaiseNotice = _core.RaiseNotice(winrt::auto_revoke, { get_weak(), &TermControl::_coreRaisedNotice });
         _revokers.HoveredHyperlinkChanged = _core.HoveredHyperlinkChanged(winrt::auto_revoke, { get_weak(), &TermControl::_hoveredHyperlinkChanged });
         _revokers.OutputIdle = _core.OutputIdle(winrt::auto_revoke, { get_weak(), &TermControl::_coreOutputIdle });
+        _revokers.SearchRefreshNeeded = _core.SearchRefreshNeeded(winrt::auto_revoke, { get_weak(), &TermControl::_coreSearchRefreshNeeded });
         _revokers.UpdateSelectionMarkers = _core.UpdateSelectionMarkers(winrt::auto_revoke, { get_weak(), &TermControl::_updateSelectionMarkers });
         _revokers.coreOpenHyperlink = _core.OpenHyperlink(winrt::auto_revoke, { get_weak(), &TermControl::_HyperlinkHandler });
         _revokers.interactivityOpenHyperlink = _interactivity.OpenHyperlink(winrt::auto_revoke, { get_weak(), &TermControl::_HyperlinkHandler });
@@ -403,6 +412,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 if (auto control{ weakThis.get() }; control && !control->_IsClosing() && control->_commandTimelineOpen)
                 {
                     control->_refreshCommandTimeline();
+                }
+            });
+
+        // The callback deliberately captures no query state: it re-reads the
+        // search box at fire time, so the latest typed text always wins and a
+        // fire that lands after the box closed finds IsOpen() false and does
+        // nothing.
+        _deferredSearch = std::make_shared<ThrottledFunc<>>(
+            dispatcher,
+            til::throttled_func_options{
+                .delay = SearchTypingCoalesceInterval,
+                .leading = true,
+                .trailing = true,
+            },
+            [weakThis = get_weak()]() {
+                if (auto control{ weakThis.get() }; control && !control->_IsClosing())
+                {
+                    control->_runLiveSearch();
                 }
             });
         _revokers.CommandTimelineChanged = _core.CommandTimelineChanged(winrt::auto_revoke, { get_weak(), &TermControl::_coreCommandTimelineChanged });
@@ -589,13 +616,52 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         _isInternalScrollBarUpdate = false;
 
-        if (_showMarksInScrollbar)
+        // Generic marks obey the ShowMarks setting; search overview pips are
+        // part of the search UX and render whenever a search is open. The
+        // surface is shared, each category keeps its own rule.
+        const auto showGenericMarks = _showMarksInScrollbar;
+        const auto showSearchMarks = _searchBox && _searchBox->IsOpen();
+
+        if (winTerm::Control::SearchUx::ShouldRenderScrollbarMarkSurface(showGenericMarks, showSearchMarks))
         {
             const auto scaleFactor = DisplayInformation::GetForCurrentView().RawPixelsPerViewPixel();
             const auto scrollBarWidthInDIP = scrollBar.ActualWidth();
             const auto scrollBarHeightInDIP = scrollBar.ActualHeight();
             const auto scrollBarWidthInPx = gsl::narrow_cast<int32_t>(lrint(scrollBarWidthInDIP * scaleFactor));
             const auto scrollBarHeightInPx = gsl::narrow_cast<int32_t>(lrint(scrollBarHeightInDIP * scaleFactor));
+
+            // A scrollbar the user configured away leaves no surface to draw
+            // on; search stays fully functional without the overview.
+            if (scrollBarWidthInPx <= 0 || scrollBarHeightInPx <= 0)
+            {
+                _collapseScrollBarCanvas();
+                return;
+            }
+
+            // The bitmap's content is independent of the thumb position. If
+            // none of its inputs changed since the last paint, this update
+            // only moved the thumb — skip the repaint so plain scrolling
+            // never re-enumerates search results or mark rows.
+            const auto core = winrt::get_self<ControlCore>(_core);
+            const til::color searchPipColor{ core->ForegroundColor() };
+            const auto paintState = winTerm::Control::SearchUx::MakeScrollbarMarkPaintState(
+                update.newMaximum,
+                update.newViewportSize,
+                scrollBarWidthInPx,
+                scrollBarHeightInPx,
+                showGenericMarks,
+                showSearchMarks,
+                core->SearchStateGeneration(),
+                showGenericMarks ? core->BufferMutationId() : 0,
+                searchPipColor);
+            if (_scrollBarCanvasVisible &&
+                !winTerm::Control::SearchUx::ShouldRepaintScrollbarMarks(
+                    _lastScrollBarMarkPaint.has_value(),
+                    _lastScrollBarMarkPaint.value_or(winTerm::Control::SearchUx::ScrollbarMarkPaintState{}),
+                    paintState))
+            {
+                return;
+            }
 
             const auto canvas = FindName(L"ScrollBarCanvas").as<Controls::Image>();
             auto source = canvas.Source().try_as<Media::Imaging::WriteableBitmap>();
@@ -645,53 +711,92 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 const auto y = std::clamp<long>(lrintf(row * offsetScale), 0, maxOffsetY);
                 return drawableDataStart + stride * y;
             };
-            // A helper to draw a single pip (mark) at the given location.
-            const auto drawPip = [&](uint8_t* beg, til::color color) [[msvc::forceinline]] {
+            // A helper to draw a single pip (mark) of the given width at the given location.
+            const auto drawPip = [&](uint8_t* beg, til::color color, int32_t width) [[msvc::forceinline]] {
                 const auto end = beg + pipHeight * stride;
                 for (; beg < end; beg += stride)
                 {
                     // a til::color does NOT have the same RGBA format as the bitmap.
 #pragma warning(suppress : 26490) // Don't use reinterpret_cast (type.1).
                     const DWORD c = 0xff << 24 | color.r << 16 | color.g << 8 | color.b;
-                    std::fill_n(reinterpret_cast<DWORD*>(beg), pipWidth, c);
+                    std::fill_n(reinterpret_cast<DWORD*>(beg), width, c);
                 }
             };
 
             memset(data, 0, buffer.Length());
 
-            if (const auto marks = _core.ScrollMarks())
+            if (showGenericMarks)
             {
-                for (const auto& m : marks)
+                if (const auto marks = _core.ScrollMarks())
                 {
-                    const auto row = m.Row;
-                    const til::color color{ m.Color.Color };
-                    const auto base = dataAt(row);
-                    drawPip(base, color);
-                }
-            }
-
-            if (_searchBox && _searchBox->IsOpen())
-            {
-                const auto core = winrt::get_self<ControlCore>(_core);
-                const auto& searchMatches = core->SearchResultRows();
-                const auto color = core->ForegroundColor();
-                const auto rightAlignedOffset = (scrollBarWidthInPx - pipWidth) * sizeof(til::color);
-                til::CoordType lastRow = til::CoordTypeMin;
-
-                for (const auto& span : searchMatches)
-                {
-                    if (lastRow != span.start.y)
+                    for (const auto& m : marks)
                     {
-                        lastRow = span.start.y;
-                        const auto base = dataAt(lastRow) + rightAlignedOffset;
-                        drawPip(base, color);
+                        const auto row = m.Row;
+                        const til::color color{ m.Color.Color };
+                        const auto base = dataAt(row);
+                        drawPip(base, color, pipWidth);
                     }
                 }
             }
 
+            if (showSearchMarks)
+            {
+                const auto& searchMatches = core->SearchResultRows();
+                const auto currentRow = core->SearchCurrentMatchRow();
+                const auto color = searchPipColor;
+                const auto rightAlignedOffset = (scrollBarWidthInPx - pipWidth) * sizeof(til::color);
+                // The current match widens into the empty center stripe, so it
+                // stands out from ordinary matches without introducing colors.
+                const auto currentRowOffset = (scrollBarWidthInPx - 2 * pipWidth) * sizeof(til::color);
+
+                winTerm::Control::SearchUx::ForEachDistinctSearchRow(searchMatches, [&](const auto row) {
+                    const auto isCurrentRow = row == currentRow;
+                    const auto base = dataAt(row) + (isCurrentRow ? currentRowOffset : rightAlignedOffset);
+                    drawPip(base, color, isCurrentRow ? pipWidth * 2 : pipWidth);
+                });
+            }
+
             source.Invalidate();
             canvas.Visibility(Visibility::Visible);
+            _scrollBarCanvasVisible = true;
+            _lastScrollBarMarkPaint = paintState;
         }
+        else
+        {
+            _collapseScrollBarCanvas();
+        }
+    }
+
+    // Hides the scrollbar mark canvas if a previous update drew on it. Cheap
+    // when nothing was ever drawn, so it can run on every scrollbar update.
+    void TermControl::_collapseScrollBarCanvas()
+    {
+        // Whatever pixels the bitmap holds no longer match a painted state;
+        // the next visible update must repaint unconditionally.
+        _lastScrollBarMarkPaint.reset();
+        if (!_scrollBarCanvasVisible)
+        {
+            return;
+        }
+        _scrollBarCanvasVisible = false;
+        if (const auto canvas = FindName(L"ScrollBarCanvas"))
+        {
+            canvas.as<Controls::Image>().Visibility(Visibility::Collapsed);
+        }
+    }
+
+    // Schedules a scrollbar marks redraw with the scrollbar's current
+    // geometry, through the same throttled path ordinary scroll updates use.
+    void TermControl::_requestScrollBarMarksRefresh()
+    {
+        const auto scrollBar = ScrollBar();
+        ScrollBarUpdate update{
+            .newValue = scrollBar.Value(),
+            .newMaximum = scrollBar.Maximum(),
+            .newMinimum = scrollBar.Minimum(),
+            .newViewportSize = scrollBar.ViewportSize(),
+        };
+        _updateScrollBar->Run(update);
     }
 
     // Method Description:
@@ -705,6 +810,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             {
                 // get at its private implementation
                 _searchBox.copy_from(winrt::get_self<implementation::SearchBoxControl>(searchBox));
+
+                // Give the box its width-adaptive layout before it opens.
+                _searchBox->SetAvailableWidth(RootGrid().ActualWidth());
 
                 // If a text is selected inside terminal, use it to populate the search box.
                 // If the search box already contains a value, it will be overridden.
@@ -808,22 +916,51 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // Return Value:
     // - <none>
     void TermControl::_SearchChanged(const winrt::hstring& text,
-                                     const bool goForward,
-                                     const bool caseSensitive,
-                                     const bool regularExpression)
+                                     const bool /*goForward*/,
+                                     const bool /*caseSensitive*/,
+                                     const bool /*regularExpression*/)
     {
-        if (_searchBox && _searchBox->IsOpen())
+        if (!_searchBox || !_searchBox->IsOpen())
         {
-            _handleSearchResults(_core.Search(SearchRequest{
-                .Text = text,
-                .GoForward = goForward,
-                .CaseSensitive = caseSensitive,
-                .RegularExpression = regularExpression,
-                .ExecuteSearch = false,
-                .ScrollIntoView = true,
-                .ScrollOffset = _searchScrollOffset,
-            }));
+            return;
         }
+
+        // Clearing the query must converge immediately: run the empty search
+        // synchronously so highlights, pips and status vanish with the last
+        // erased character. A still-pending coalesced search is harmless — it
+        // re-reads the (now empty) box state when it fires.
+        if (text.empty())
+        {
+            _runLiveSearch();
+            return;
+        }
+
+        // Every executed search scans the entire scrollback, so rapid typing
+        // is coalesced. Navigation (Enter / the buttons) doesn't go through
+        // this path: _Search always executes synchronously with the box's
+        // current text, so navigation can never act on a stale query.
+        _deferredSearch->Run();
+    }
+
+    // Performs a reset-only search from the search box's current state. Both
+    // the immediate empty-query path and the coalesced typing path land here,
+    // which is what guarantees that the newest state always wins.
+    void TermControl::_runLiveSearch()
+    {
+        if (!_searchBox || !_searchBox->IsOpen())
+        {
+            return;
+        }
+
+        _handleSearchResults(_core.Search(SearchRequest{
+            .Text = _searchBox->Text(),
+            .GoForward = _searchBox->GoForward(),
+            .CaseSensitive = _searchBox->CaseSensitive(),
+            .RegularExpression = _searchBox->RegularExpression(),
+            .ExecuteSearch = false,
+            .ScrollIntoView = true,
+            .ScrollOffset = _searchScrollOffset,
+        }));
     }
 
     // Method Description:
@@ -840,18 +977,9 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _searchBox->Close();
         _core.ClearSearch();
 
-        // Clear search highlights scroll marks (by triggering an update after closing the search box)
-        if (_showMarksInScrollbar)
-        {
-            const auto scrollBar = ScrollBar();
-            ScrollBarUpdate update{
-                .newValue = scrollBar.Value(),
-                .newMaximum = scrollBar.Maximum(),
-                .newMinimum = scrollBar.Minimum(),
-                .newViewportSize = scrollBar.ViewportSize(),
-            };
-            _updateScrollBar->Run(update);
-        }
+        // Redraw the scrollbar marks: this clears the search overview pips
+        // and, when generic marks are disabled, hides the canvas again.
+        _requestScrollBarMarksRefresh();
 
         // Set focus back to terminal control
         this->Focus(FocusState::Programmatic);
@@ -2850,17 +2978,26 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
     }
 
-    void TermControl::_CommandTimelineSizeChanged(const IInspectable& /*sender*/,
-                                                  const SizeChangedEventArgs& args)
+    void TermControl::_RootGridSizeChanged(const IInspectable& /*sender*/,
+                                           const SizeChangedEventArgs& args)
     {
-        if (!_commandTimelineOpen || _IsClosing())
+        if (_IsClosing())
         {
             return;
         }
 
-        const auto width = std::clamp(static_cast<double>(args.NewSize().Width) * 0.42, 180.0, 360.0);
-        CommandTimelineOverlay().Width(std::max(1.0, std::min(width, static_cast<double>(args.NewSize().Width))));
-        _refreshCommandTimeline();
+        // The search box adapts its layout to the width the pane can offer.
+        if (_searchBox)
+        {
+            _searchBox->SetAvailableWidth(args.NewSize().Width);
+        }
+
+        if (_commandTimelineOpen)
+        {
+            const auto width = std::clamp(static_cast<double>(args.NewSize().Width) * 0.42, 180.0, 360.0);
+            CommandTimelineOverlay().Width(std::max(1.0, std::min(width, static_cast<double>(args.NewSize().Width))));
+            _refreshCommandTimeline();
+        }
     }
 
     void TermControl::_CommandTimelineWheelSettled(const IInspectable& /*sender*/,
@@ -4874,19 +5011,12 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             _searchBox->SetStatus(results.TotalMatches, results.CurrentMatch, results.SearchRegexInvalid);
         }
 
-        if (results.SearchInvalidated)
+        // Refresh the scrollbar overview on result-set changes and also on
+        // plain navigation, so the emphasized current-match pip keeps
+        // tracking the search core. The update path is throttled.
+        if (_searchBox->IsOpen())
         {
-            if (_showMarksInScrollbar)
-            {
-                const auto scrollBar = ScrollBar();
-                ScrollBarUpdate update{
-                    .newValue = scrollBar.Value(),
-                    .newMaximum = scrollBar.Maximum(),
-                    .newMinimum = scrollBar.Minimum(),
-                    .newViewportSize = scrollBar.ViewportSize(),
-                };
-                _updateScrollBar->Run(update);
-            }
+            _requestScrollBarMarksRefresh();
         }
 
         if (auto automationPeer{ FrameworkElementAutomationPeer::FromElement(*this) })
@@ -4904,6 +5034,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     }
 
     void TermControl::_coreOutputIdle(const IInspectable& /*sender*/, const IInspectable& /*args*/)
+    {
+        _refreshSearch();
+    }
+
+    // Raised by the core while output streams continuously and a search is
+    // active; OutputIdle alone would never fire in that state. _refreshSearch
+    // re-checks the search box, so a late event after close is a no-op.
+    void TermControl::_coreSearchRefreshNeeded(const IInspectable& /*sender*/, const IInspectable& /*args*/)
     {
         _refreshSearch();
     }

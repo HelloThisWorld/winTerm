@@ -1325,10 +1325,12 @@ void Microsoft::Terminal::Core::Terminal::SetClearQuickFixCallback(std::function
 
 // Method Description:
 // - Stores the search highlighted regions in the terminal
-void Terminal::SetSearchHighlights(const std::vector<til::point_span>& highlights) noexcept
+// - Takes the vector by value so that clearing the highlights releases the
+//   previous allocation instead of retaining its capacity indefinitely.
+void Terminal::SetSearchHighlights(std::vector<til::point_span> highlights) noexcept
 {
     _assertLocked();
-    _searchHighlights = highlights;
+    _searchHighlights = std::move(highlights);
 }
 
 // Method Description:

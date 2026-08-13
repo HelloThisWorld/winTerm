@@ -16,6 +16,7 @@ Author(s):
 #pragma once
 
 #include "SearchBoxControl.g.h"
+#include "SearchUxHelpers.h"
 
 namespace winrt::Microsoft::Terminal::Control::implementation
 {
@@ -40,6 +41,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool GoForward();
         bool CaseSensitive();
         bool RegularExpression();
+        void SetAvailableWidth(double availableWidth);
         void SetFocusOnTextbox();
         void PopulateTextbox(const winrt::hstring& text);
         bool ContainsFocus();
@@ -69,8 +71,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         winrt::Windows::UI::Xaml::FrameworkElement::Loaded_revoker _initialLoadedRevoker;
         bool _initialized = false;
         std::function<void()> _initializedCallback;
+        winTerm::Control::SearchUx::SearchBoxLayoutState _layoutState = winTerm::Control::SearchUx::SearchBoxLayoutState::Normal;
 
         void _Initialize();
+        void _ApplyLayoutState(winTerm::Control::SearchUx::SearchBoxLayoutState state);
         void _UpdateSizeDependents();
         void _ContentClipRect(const winrt::Windows::Foundation::Rect& rect);
         void _OpenAnimationStartPoint(double y);

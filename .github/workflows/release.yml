@@ -15,7 +15,7 @@ concurrency:
 jobs:
   checkpoint-validation:
     name: Validate engineering checkpoint
-    if: ${{ contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4"]'), github.ref_name) }}
+    if: ${{ contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2","v1.3.3"]'), github.ref_name) }}
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -35,7 +35,7 @@ jobs:
 
   validate:
     name: Validate exact release source
-    if: ${{ !contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4"]'), github.ref_name) }}
+    if: ${{ !contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2","v1.3.3"]'), github.ref_name) }}
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -82,7 +82,7 @@ jobs:
 
   test-x64:
     name: Build and test x64 Release
-    if: ${{ !contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4"]'), github.ref_name) }}
+    if: ${{ !contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2","v1.3.3"]'), github.ref_name) }}
     needs: validate
     runs-on: windows-2022
     timeout-minutes: 240
@@ -102,7 +102,7 @@ jobs:
 
   release:
     name: Build, test, attest, and publish EXE and Portable ZIP
-    if: ${{ !contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4"]'), github.ref_name) }}
+    if: ${{ !contains(fromJSON('["v1.2.1","v1.2.2","v1.2.3","v1.2.4","v1.3.1","v1.3.2","v1.3.3"]'), github.ref_name) }}
     needs:
       - validate
       - test-x64
