@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.4.0-alpha - 2026-08-13
+
+Alpha prerelease: the integration candidate of the Pane Search release,
+bundling the v1.3.1, v1.3.2, and v1.3.3 engineering checkpoints on top of
+v1.3.0-beta3 for manual validation. Published as a GitHub prerelease with
+the standard asset layout; GitHub Latest and WinGet keep pointing at the
+stable v1.2.0, and this alpha replaces v1.3.0-beta3 as the newest published
+prerelease. A `PASS` verdict from manual testing promotes this build to
+`1.4.0-beta`; a `FAIL` produces a fixed `1.4.1-alpha`.
+
+### Added
+
+- Pane Search, end to end: `Ctrl+F` opens Find in the active pane only
+  (`Ctrl+Shift+F` retained as a remappable alias), with live search over
+  the pane's entire scrollback, all-match highlighting, `Enter` /
+  `Shift+Enter` navigation with wrap-around, case-sensitive and regex
+  modes, and full input isolation from the shell (Phase 1, v1.3.1); the
+  winTerm compact search box with the `current / total` counter and
+  width-adaptive layouts, plus the scrollbar search overview with one
+  marker per matching row and current-match emphasis, independent of the
+  `ShowMarks` setting (Phase 2, v1.3.2); and performance/edge-case
+  hardening — per-pane typing coalescing, mid-output refresh convergence,
+  scrollbar repaint signatures, resize/reflow and alternate-screen safety,
+  eviction and Unicode coverage (Phase 3, v1.3.3).
+
+### Changed
+
+- Executable metadata major.minor advances to `1.4`; the release channel
+  switches to `alpha` with package version `1.4.0.0` and module prerelease
+  suffix `alpha`. The `v1.4.0-alpha` tag runs the full guarded release
+  pipeline (build, compiled tests, artifact generation, draft asset
+  round-trip testing) before the prerelease is published.
+
 ## 1.3.3 - 2026-08-12
 
 Engineering checkpoint for the Pane Search roadmap, Phase 3: performance and

@@ -1,37 +1,38 @@
 # Current development progress
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
 ## Repository state
 
-- Branch: `feature/v1.3.3-pane-search-phase3`, based on `main` at
-  `97ecb7e85` (Pane Search Phase 2 checkpoint, pull request #45)
+- Branch: `release/v1.4.0-alpha`, based on `main` at
+  `e436fdf00` (Pane Search Phase 3 checkpoint, pull request #46)
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.3`
-- Package/file version: `1.3.3.0`
-- PowerShell module version: `1.3.3` with no prerelease suffix
-- Release channel: `stable` (engineering checkpoint; nothing is published)
-- Checkpoint tag: `v1.3.3`, listed with the earlier checkpoint tags in the
-  release workflow so a pushed checkpoint tag runs quick validation only and
-  can never produce release artifacts
+- Application version: `1.4.0-alpha`
+- Package/file version: `1.4.0.0`
+- PowerShell module version: `1.4.0` with prerelease suffix `alpha`
+- Release channel: `alpha` (published as a GitHub prerelease)
+- Release tag: `v1.4.0-alpha`. This is not an engineering checkpoint: the
+  tag runs the full guarded release pipeline (build, compiled tests,
+  artifact generation, draft asset round-trip testing, then publication as
+  a prerelease). The checkpoint-tag allowlist is unchanged.
 - Current public Latest: `v1.2.0`, the stable Visual Progress release
-- Newest published prerelease: `v1.3.0-beta3` on the beta channel
+- Newest published prerelease: `v1.4.0-alpha` (replacing `v1.3.0-beta3`)
 - Supported target: Windows 11 x64
 
-`v1.3.3` is an engineering checkpoint, the third of the Pane Search roadmap
-toward v1.4. Like the v1.2.1 through v1.2.4 Command Timeline checkpoints, it
-is a source/development version only: no GitHub Release, website slot, or
-WinGet update is produced, and `/releases/latest` keeps resolving to v1.2.0.
+`v1.4.0-alpha` is the integration candidate of the Pane Search release. It
+bundles the three engineering checkpoints (`1.3.1`, `1.3.2`, `1.3.3`) for
+manual validation. `/releases/latest` keeps resolving to v1.2.0, and WinGet
+is not updated for prereleases.
 
 ## Pane Search status (v1.4 roadmap)
 
 - Phase 1 — active-pane search — complete at `1.3.1`.
 - Phase 2 — search UX and scrollbar overview — complete at `1.3.2`.
 - Phase 3 — performance and edge-case hardening — complete at `1.3.3`.
-- Final integration — `1.4.0-alpha`, promoted to beta only after manual
-  user validation. Starting `1.4.0-alpha` requires a separate instruction;
-  it is not begun automatically.
+- Final integration — `1.4.0-alpha` published for manual user validation.
+  `PASS` promotes to `1.4.0-beta`; `FAIL` produces a fixed `1.4.1-alpha`.
+  Only the user authorizes the alpha → beta promotion.
 
 Phase 1 made `Ctrl+F` (with the retained `Ctrl+Shift+F` alias) open the
 existing Microsoft Terminal search box inside the focused pane only,
@@ -189,12 +190,15 @@ through pull request #32:
 
 ## Next steps
 
-1. Final integration checkpoint `1.4.0-alpha`, then manual user validation
-   before any beta promotion. This stage requires a separate instruction
-   from the user; do not begin it automatically.
-2. Collect Command Timeline beta feedback; promote a stable `v1.3.0` only
-   after beta testing, which is the point at which Latest, WinGet, and the
-   website stable slot move.
+1. Manual user validation of the published `v1.4.0-alpha` prerelease
+   (typing responsiveness, continuous output, huge match counts, resize
+   and reflow, split panes, alternate-screen applications, Unicode
+   queries, rapid open/close). `PASS` promotes to `1.4.0-beta`; `FAIL`
+   produces a fixed `1.4.1-alpha`. Only the user authorizes the
+   promotion.
+2. Collect Command Timeline and Pane Search beta feedback; promote a
+   stable release only after beta testing, which is the point at which
+   Latest, WinGet, and the website stable slot move.
 
 ## Validation state
 
