@@ -1,33 +1,27 @@
 # Current development progress
 
-Last updated: 2026-08-05
+Last updated: 2026-08-13
 
 ## Repository state
 
-- Branch: `release/v1.3.0-beta3`
-- Base: `fix/visual-progress-shell-fallback-one-shot` at `baf6f8a87`
-  (one-shot launch fallback fix, pull request #41), based on `main` at
-  `39193206c` (1.3.0-beta2 release metadata, pull request #40)
+- Branch: `release/v1.3.0` (maintenance branch), based on the
+  `v1.3.0-beta3` tree at `feb2687e5`
 - Microsoft Terminal upstream revision:
   `1cea42d433253d95c4487a3037db48197b5e72f4`
-- Application version: `1.3.0-beta3`
-- Package/file version: `1.3.0.6`
-- PowerShell module version: `1.3.0` with prerelease suffix `beta3`
-- Release channel: `beta`
-- Release tag: `v1.3.0-beta3`
-- Current public Latest: `v1.2.0`, the stable Visual Progress release
+- Application version: `1.3.0`
+- Package/file version: `1.3.0.7`
+- PowerShell module version: `1.3.0` with no prerelease suffix
+- Release channel: `stable`
+- Release tag: `v1.3.0`
 - Supported target: Windows 11 x64
 
-`v1.3.0-beta3` is the third beta of the Command Timeline release. It fixes
-the beta2 field report that any long-running command — k9s, vim, top,
-FastAPI/uvicorn, Spring Boot, Node dev servers, `tail -f`,
-`kubectl port-forward` — kept the Visual Progress rainbow animation looping
-for its whole lifetime. The OSC 133 Shell Integration fallback is now a
-bounded one-shot launch indication scoped by a shell command generation. The
-release workflow marks any non-stable channel with `--prerelease` and
-`--latest=false`, so `/releases/latest` keeps resolving to v1.2.0. Like the
-earlier betas, it is listed on the winTerm website next to the stable v1.2.0
-download and is skipped by the WinGet workflow.
+`v1.3.0` promotes the field-tested v1.3.0-beta3 build — the Command
+Timeline release with the Visual Progress launch-fallback fix — to the
+stable channel. The release workflow publishes it with `--latest`, moving
+GitHub Latest from v1.2.0 (the Visual Progress stable release) to v1.3.0.
+Development has meanwhile continued on `main` in the 1.4 series
+(Pane Search); this maintenance branch exists only to carry the stable
+version metadata for the v1.3.0 tag.
 
 ## Command Timeline status
 

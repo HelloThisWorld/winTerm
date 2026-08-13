@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.0 - 2026-08-13
+
+Stable release of the **Command Timeline** and **Visual Progress**
+generation, promoting the field-tested v1.3.0-beta3 build to the stable
+channel. This release moves GitHub Latest from v1.2.0 to v1.3.0; the
+content is identical to v1.3.0-beta3 apart from the stable version
+metadata (package version `1.3.0.7`, no prerelease suffix).
+
+Highlights since v1.2.0:
+
+- The per-pane **Command Timeline** (`Ctrl+Tab` or the left-edge handle):
+  an in-memory list of the commands a pane has run, built exclusively from
+  OSC 133 shell integration, with load-without-executing, literal
+  case-insensitive filtering, copy command/output, jump to output, and
+  trustworthy ✓/✕/Running status that never guesses. No persistent
+  history, no output cache, no telemetry.
+- Automatic PowerShell shell integration: bare `powershell.exe`/`pwsh.exe`
+  profiles import the packaged `winTerm.Shell` module at startup
+  (per-profile `"shellIntegration.autoInject"`, default on).
+- Visual Progress hardening from three alphas and three betas of field
+  testing, including the bounded one-shot launch fallback so long-running
+  commands (TUIs, dev servers, `tail -f`) never animate forever.
+
 ## 1.3.0-beta3 - 2026-08-05
 
 Third beta of the Command Timeline release, fixing the beta2 field report
