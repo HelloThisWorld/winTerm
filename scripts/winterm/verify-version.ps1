@@ -49,10 +49,10 @@ try
     $versionPath = Join-Path $repositoryRoot 'src\winterm\Branding\version.json'
     $version = Get-Content -LiteralPath $versionPath -Raw | ConvertFrom-Json
 
-    Assert-Condition ($version.applicationVersion -eq '1.4.0-alpha') 'Application version is 1.4.0-alpha'
-    Assert-Condition ($version.packageVersion -eq '1.4.0.0') 'Package version is 1.4.0.0'
+    Assert-Condition ($version.applicationVersion -eq '1.4.0-beta') 'Application version is 1.4.0-beta'
+    Assert-Condition ($version.packageVersion -eq '1.4.0.1') 'Package version is 1.4.0.1'
     Assert-Condition ($version.moduleVersion -eq '1.4.0') 'PowerShell module version is 1.4.0'
-    Assert-Condition ($version.modulePrerelease -eq 'alpha') 'PowerShell module prerelease suffix is alpha'
+    Assert-Condition ($version.modulePrerelease -eq 'beta') 'PowerShell module prerelease suffix is beta'
 
     # The release workflow treats any channel other than 'stable' as a
     # prerelease: it marks the GitHub Release --prerelease and --latest=false.
@@ -66,7 +66,7 @@ try
     Assert-Condition ($version.packageVersion -match '^\d+\.\d+\.\d+\.\d+$') 'Package version stays a four-part numeric version'
     Assert-Condition ($version.moduleVersion -match '^\d+\.\d+\.\d+$') 'PowerShell module version stays numeric'
 
-    Assert-Condition ($version.tag -eq 'v1.4.0-alpha') 'Prerelease tag is v1.4.0-alpha'
+    Assert-Condition ($version.tag -eq 'v1.4.0-beta') 'Prerelease tag is v1.4.0-beta'
     Assert-Condition ($version.workspaceSchemaVersion -eq 2) 'Workspace Schema version remains 2'
     Assert-Condition ($version.dockingModelVersion -eq 1) 'Docking Model version remains 1'
     Assert-Condition ($version.shellProtocolVersion -eq 1) 'Shell Protocol version remains 1'
@@ -98,8 +98,8 @@ try
     Assert-Condition ($shellVersion.protocolVersion -eq $version.shellProtocolVersion) 'Shell asset protocol version matches release metadata'
 
     $releaseHeader = Get-Text 'src\winterm\Branding\ReleaseMetadata.h'
-    Assert-Condition ($releaseHeader.Contains('ApplicationVersion{ L"1.4.0-alpha" }')) 'About metadata application version is 1.4.0-alpha'
-    Assert-Condition ($releaseHeader.Contains('ReleaseChannel{ L"Alpha" }')) 'About metadata channel is Alpha'
+    Assert-Condition ($releaseHeader.Contains('ApplicationVersion{ L"1.4.0-beta" }')) 'About metadata application version is 1.4.0-beta'
+    Assert-Condition ($releaseHeader.Contains('ReleaseChannel{ L"Beta" }')) 'About metadata channel is Beta'
     Assert-Condition ($releaseHeader.Contains($version.microsoftTerminalUpstreamRevision)) 'About metadata contains the Microsoft Terminal upstream revision'
     Assert-Condition ($releaseHeader.Contains('WorkspaceSchemaVersion{ 2 }')) 'About metadata contains Workspace Schema version 2'
     Assert-Condition ($releaseHeader.Contains('DockingModelVersion{ 1 }')) 'About metadata contains Docking Model version 1'
@@ -129,10 +129,10 @@ try
 
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('WorkspaceSchemaVersion{ 2 }')) 'Workspace model remains at Schema version 2'
     Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('DockingModelVersion{ 1 }')) 'Workspace model remains at Docking version 1'
-    Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('applicationVersion{ "1.4.0-alpha" }')) 'Workspace model application-version fallback is 1.4.0-alpha'
+    Assert-Condition ((Get-Text 'src\winterm\Workspaces\Model\WorkspaceDescriptor.h').Contains('applicationVersion{ "1.4.0-beta" }')) 'Workspace model application-version fallback is 1.4.0-beta'
     Assert-Condition ((Get-Text 'src\winterm\Shell\Protocol\ShellIntegrationProtocol.h').Contains('ShellProtocolVersion{ 1 }')) 'Shell protocol remains at version 1'
     Assert-Condition ((Get-Text 'src\winterm\Appearance\Themes\ThemeDescriptor.h').Contains('CurrentThemeSchemaVersion{ 1 }')) 'Theme Schema remains at version 1'
-    Assert-Condition ((Get-Text 'src\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp').Contains('"1.4.0-alpha"')) 'Workspace serializer application-version fallback is 1.4.0-alpha'
+    Assert-Condition ((Get-Text 'src\winterm\Workspaces\Persistence\WorkspaceSerializer.cpp').Contains('"1.4.0-beta"')) 'Workspace serializer application-version fallback is 1.4.0-beta'
 
     $releaseWorkflow = Get-Text '.github\workflows\release.yml'
     Assert-Condition ($releaseWorkflow.Contains("- 'v*'")) 'Release workflow accepts version tags through a generic guarded trigger'
@@ -141,9 +141,9 @@ try
     Assert-Condition ($releaseWorkflow.Contains("`$expectedTag = `"v`$(`$metadata.applicationVersion)`"")) 'Release workflow derives the expected tag from version.json'
     Assert-Condition ($releaseWorkflow.Contains("`$metadata.tag -cne `$expectedTag")) 'Release workflow rejects a version metadata tag mismatch'
 
-    Assert-Condition ((Get-Text 'CHANGELOG.md').Contains('## 1.2.0 - 2026-08-01')) 'Changelog retains public Latest 1.2.0'
+    Assert-Condition ((Get-Text 'CHANGELOG.md').Contains('## 1.3.0 - 2026-08-13')) 'Changelog contains the 1.3.0 stable entry'
     Assert-Condition ((Get-Text 'README.md').Contains("current source version is ``$($version.applicationVersion)``")) 'README source version matches release metadata'
-    Assert-Condition ((Get-Text 'README.md').Contains('latest stable release is `1.2.0`')) 'README retains public Latest 1.2.0'
+    Assert-Condition ((Get-Text 'README.md').Contains('latest stable release is `1.3.0`')) 'README stable pointer is 1.3.0'
 
     # The Japanese README is a maintained counterpart, not a marketing summary:
     # both files must link to each other, the translation must point at the
@@ -162,7 +162,7 @@ try
     Assert-Condition ($readmeJa.Contains('[English](README.md)')) 'Japanese README links back to the English README'
     Assert-Condition ($readmeJa.Contains('https://winterm.dev/ja/')) 'Japanese README links to the Japanese website'
     Assert-Condition ($readmeJa.Contains("``$($version.applicationVersion)``")) 'Japanese README source version matches release metadata'
-    Assert-Condition ($readmeJa.Contains('`1.2.0`')) 'Japanese README retains public Latest 1.2.0'
+    Assert-Condition ($readmeJa.Contains('`1.3.0`')) 'Japanese README stable pointer is 1.3.0'
     Assert-Condition ($readmeJa.Contains('winTerm-<version>-setup-x64.exe')) 'Japanese README retains the installer asset pattern'
     Assert-Condition ($readmeJa.Contains('winTerm-<version>-portable-x64.zip')) 'Japanese README retains the portable asset pattern'
     Assert-Condition ($readmeJa.Contains('SHA256SUMS.txt')) 'Japanese README retains the checksum filename'
@@ -187,7 +187,7 @@ try
     if ($RequireTag)
     {
         $tag = (& git describe --tags --exact-match 2>$null).Trim()
-        Assert-Condition ($LASTEXITCODE -eq 0 -and $tag -eq $version.tag) 'Checked-out commit is exactly tagged v1.4.0-alpha'
+        Assert-Condition ($LASTEXITCODE -eq 0 -and $tag -eq $version.tag) 'Checked-out commit is exactly tagged v1.4.0-beta'
     }
 
     Write-Host 'winTerm version consistency verification passed.' -ForegroundColor Green

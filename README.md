@@ -13,8 +13,8 @@ English | [日本語](README.ja.md)
 The latest stable Release page provides the Setup EXE, Portable ZIP, release
 notes, and checksums together.
 
-An **alpha** prerelease is also available for early access to Pane Search:
-[v1.4.0-alpha](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.4.0-alpha)
+A **beta** prerelease is also available for early access to Pane Search:
+[v1.4.0-beta](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.4.0-beta)
 is published as a GitHub prerelease with the same asset layout. Prereleases
 are for testing; the stable release above stays the recommended download.
 
@@ -36,8 +36,8 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `1.4.0-alpha`;
-the latest stable release is `1.2.0`. See the
+The current source version is `1.4.0-beta`;
+the latest stable release is `1.3.0`. See the
 [latest official Release](https://github.com/HelloThisWorld/winTerm/releases/latest)
 for the complete published asset list and checksums.
 
@@ -47,7 +47,7 @@ Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
 See [installation guidance](docs/user/installation.md) and the
-[1.2.0 release notes](docs/releases/1.2.0.md).
+[1.3.0 release notes](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.3.0), and the earlier [1.2.0 notes](docs/releases/1.2.0.md).
 
 ## Core features
 
@@ -105,8 +105,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.4.0-alpha -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.4.0-alpha -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.4.0-beta -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.4.0-beta -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build
