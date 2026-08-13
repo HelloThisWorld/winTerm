@@ -1,6 +1,6 @@
 {
-  "applicationVersion": "1.4.0-alpha",
+  "applicationVersion": "1.4.0-beta",
   "moduleVersion": "1.4.0",
-  "modulePrerelease": "alpha",
+  "modulePrerelease": "beta",
   "protocolVersion": 1
 }

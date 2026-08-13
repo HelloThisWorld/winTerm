@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.4.0-beta - 2026-08-13
+
+Beta prerelease of the Pane Search release. Manual validation of
+v1.4.0-alpha passed — live search under sustained log output (Kafka /
+Spring Boot workloads), match navigation, the counter, and the scrollbar
+overview all behaved — so the alpha is promoted to beta with beta version
+metadata (package version `1.4.0.1`, prerelease suffix `beta`) and no code
+changes. Published as a GitHub prerelease; the new stable v1.3.0 holds
+GitHub Latest, and this beta replaces v1.4.0-alpha as the newest published
+prerelease. Beta feedback decides the stable 1.4.0 promotion.
+
+## 1.3.0 - 2026-08-13
+
+Stable release of the **Command Timeline** and **Visual Progress**
+generation, promoting the field-tested v1.3.0-beta3 build to the stable
+channel from the `release/v1.3.0` maintenance branch. GitHub Latest moves
+from v1.2.0 to v1.3.0; content is identical to v1.3.0-beta3 apart from the
+stable version metadata (package version `1.3.0.7`, no prerelease suffix).
+Highlights since v1.2.0: the per-pane Command Timeline (`Ctrl+Tab` or the
+left-edge handle) built exclusively from OSC 133 shell integration with
+load-without-executing, filtering, copy command/output, jump to output,
+and trustworthy ✓/✕/Running status; automatic PowerShell shell
+integration for bare `powershell.exe`/`pwsh.exe` profiles; and the Visual
+Progress hardening from six prerelease field-testing rounds, including
+the bounded one-shot launch fallback for long-running commands.
+
 ## 1.4.0-alpha - 2026-08-13
 
 Alpha prerelease: the integration candidate of the Pane Search release,
