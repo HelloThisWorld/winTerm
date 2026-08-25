@@ -1366,12 +1366,12 @@
     <comment>A description for what the "Automatically mark prompts on pressing Enter" setting does. Presented near "Profile_AutoMarkPrompts".</comment>
   </data>
   <data name="Profile_RepositionCursorWithMouse.Header" xml:space="preserve">
-    <value>Experimental: Reposition the cursor with mouse clicks</value>
+    <value>Click to position cursor</value>
     <comment>This allows the user to move the text cursor just by clicking with the mouse.</comment>
   </data>
   <data name="Profile_RepositionCursorWithMouse.HelpText" xml:space="preserve">
-    <value>When enabled, clicking inside the prompt will move the cursor to that position. This requires shell integration to be enabled in your shell to work as expected.</value>
-    <comment>A description for what the "Reload environment variables" setting does. Presented near "Profile_RepositionCursorWithMouse".</comment>
+    <value>Click inside the current command line to move the text cursor to that position. Shell integration is required to identify the editable command safely.</value>
+    <comment>A description for what the "Click to position cursor" setting does. Presented near "Profile_RepositionCursorWithMouse".</comment>
   </data>
   <data name="Profile_BellStyleAudible.Content" xml:space="preserve">
     <value>Audible</value>

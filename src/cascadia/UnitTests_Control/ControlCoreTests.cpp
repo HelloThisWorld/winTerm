@@ -69,6 +69,8 @@ namespace ControlUnitTests
         TEST_METHOD(TestSelectOutputExactWrap);
 
         TEST_METHOD(TestSimpleClickSelection);
+        TEST_METHOD(TestCursorRepositionSafetyAndMovement);
+        TEST_METHOD(TestCursorRepositionWrappedWideAndPaneIsolation);
 
         TEST_CLASS_SETUP(ModuleSetup)
         {
@@ -1596,5 +1598,161 @@ namespace ControlUnitTests
             VERIFY_ARE_EQUAL(expectedEnd, end);
         }
         VERIFY_IS_TRUE(gotSelectionUpdate);
+    }
+
+    void ControlCoreTests::TestCursorRepositionSafetyAndMovement()
+    {
+        const auto arrows = [](const wchar_t direction, const size_t count) {
+            std::wstring value;
+            for (size_t i = 0; i < count; ++i)
+            {
+                value.append(L"\x1b[");
+                value.push_back(direction);
+            }
+            return value;
+        };
+
+        const auto createPrompt = [&](const bool enabled, const std::wstring_view command) {
+            auto [settings, conn] = _createSettingsAndConnection();
+            settings->RepositionCursorWithMouse(enabled);
+            auto core = createCore(*settings, *conn);
+            _standardInit(core);
+
+            std::wstring prompt{ L"\x1b]133;A\aPS> \x1b]133;B\a" };
+            prompt.append(command);
+            conn->WriteInput(winrt_wstring_to_array_view(prompt));
+            return std::make_tuple(settings, conn, core);
+        };
+
+        {
+            auto [settings, conn, core] = createPrompt(false, L"abcdef");
+            std::wstring sent;
+            conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sent.append(winrt_array_to_wstring_view(value));
+            });
+
+            core->RepositionCursorWithMouse({ 7, 0 });
+            VERIFY_IS_TRUE(sent.empty(), L"An explicit false setting must disable cursor repositioning");
+        }
+
+        {
+            auto [settings, conn, core] = createPrompt(true, L"abcdef");
+            std::wstring sent;
+            conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sent.append(winrt_array_to_wstring_view(value));
+            });
+
+            // microsoft/terminal#20442: padding and malformed coordinates
+            // must not reach TextBuffer iterators out of bounds.
+            core->RepositionCursorWithMouse({ -1, 0 });
+            core->RepositionCursorWithMouse({ 5, -1 });
+            core->RepositionCursorWithMouse({ 5, 20 });
+            core->RepositionCursorWithMouse({ til::CoordTypeMax, til::CoordTypeMax });
+            VERIFY_IS_TRUE(sent.empty());
+
+            core->RepositionCursorWithMouse({ 7, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'D', 3), sent, L"A click before the cursor sends LEFT events");
+
+            sent.clear();
+            core->RepositionCursorWithMouse({ 10, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'C', 3), sent, L"A click after the cursor sends RIGHT events");
+
+            sent.clear();
+            core->RepositionCursorWithMouse({ 4, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'D', 6), sent, L"The command start is a valid destination");
+
+            sent.clear();
+            core->RepositionCursorWithMouse({ 200, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'C', 6), sent, L"Right padding clamps to the editable command end");
+        }
+
+        {
+            auto [settings, conn, core] = createPrompt(true, L"");
+            std::wstring sent;
+            conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sent.append(winrt_array_to_wstring_view(value));
+            });
+            core->RepositionCursorWithMouse({ 4, 0 });
+            VERIFY_IS_TRUE(sent.empty(), L"An empty command is a safe no-op");
+        }
+
+        {
+            auto [settings, conn] = _createSettingsAndConnection();
+            settings->RepositionCursorWithMouse(true);
+            auto core = createCore(*settings, *conn);
+            _standardInit(core);
+            conn->WriteInput(winrt_wstring_to_array_view(
+                L"\x1b]133;A\aPS> \x1b]133;B\aold\x1b]133;C\a\r\noutput\r\n"
+                L"\x1b]133;D;0\a\x1b]133;A\aPS> \x1b]133;B\anew"));
+
+            std::wstring sent;
+            conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sent.append(winrt_array_to_wstring_view(value));
+            });
+            core->RepositionCursorWithMouse({ 5, 0 });
+            VERIFY_IS_TRUE(sent.empty(), L"Historical command output is never an editable destination");
+        }
+    }
+
+    void ControlCoreTests::TestCursorRepositionWrappedWideAndPaneIsolation()
+    {
+        const auto arrows = [](const wchar_t direction, const size_t count) {
+            std::wstring value;
+            for (size_t i = 0; i < count; ++i)
+            {
+                value.append(L"\x1b[");
+                value.push_back(direction);
+            }
+            return value;
+        };
+
+        const auto createPrompt = [&](const std::wstring_view command) {
+            auto [settings, conn] = _createSettingsAndConnection();
+            settings->RepositionCursorWithMouse(true);
+            auto core = createCore(*settings, *conn);
+            _standardInit(core);
+            std::wstring prompt{ L"\x1b]133;A\aPS> \x1b]133;B\a" };
+            prompt.append(command);
+            conn->WriteInput(winrt_wstring_to_array_view(prompt));
+            return std::make_tuple(settings, conn, core);
+        };
+
+        {
+            auto [settings, conn, core] = createPrompt(L"\u4f60a");
+            std::wstring sent;
+            conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sent.append(winrt_array_to_wstring_view(value));
+            });
+            core->RepositionCursorWithMouse({ 4, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'D', 2), sent, L"A double-cell CJK glyph produces one LEFT event");
+        }
+
+        {
+            const std::wstring wrappedCommand(40, L'a');
+            auto [settings, conn, core] = createPrompt(wrappedCommand);
+            std::wstring sent;
+            conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sent.append(winrt_array_to_wstring_view(value));
+            });
+            core->RepositionCursorWithMouse({ 4, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'D', wrappedCommand.size()), sent, L"Wrapped commands remain navigable");
+        }
+
+        {
+            auto [settingsA, connA, coreA] = createPrompt(L"pane-a");
+            auto [settingsB, connB, coreB] = createPrompt(L"pane-b");
+            std::wstring sentA;
+            std::wstring sentB;
+            connA->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sentA.append(winrt_array_to_wstring_view(value));
+            });
+            connB->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+                sentB.append(winrt_array_to_wstring_view(value));
+            });
+
+            coreA->RepositionCursorWithMouse({ 4, 0 });
+            VERIFY_ARE_EQUAL(arrows(L'D', 6), sentA);
+            VERIFY_IS_TRUE(sentB.empty(), L"A click can only write to its owning pane connection");
+        }
     }
 }

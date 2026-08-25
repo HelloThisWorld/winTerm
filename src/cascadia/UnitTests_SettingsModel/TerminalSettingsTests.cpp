@@ -54,7 +54,37 @@ namespace SettingsModelUnitTests
         TEST_METHOD(TestLayerProfileOnColorScheme);
         TEST_METHOD(TestCommandlineToTitlePromotion);
         TEST_METHOD(TestInitialPositionParsing);
+        TEST_METHOD(TestCursorRepositionDefaultAndOverride);
     };
+
+    void TerminalSettingsTests::TestCursorRepositionDefaultAndOverride()
+    {
+        static constexpr std::string_view defaultJson{ R"({
+            "profiles": [
+                { "name": "default", "guid": "{6239a42c-1111-49a3-80bd-e8fdd045185c}" }
+            ]
+        })" };
+        static constexpr std::string_view disabledJson{ R"({
+            "profiles": [
+                {
+                    "name": "disabled",
+                    "guid": "{6239a42c-1111-49a3-80bd-e8fdd045185c}",
+                    "experimental.repositionCursorWithMouse": false
+                }
+            ]
+        })" };
+
+        const auto defaults = winrt::make_self<implementation::CascadiaSettings>(defaultJson);
+#if defined(WT_BRANDING_WINTERM)
+        VERIFY_IS_TRUE(defaults->AllProfiles().GetAt(0).RepositionCursorWithMouse());
+#else
+        VERIFY_IS_FALSE(defaults->AllProfiles().GetAt(0).RepositionCursorWithMouse());
+#endif
+
+        const auto disabled = winrt::make_self<implementation::CascadiaSettings>(disabledJson);
+        VERIFY_IS_FALSE(disabled->AllProfiles().GetAt(0).RepositionCursorWithMouse(),
+                        L"An explicit user false must override the winTerm default");
+    }
 
     // CascadiaSettings::_normalizeCommandLine abuses some aspects from CommandLineToArgvW
     // to simplify the implementation. It assumes that all arguments returned by

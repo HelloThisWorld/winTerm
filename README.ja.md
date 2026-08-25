@@ -13,12 +13,8 @@
 [**最新の安定版リリースページを開いて、x64版のwinTermをダウンロードする**](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
 最新の安定版リリースページには、インストーラー（Setup EXE）、ポータブルZIP、
-リリースノート、チェックサムがまとめて掲載されています。
-
-Pane Search（ペイン検索）を先行して試せる**ベータ版**のプレリリースもあります。
-[v1.4.0-beta](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.4.0-beta)
-はGitHubのプレリリースとして公開されており、資産の構成は安定版と同じです。
-プレリリースは動作確認を目的とした配布のため、通常の利用には上記の安定版を推奨します。
+リリースノート、チェックサムがまとめて掲載されています。現在の安定版は
+**winTerm 1.4.1** です。
 
 インストーラーは署名されていないため、Windowsに「不明な発行元」または
 SmartScreenの警告が表示される場合があります。必ず上記の公式リリースから
@@ -38,8 +34,8 @@ Microsoft、Windows、Windows Terminalのロゴも使用していません。
 - `winTerm-<version>-setup-x64.exe` — 現在のユーザー、または全ユーザーへのインストール用;
 - `winTerm-<version>-portable-x64.zip` — 展開してそのまま実行する用。
 
-現在のソースバージョンは `1.4.0-beta` で、
-最新の安定版リリースは `1.3.0` です。公開されている資産の一覧とチェックサムの全体は、
+現在のソースバージョンは `1.4.1` で、
+最新の安定版リリースも `1.4.1` です。公開されている資産の一覧とチェックサムの全体は、
 [最新の公式リリース](https://github.com/HelloThisWorld/winTerm/releases/latest)
 を参照してください。
 
@@ -49,11 +45,20 @@ Windowsに「不明な発行元」またはSmartScreenの警告が表示され�
 リリースEXEのインストールに、証明書のインポート、開発者モード、Visual Studio、
 Windows SDK、`Add-AppxPackage` は一切必要ありません。
 
-[インストール手順（英語）](docs/user/installation.md)と
-[1.2.0のリリースノート（英語）](docs/releases/1.2.0.md)もあわせて参照してください。
+[インストール手順（英語）](docs/user/installation.md)、
+[1.4.1のリリースノート（英語）](docs/releases/1.4.1.md)、
+[1.3.0のリリースノート（英語）](docs/releases/1.3.0.md)もあわせて参照してください。
 
 ## 主な機能
 
+- ペインごとの**Pane Search（ペイン検索）**（`Ctrl+F`）: スクロールバック全体を
+  検索し、入力中のライブ更新、全一致箇所の強調、`Enter`／`Shift+Enter` での移動、
+  大文字と小文字の区別、正規表現、件数表示、スクロールバー上の概要表示に対応します。
+  出力が流れ続けている間も検索結果が更新されます;
+- **クリックした位置へカーソルを移動**: シェル統合で安全に確認できる現在の編集中
+  コマンド内をクリックすると、シェルのテキストカーソルがその位置へ移動します。
+  既定で有効で、Profile > Advancedから無効にできます。ドラッグ、Shift、単語／行選択、
+  ハイパーリンク、VTマウス対応アプリの操作が優先され、明示的な `false` 設定も維持されます;
 - ペインごとの**Command Timeline**（`Ctrl+Tab`、またはターミナル左端の細い
   ハンドル）: そのペインで実行したコマンドをメモリ上に保持する一覧です。
   OSC 133のシェル統合の情報だけから構築され、実行せずに入力欄へ読み込む操作、
@@ -111,8 +116,8 @@ PowerShell 7と、[ビルド手順（英語）](docs/build.md)に記載された
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.4.0-beta -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.4.0-beta -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.4.1 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.4.1 -Platform x64
 ```
 
 アンパッケージ形式の生成処理では、統合されたリソースインデックスを作るための

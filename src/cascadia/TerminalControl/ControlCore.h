@@ -266,6 +266,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                  const bool shiftEnabled,
                                  const bool isOnOriginalPosition,
                                  bool& selectionNeedsToBeCopied);
+        void RepositionCursorWithMouse(const til::point terminalPosition);
 
         void AttachUiaEngine(::Microsoft::Console::Render::UiaEngine* const pEngine);
         void DetachUiaEngine(::Microsoft::Console::Render::UiaEngine* const pEngine);

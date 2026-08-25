@@ -11,12 +11,7 @@ English | [日本語](README.ja.md)
 [**Open the latest stable release and download winTerm for x64**](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
 The latest stable Release page provides the Setup EXE, Portable ZIP, release
-notes, and checksums together.
-
-A **beta** prerelease is also available for early access to Pane Search:
-[v1.4.0-beta](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.4.0-beta)
-is published as a GitHub prerelease with the same asset layout. Prereleases
-are for testing; the stable release above stays the recommended download.
+notes, and checksums together. The current stable release is **winTerm 1.4.1**.
 
 The installer is unsigned, so Windows may display Unknown Publisher or a
 SmartScreen warning. Download only from the official release above and verify
@@ -36,8 +31,8 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `1.4.0-beta`;
-the latest stable release is `1.3.0`. See the
+The current source version is `1.4.1`;
+the latest stable release is `1.4.1`. See the
 [latest official Release](https://github.com/HelloThisWorld/winTerm/releases/latest)
 for the complete published asset list and checksums.
 
@@ -46,11 +41,20 @@ Unknown Publisher or SmartScreen warning; verify `SHA256SUMS.txt` from the same
 Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
-See [installation guidance](docs/user/installation.md) and the
-[1.3.0 release notes](https://github.com/HelloThisWorld/winTerm/releases/tag/v1.3.0), and the earlier [1.2.0 notes](docs/releases/1.2.0.md).
+See [installation guidance](docs/user/installation.md), the
+[1.4.1 release notes](docs/releases/1.4.1.md), and the earlier
+[1.3.0 notes](docs/releases/1.3.0.md).
 
 ## Core features
 
+- per-pane **Pane Search** (`Ctrl+F`) over the full scrollback, with live
+  all-match highlighting, `Enter` / `Shift+Enter` navigation, case-sensitive
+  and regex modes, a compact match counter, and a scrollbar overview that
+  stays current while output streams;
+- **Click to position cursor** inside the current shell-integrated editable
+  command, enabled by default and available under Profile > Advanced; normal
+  drag, Shift, word/line selection, hyperlinks, and VT mouse applications
+  retain precedence, and an explicit setting of `false` remains respected;
 - a per-pane **Command Timeline** (`Ctrl+Tab`, or the thin handle on the
   terminal's left edge): an in-memory list of the commands that pane has run,
   built from OSC 133 shell integration only, with load-without-executing onto
@@ -105,8 +109,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.4.0-beta -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.4.0-beta -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.4.1 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.4.1 -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build

@@ -53,6 +53,17 @@ that needs a literal `Ctrl+F` keystroke can reclaim it by unbinding the
 default (`{ "command": "unbound", "keys": "ctrl+f" }` in settings); Find
 stays reachable through `Ctrl+Shift+F` or the Command Palette.
 
+## Click to position cursor
+
+With shell integration active, a plain single left click inside the current
+editable command moves the shell cursor on button release. Dragging past the
+existing selection threshold selects text without moving the command cursor
+first. Ctrl+Click hyperlinks, VT mouse reporting, double/triple click,
+Shift+Click, and drag selection keep their normal precedence. The feature is
+enabled by default for winTerm and can be disabled under Profile > Advanced.
+If an editable shell range cannot be established safely, the click does
+nothing.
+
 ## Command Timeline
 
 | Shortcut | Behavior |

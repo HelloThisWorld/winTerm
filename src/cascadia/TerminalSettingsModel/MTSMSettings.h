@@ -20,8 +20,10 @@ Author(s):
 
 #if defined(WT_BRANDING_WINTERM)
 #define MTSM_FIRST_WINDOW_PREFERENCE_DEFAULT FirstWindowPreference::PersistedLayout
+#define MTSM_REPOSITION_CURSOR_WITH_MOUSE_DEFAULT true
 #else
 #define MTSM_FIRST_WINDOW_PREFERENCE_DEFAULT FirstWindowPreference::DefaultProfile
+#define MTSM_REPOSITION_CURSOR_WITH_MOUSE_DEFAULT false
 #endif
 
 #define MTSM_GLOBAL_SETTINGS(X)                                                                                                                                                                       \
@@ -124,7 +126,7 @@ Author(s):
     X(bool, AutoMarkPrompts, "autoMarkPrompts", true)                                                                                                          \
     X(bool, AutoInjectShellIntegration, "shellIntegration.autoInject", true)                                                                                   \
     X(bool, ShowMarks, "showMarksOnScrollbar", false)                                                                                                          \
-    X(bool, RepositionCursorWithMouse, "experimental.repositionCursorWithMouse", false)                                                                        \
+    X(bool, RepositionCursorWithMouse, "experimental.repositionCursorWithMouse", MTSM_REPOSITION_CURSOR_WITH_MOUSE_DEFAULT)                                  \
     X(bool, ReloadEnvironmentVariables, "compatibility.reloadEnvironmentVariables", true)                                                                      \
     X(bool, RainbowSuggestions, "experimental.rainbowSuggestions", false)                                                                                      \
     X(bool, ForceVTInput, "compatibility.input.forceVT", false)                                                                                                \
