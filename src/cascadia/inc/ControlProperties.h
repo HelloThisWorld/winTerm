@@ -3,6 +3,12 @@
 
 #pragma once
 
+#if defined(WT_BRANDING_WINTERM)
+#define CONTROL_REPOSITION_CURSOR_WITH_MOUSE_DEFAULT true
+#else
+#define CONTROL_REPOSITION_CURSOR_WITH_MOUSE_DEFAULT false
+#endif
+
 // --------------------------- Core Appearance ---------------------------
 //  All of these settings are defined in ICoreAppearance.
 #define CORE_APPEARANCE_SETTINGS(X)                                                                                       \
@@ -55,7 +61,7 @@
     X(bool, CommandTimelineEnabled, true)                                                                         \
     X(int32_t, CommandTimelineHistoryLimit, 500)                                                                  \
     X(bool, AutoMarkPrompts)                                                                                      \
-    X(bool, RepositionCursorWithMouse, false)                                                                     \
+    X(bool, RepositionCursorWithMouse, CONTROL_REPOSITION_CURSOR_WITH_MOUSE_DEFAULT)                              \
     X(bool, RainbowSuggestions)                                                                                   \
     X(bool, AllowVtChecksumReport)                                                                                \
     X(bool, AllowVtClipboardWrite, true)

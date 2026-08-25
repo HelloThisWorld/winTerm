@@ -43,6 +43,8 @@ namespace ControlUnitTests
         TEST_METHOD(GetMouseEventsInTest);
         TEST_METHOD(AltBufferClampMouse);
         TEST_METHOD(RightClickCopiesSelectionThenPastes);
+        TEST_METHOD(CursorRepositionOccursOnReleaseOnly);
+        TEST_METHOD(CursorRepositionDragAndSelectionPriority);
 
         TEST_CLASS_SETUP(ClassSetup)
         {
@@ -1082,5 +1084,89 @@ namespace ControlUnitTests
                                       modifiers,
                                       cursorPosition1.to_core_point());
         VERIFY_ARE_EQUAL(0u, expectedOutput.size(), L"Validate we drained all the expected output");
+    }
+
+    void ControlInteractivityTests::CursorRepositionOccursOnReleaseOnly()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point click{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, click);
+        VERIFY_IS_TRUE(sent.empty(), L"Mouse-down must not reposition the shell cursor");
+        VERIFY_IS_TRUE(interactivity->_cursorRepositionPending);
+
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, click);
+        VERIFY_ARE_EQUAL(std::wstring{ L"\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D" }, sent);
+        VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
+    }
+
+    void ControlInteractivityTests::CursorRepositionDragAndSelectionPriority()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point start{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const Core::Point end{ static_cast<int32_t>(font.Width * 8.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, start);
+        interactivity->PointerMoved(leftMouseDown, WM_LBUTTONDOWN, modifiers, true, end, true);
+        VERIFY_IS_TRUE(core->HasSelection());
+        VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, end);
+        VERIFY_IS_TRUE(sent.empty(), L"A drag selection must never move the command-line cursor first");
+
+        core->ClearSelection();
+        const auto shift = ControlKeyStates{ SHIFT_PRESSED };
+        const auto shiftClickTime = interactivity->_multiClickTimer + 10;
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, shiftClickTime, shift, start);
+        VERIFY_IS_TRUE(core->HasSelection(), L"Shift+Click retains selection semantics");
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, shift, start);
+        VERIFY_IS_TRUE(sent.empty());
+
+        // Establish the first click of a fresh multi-click sequence. A first
+        // click may reposition normally; the second and third clicks must be
+        // owned exclusively by word/line selection.
+        core->ClearSelection();
+        const auto firstClickTime = shiftClickTime + interactivity->_multiClickTimer + 10;
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, firstClickTime, modifiers, start);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, start);
+        sent.clear();
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, firstClickTime + 1, modifiers, start);
+        VERIFY_IS_TRUE(core->HasSelection(), L"The second click retains word-selection semantics");
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, start);
+        VERIFY_IS_TRUE(sent.empty());
+
+        core->ClearSelection();
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, firstClickTime + 2, modifiers, start);
+        VERIFY_IS_TRUE(core->HasSelection(), L"The third click retains line-selection semantics");
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, start);
+        VERIFY_IS_TRUE(sent.empty());
     }
 }

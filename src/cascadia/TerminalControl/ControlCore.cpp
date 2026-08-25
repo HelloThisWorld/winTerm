@@ -2661,11 +2661,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             _terminal->MultiClickSelection(terminalPosition, mode);
             selectionNeedsToBeCopied = true;
         }
-        else if (_settings.RepositionCursorWithMouse() && !selectionNeedsToBeCopied) // Don't reposition cursor if this is part of a selection operation
-        {
-            _repositionCursorWithMouse(terminalPosition);
-        }
         _updateSelectionUI();
+    }
+
+    void ControlCore::RepositionCursorWithMouse(const til::point terminalPosition)
+    {
+        const auto lock = _terminal->LockForWriting();
+
+        // This is deliberately a release-time action. Selection has already
+        // had the opportunity to claim the gesture using its established drag
+        // threshold, and VT mouse mode remains authoritative.
+        if (!_settings.RepositionCursorWithMouse() ||
+            _terminal->IsSelectionActive() ||
+            _terminal->IsTrackingMouseInput())
+        {
+            return;
+        }
+
+        _repositionCursorWithMouse(terminalPosition);
     }
 
     void ControlCore::_repositionCursorWithMouse(const til::point terminalPosition)
@@ -2681,17 +2694,72 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // As noted in GH #8573, there's plenty of edge cases with this
         // approach, but it's good enough to bring value to 90% of use cases.
 
-        // Does the current buffer line have a mark on it?
+        // Does the current editable prompt have a trustworthy shell mark?
         const auto& marks{ _terminal->GetMarkExtents() };
         if (!marks.empty())
         {
             const auto& last{ marks.back() };
-            const auto [start, end] = last.GetExtent();
+            // Command text itself gives the live mark a commandEnd extent as
+            // the user types, so commandEnd is not evidence of execution.
+            // The shell-integration lifecycle is authoritative: only the
+            // unfinished CommandStart state is editable. Executing, finished,
+            // historic-output, and prompt-only states are safe no-ops.
+            const auto shellIntegrationState = static_cast<ShellIntegrationMarkKind>(_terminal->GetShellIntegrationState());
+            if (shellIntegrationState != ShellIntegrationMarkKind::CommandStart ||
+                last.outputEnd.has_value() ||
+                last.data.exitCode.has_value())
+            {
+                return;
+            }
+
             const auto& buffer = _terminal->GetTextBuffer();
             const auto cursorPos = buffer.GetCursor().GetPosition();
             const auto bufferSize = buffer.GetSize();
+            const auto viewport = _terminal->GetViewport();
+
+            if (bufferSize.Width() <= 0 ||
+                bufferSize.Height() <= 0 ||
+                terminalPosition.y < 0 ||
+                terminalPosition.y >= viewport.Height() ||
+                !bufferSize.IsInBounds(last.end) ||
+                !bufferSize.IsInBounds(cursorPos))
+            {
+                return;
+            }
+
+            // terminalPosition is viewport-relative. Do the addition at a
+            // wider precision so even malformed coordinates cannot overflow,
+            // then clamp horizontal padding to the nearest rendered cell.
+            // Vertical padding is not an editable row and remains a no-op.
+            const auto viewportOrigin = viewport.Origin();
+            const auto rawX = static_cast<int64_t>(viewportOrigin.x) + terminalPosition.x;
+            const auto rawY = static_cast<int64_t>(viewportOrigin.y) + terminalPosition.y;
+            if (rawY < bufferSize.Top() || rawY > bufferSize.BottomInclusive())
+            {
+                return;
+            }
+
+            const til::point bufferPos{
+                gsl::narrow_cast<til::CoordType>(std::clamp<int64_t>(rawX, bufferSize.Left(), bufferSize.RightInclusive())),
+                gsl::narrow_cast<til::CoordType>(rawY),
+            };
+
             auto lastNonSpace = buffer.GetLastNonSpaceCharacter();
-            bufferSize.IncrementInBounds(lastNonSpace, true);
+            if (!bufferSize.IsInBounds(lastNonSpace))
+            {
+                return;
+            }
+            bufferSize.IncrementInBounds(lastNonSpace);
+
+            // The cursor can sit after trailing spaces, which are intentionally
+            // absent from GetLastNonSpaceCharacter(). Preserve that valid
+            // position while keeping every point passed to TextBuffer APIs in
+            // inclusive buffer bounds.
+            const auto editableEnd = std::max(std::max(last.end, lastNonSpace), cursorPos);
+            if (!bufferSize.IsInBounds(editableEnd) || cursorPos < last.end || cursorPos > editableEnd)
+            {
+                return;
+            }
 
             // If the user clicked off to the right side of the prompt, we
             // want to send keystrokes to the last character in the prompt +1.
@@ -2705,16 +2773,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             // should leave the cursor at the very end of the prompt,
             // without adding any characters from a previous command.
 
-            // terminalPosition is viewport-relative.
-            const auto bufferPos = _terminal->GetViewport().Origin() + terminalPosition;
-            if (bufferPos.y > lastNonSpace.y)
+            if (bufferPos < last.end || bufferPos.y > editableEnd.y)
             {
-                // Clicked under the prompt. Bail.
+                // Clicked before the current command or under it. Bail.
                 return;
             }
 
-            // Limit the click to 1 past the last character on the last line.
-            const auto clampedClick = std::min(bufferPos, lastNonSpace);
+            // Limit horizontal padding on the final command row to the
+            // current editable end. Positions beyond another row are not part
+            // of the command and are rejected above.
+            const auto clampedClick = bufferPos > editableEnd ? editableEnd : bufferPos;
 
             if (clampedClick >= last.end)
             {
@@ -2727,7 +2795,20 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                 const auto startPoint = goRight ? cursorPos : clampedClick;
                 const auto endPoint = goRight ? clampedClick : cursorPos;
 
-                const auto delta = _terminal->GetTextBuffer().GetCellDistance(startPoint, endPoint);
+                // Count rendered glyphs, not trailing halves of wide cells.
+                // One LEFT/RIGHT event should cross one shell character, so
+                // CJK and other double-cell glyphs must not produce two keys.
+                size_t delta = 0;
+                auto cell = buffer.GetCellDataAt(startPoint);
+                const auto endCell = buffer.GetCellDataAt(endPoint);
+                while (cell != endCell)
+                {
+                    if (cell->DbcsAttr() != DbcsAttribute::Trailing)
+                    {
+                        ++delta;
+                    }
+                    ++cell;
+                }
                 const WORD key = goRight ? VK_RIGHT : VK_LEFT;
 
                 std::wstring buffer;
@@ -2748,6 +2829,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                     append(_terminal->SendKeyEvent(key, 0, {}, false));
                 }
 
+                if (!buffer.empty())
                 {
                     // Sending input requires that we're unlocked, because
                     // writing the input pipe may block indefinitely.

@@ -1411,9 +1411,10 @@ try
         Assert-Matches $releaseNotes $requiredPattern 'winTerm 1.2.0 Visual Progress release notes'
     }
     Assert-Matches $source.Changelog '(?m)^##\s+.*1\.2\.0' 'Changelog 1.2.0 entry'
-    Assert-Matches $source.CurrentProgress '(?i)1\.2\.0.*Visual Progress|Visual Progress.*1\.2\.0' 'Current progress v1.2.0 milestone'
+    Assert-Matches $source.CurrentProgress '(?i)1\.4\.1' 'Current progress v1.4.1 milestone'
+    Assert-Matches $source.CurrentProgress '(?i)Visual Progress' 'Current progress Visual Progress coverage'
     Assert-Contains $source.Readme '/releases/latest' 'Stable latest-release README download route'
-    Assert-Matches $source.Readme '(?i)1\.2\.0' 'README v1.2.0 surface'
+    Assert-Matches $source.Readme '(?i)1\.4\.1' 'README v1.4.1 surface'
     foreach ($requiredPattern in @(
         '(?is)recognition.*runs locally|locally.*recognition',
         '(?is)bounded.*newly\s+arriving\s+output|newly\s+arriving.*bounded',
@@ -1431,12 +1432,12 @@ try
 
     $version = $source.VersionMetadata | ConvertFrom-Json
     $expectedVersionValues = [ordered]@{
-        applicationVersion = '1.4.0-beta'
-        packageVersion = '1.4.0.1'
-        moduleVersion = '1.4.0'
-        modulePrerelease = 'beta'
-        channel = 'beta'
-        tag = 'v1.4.0-beta'
+        applicationVersion = '1.4.1'
+        packageVersion = '1.4.1.0'
+        moduleVersion = '1.4.1'
+        modulePrerelease = ''
+        channel = 'stable'
+        tag = 'v1.4.1'
         workspaceSchemaVersion = 2
         dockingModelVersion = 1
         shellProtocolVersion = 1
@@ -1451,39 +1452,39 @@ try
         }
     }
     $shellVersion = $source.ShellVersion | ConvertFrom-Json
-    if ($shellVersion.applicationVersion -ne '1.4.0-beta' -or $shellVersion.moduleVersion -ne '1.4.0' -or $shellVersion.protocolVersion -ne 1)
+    if ($shellVersion.applicationVersion -ne '1.4.1' -or $shellVersion.moduleVersion -ne '1.4.1' -or $shellVersion.protocolVersion -ne 1)
     {
-        throw 'Shell version metadata does not match winTerm version 1.4.0-beta with protocol version 1.'
+        throw 'Shell version metadata does not match winTerm version 1.4.1 with protocol version 1.'
     }
     foreach ($surface in @(
-        @{ Content = $source.ReleaseMetadata; Value = 'ApplicationVersion{ L"1.4.0-beta" }'; Description = 'About release metadata' },
-        @{ Content = $source.PackageManifest; Value = 'Version="1.4.0.1"'; Description = 'MSIX package manifest' },
-        @{ Content = $source.HostResource; Value = 'FILEVERSION 1,4,0,1'; Description = 'Terminal host file version' },
-        @{ Content = $source.HostResource; Value = '"ProductVersion", "1.4.0-beta\0"'; Description = 'Terminal host display version' },
-        @{ Content = $source.ShimResource; Value = 'FILEVERSION 1,4,0,1'; Description = 'Shim file version' },
-        @{ Content = $source.ShimResource; Value = '"ProductVersion", "1.4.0-beta\0"'; Description = 'Shim display version' },
+        @{ Content = $source.ReleaseMetadata; Value = 'ApplicationVersion{ L"1.4.1" }'; Description = 'About release metadata' },
+        @{ Content = $source.PackageManifest; Value = 'Version="1.4.1.0"'; Description = 'MSIX package manifest' },
+        @{ Content = $source.HostResource; Value = 'FILEVERSION 1,4,1,0'; Description = 'Terminal host file version' },
+        @{ Content = $source.HostResource; Value = '"ProductVersion", "1.4.1\0"'; Description = 'Terminal host display version' },
+        @{ Content = $source.ShimResource; Value = 'FILEVERSION 1,4,1,0'; Description = 'Shim file version' },
+        @{ Content = $source.ShimResource; Value = '"ProductVersion", "1.4.1\0"'; Description = 'Shim display version' },
         @{ Content = $source.CustomProps; Value = '<VersionMajor>1</VersionMajor>'; Description = 'Executable major version' },
         @{ Content = $source.CustomProps; Value = '<VersionMinor>4</VersionMinor>'; Description = 'Executable minor version' },
-        @{ Content = $source.ShellModuleManifest; Value = "ModuleVersion = '1.4.0'"; Description = 'PowerShell module manifest' },
-        @{ Content = $source.ShellModule; Value = "`$script:WinTermModuleVersion = '1.4.0'"; Description = 'PowerShell module runtime' },
+        @{ Content = $source.ShellModuleManifest; Value = "ModuleVersion = '1.4.1'"; Description = 'PowerShell module manifest' },
+        @{ Content = $source.ShellModule; Value = "`$script:WinTermModuleVersion = '1.4.1'"; Description = 'PowerShell module runtime' },
         @{ Content = $source.PackageShellAssets; Value = "'shell\shared\version.json'"; Description = 'Canonical shell version metadata packaging' },
-        @{ Content = $source.WorkspaceSerializer; Value = '"1.4.0-beta"'; Description = 'Workspace application-version fallback' }
+        @{ Content = $source.WorkspaceSerializer; Value = '"1.4.1"'; Description = 'Workspace application-version fallback' }
     ))
     {
         Assert-Contains $surface.Content $surface.Value $surface.Description
     }
     foreach ($required in @(
-        "applicationVersion -eq '1.4.0-beta'",
-        "packageVersion -eq '1.4.0.1'",
-        "moduleVersion -eq '1.4.0'",
-        "tag -eq 'v1.4.0-beta'",
+        "applicationVersion -eq '1.4.1'",
+        "packageVersion -eq '1.4.1.0'",
+        "moduleVersion -eq '1.4.1'",
+        "tag -eq 'v1.4.1'",
         "Workspace Schema version remains 2",
         "Docking Model version remains 1",
         "Shell Protocol version remains 1",
         "Theme Schema remains at version 1"
     ))
     {
-        Assert-Contains $source.VerifyVersion $required 'Authoritative v1.4.0-beta version validation surface'
+        Assert-Contains $source.VerifyVersion $required 'Authoritative v1.4.1 version validation surface'
     }
 
     $testBinary = Join-Path $root "bin\$Platform\$Configuration\UnitTests_SettingsModel\SettingsModel.Unit.Tests.dll"

@@ -1366,12 +1366,12 @@
     <comment>A description for what the "Automatically mark prompts on pressing Enter" setting does. Presented near "Profile_AutoMarkPrompts".</comment>
   </data>
   <data name="Profile_RepositionCursorWithMouse.Header" xml:space="preserve">
-    <value>試験段階: マウスのクリックでカーソルの位置を変更する</value>
+    <value>クリックした位置にカーソルを移動</value>
     <comment>This allows the user to move the text cursor just by clicking with the mouse.</comment>
   </data>
   <data name="Profile_RepositionCursorWithMouse.HelpText" xml:space="preserve">
-    <value>有効にすると、プロンプト内をクリック時にカーソルがその位置に移動します。これを行うには、シェルでシェル統合を有効にし、期待どおりに動作させる必要があります。</value>
-    <comment>A description for what the "Reload environment variables" setting does. Presented near "Profile_RepositionCursorWithMouse".</comment>
+    <value>現在編集中のコマンドライン内をクリックすると、テキストカーソルがその位置へ移動します。編集可能な範囲を安全に判定するため、シェル統合が必要です。</value>
+    <comment>A description for what the "Click to position cursor" setting does. Presented near "Profile_RepositionCursorWithMouse".</comment>
   </data>
   <data name="Profile_BellStyleAudible.Content" xml:space="preserve">
     <value>音によるチャイム</value>

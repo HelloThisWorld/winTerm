@@ -260,6 +260,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         const auto altEnabled = modifiers.IsAltPressed();
         const auto shiftEnabled = modifiers.IsShiftPressed();
         const auto ctrlEnabled = modifiers.IsCtrlPressed();
+        _cursorRepositionPending = false;
 
         // GH#9396: we prioritize hyper-link over VT mouse events
         auto hyperlink = _core->GetHyperlink(terminalPosition.to_core_point());
@@ -286,6 +287,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             // number of acceptable click states, simply increment
             // MAX_CLICK_COUNT and add another if-statement
             const auto multiClickMapper = clickCount > MAX_CLICK_COUNT ? ((clickCount + MAX_CLICK_COUNT - 1) % MAX_CLICK_COUNT) + 1 : clickCount;
+            _cursorRepositionPending = multiClickMapper == 1 && !altEnabled && !shiftEnabled && !ctrlEnabled;
 
             // Capture the position of the first click when no selection is active
             if (multiClickMapper == 1)
@@ -399,6 +401,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
                 if (distanceSquared >= maxDistanceSquared)
                 {
+                    // Selection owns this gesture. Never move the shell cursor
+                    // before establishing the drag selection.
+                    _cursorRepositionPending = false;
+
                     // GH#9955.c: Make sure to use the terminal location of the
                     // _touchdown_ point here. We want to start the selection
                     // from where the user initially clicked, not where they are
@@ -472,6 +478,8 @@ namespace winrt::Microsoft::Terminal::Control::implementation
                                                const Core::Point pixelPosition)
     {
         const auto terminalPosition = _getTerminalPosition(til::point{ pixelPosition }, false);
+        const auto repositionPending = _cursorRepositionPending;
+        _cursorRepositionPending = false;
         // Short-circuit isReadOnly check to avoid warning dialog
         if (!_core->IsInReadOnlyMode() && _canSendVTMouseInput(modifiers))
         {
@@ -491,6 +499,16 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             // DO NOT clear the selection here!
             // Otherwise, the selection will be cleared immediately after you make it.
             CopySelectionToClipboard(false, false, _core->Settings().CopyFormatting());
+        }
+
+        if (isLeftMouseRelease &&
+            repositionPending &&
+            !_selectionNeedsToBeCopied &&
+            !modifiers.IsAltPressed() &&
+            !modifiers.IsShiftPressed() &&
+            !modifiers.IsCtrlPressed())
+        {
+            _core->RepositionCursorWithMouse(_getTerminalPosition(til::point{ pixelPosition }, true));
         }
 
         _singleClickTouchdownPos = std::nullopt;

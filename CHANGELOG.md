@@ -1,5 +1,73 @@
 # Changelog
 
+## 1.4.1 - 2026-08-25
+
+Stable production release of the **Pane Search** generation and **Click to
+position cursor**. This release contains the complete application delta from
+stable v1.3.0, promotes the field-tested 1.4 search line without a prerelease
+suffix, and publishes as GitHub Latest with application version `1.4.1`,
+package/file version `1.4.1.0`, PowerShell module version `1.4.1`, and tag
+`v1.4.1`.
+
+### Added
+
+- **Pane Search:** `Ctrl+F` opens Find in the focused pane only
+  (`Ctrl+Shift+F` remains a remappable compatibility alias). Search covers the
+  full active-pane scrollback, updates while typing, highlights all matches,
+  navigates with `Enter` / `Shift+Enter`, supports case-sensitive and regular
+  expression modes, shows a compact `current / total` counter, and renders a
+  pane-local match overview on the scrollbar.
+- **Click to position cursor:** a plain single left click inside the current
+  shell-integrated editable command sends the established LEFT/RIGHT input
+  events needed to move the shell cursor to that position. It is enabled by
+  default in winTerm, remains configurable under Profile > Advanced, and an
+  explicit existing value of `false` continues to win.
+
+### Improved
+
+- Pane Search coalesces rapid typing, converges while output streams
+  continuously, and avoids repainting an unchanged scrollbar overview. Search
+  state remains isolated per pane and safe across reflow, scrollback eviction,
+  and main/alternate-buffer transitions.
+- Cursor positioning now occurs on mouse release only after the existing drag
+  threshold has not been crossed. Starting a drag therefore establishes text
+  selection without first moving the shell cursor.
+- Cursor movement counts rendered glyphs rather than the trailing halves of
+  double-cell glyphs, so CJK and other full-width input does not generate an
+  extra arrow event for the second cell.
+
+### Fixed
+
+- Backported the safety intent of Microsoft Terminal PR #20442
+  (`de3fc87d186e5da1d5ccd8731412905f5e2aba30`): negative, padding, overflow,
+  and out-of-buffer mouse coordinates are validated before any TextBuffer
+  access, preventing malformed boundary clicks from reaching invalid buffer
+  iterators.
+- Click positioning now requires an unfinished final shell-integration mark
+  and a trustworthy editable range. Previous commands, completed command
+  output, unrelated scrollback rows, invalid resize-era coordinates, and
+  unsupported positions safely do nothing.
+- Pane Search resize no longer converts stale pre-reflow spans into a stray
+  selection; main/alternate-buffer switches discard stale highlights; and
+  closing search releases its terminal-side highlight span copy.
+
+### Compatibility
+
+- Ctrl+Click hyperlinks, VT mouse reporting, double-click word selection,
+  triple-click line selection, Shift+Click, drag selection, and split-pane
+  connection isolation keep precedence over click positioning. Mouse-aware
+  terminal applications retain ownership while VT mouse reporting is active.
+- Cursor positioning uses shell/readline input events; it does not directly
+  move the renderer cursor, rewrite or execute the command, or guess an
+  editable range when shell integration is unavailable.
+
+### Release
+
+- The stable Release provides the Setup EXE, Portable ZIP, checksums, release
+  notes, third-party notices, SPDX and CycloneDX SBOMs, and release metadata
+  through the guarded tag workflow. The installer is not Authenticode-signed,
+  so Windows can show Unknown Publisher or a SmartScreen warning.
+
 ## 1.4.0-beta - 2026-08-13
 
 Beta prerelease of the Pane Search release. Manual validation of
