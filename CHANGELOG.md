@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.2 - 2026-08-25
+
+Stable patch release of the **Pane Search** generation and **Click to position
+cursor**. The application payload is unchanged from the fully validated 1.4.1
+candidate. This patch corrects the release-note signing heading required by the
+guarded asset verifier after the published `v1.4.1` tag could no longer be
+moved or replaced. It publishes as GitHub Latest with application version
+`1.4.2`, package/file version `1.4.2.0`, PowerShell module version
+`1.4.2`, and tag `v1.4.2`.
+
+### Fixed
+
+- The packaged release notes now use the canonical `## Signing` section
+  required by the exact-asset verifier while retaining the explicit unsigned
+  installer and SmartScreen disclosure.
+
 ## 1.4.1 - 2026-08-25
 
 Stable production release of the **Pane Search** generation and **Click to
