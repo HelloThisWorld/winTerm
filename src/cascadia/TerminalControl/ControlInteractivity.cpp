@@ -387,6 +387,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // selection into space.
         else if (focused && pointerPressedInBounds && WI_IsFlagSet(buttonState, MouseButtonState::IsLeftButtonDown))
         {
+            auto updateSelectionEnd = !_singleClickTouchdownPos;
             if (_singleClickTouchdownPos)
             {
                 // Figure out if the user's moved a 1/4th of a cell's smaller axis
@@ -425,10 +426,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
                     // stop tracking the touchdown point
                     _singleClickTouchdownPos = std::nullopt;
+                    updateSelectionEnd = true;
                 }
             }
 
-            SetEndSelectionPoint(pixelPosition);
+            // Normal physical mouse jitter must not turn a click into a
+            // selection gesture. Before the drag threshold is crossed there
+            // is no selection to extend and selection-copy state must remain
+            // untouched. Once the drag owns the gesture, subsequent moves
+            // continue updating the existing selection end.
+            if (updateSelectionEnd)
+            {
+                SetEndSelectionPoint(pixelPosition);
+            }
         }
 
         _core->SetHoveredCell(terminalPosition.to_core_point());
@@ -490,9 +500,19 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // Only a left click release when copy on select is active should perform a copy.
         // Right clicks and middle clicks should not need to do anything when released.
         const auto isLeftMouseRelease = pointerUpdateKind == WM_LBUTTONUP;
+        const auto hasSelection = _core->HasSelection();
+
+        // A copy candidate without a real selection is stale by definition.
+        // Normalize it here without disturbing legitimate mark-mode or
+        // CopyOnSelect state while a selection remains active.
+        if (!hasSelection)
+        {
+            _selectionNeedsToBeCopied = false;
+        }
 
         if (_core->CopyOnSelect() &&
             isLeftMouseRelease &&
+            hasSelection &&
             _selectionNeedsToBeCopied)
         {
             // IMPORTANT!
@@ -503,7 +523,6 @@ namespace winrt::Microsoft::Terminal::Control::implementation
 
         if (isLeftMouseRelease &&
             repositionPending &&
-            !_selectionNeedsToBeCopied &&
             !modifiers.IsAltPressed() &&
             !modifiers.IsShiftPressed() &&
             !modifiers.IsCtrlPressed())
@@ -732,8 +751,14 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         // Don't round in VT mouse mode; cell-level precision matters more
         const auto round = !_core->IsVtMouseModeEnabled();
-        _core->SetEndSelectionPoint(_getTerminalPosition(til::point{ pixelPosition }, round));
-        _selectionNeedsToBeCopied = true;
+        if (_core->SetEndSelectionPoint(_getTerminalPosition(til::point{ pixelPosition }, round)))
+        {
+            _selectionNeedsToBeCopied = true;
+        }
+        else
+        {
+            _selectionNeedsToBeCopied = false;
+        }
     }
 
     // Method Description:

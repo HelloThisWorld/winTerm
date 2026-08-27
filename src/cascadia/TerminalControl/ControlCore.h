@@ -251,7 +251,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         bool CopyOnSelect() const;
         Control::SelectionData SelectionInfo() const;
         void SetSelectionAnchor(const til::point position);
-        void SetEndSelectionPoint(const til::point position);
+        bool SetEndSelectionPoint(const til::point position);
 
         SearchResults Search(const SearchRequest& request);
         const std::vector<til::point_span>& SearchResultRows() const noexcept;

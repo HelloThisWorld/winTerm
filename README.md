@@ -11,7 +11,7 @@ English | [日本語](README.ja.md)
 [**Open the latest stable release and download winTerm for x64**](https://github.com/HelloThisWorld/winTerm/releases/latest)
 
 The latest stable Release page provides the Setup EXE, Portable ZIP, release
-notes, and checksums together. The current stable release is **winTerm 1.4.2**.
+notes, and checksums together. The current stable release is **winTerm 1.4.3**.
 
 The installer is unsigned, so Windows may display Unknown Publisher or a
 SmartScreen warning. Download only from the official release above and verify
@@ -31,8 +31,8 @@ application downloads are:
 - `winTerm-<version>-setup-x64.exe` — current-user or all-users installation;
 - `winTerm-<version>-portable-x64.zip` — extract and run without installation.
 
-The current source version is `1.4.2`;
-the latest stable release is `1.4.2`. See the
+The current source version is `1.4.3`;
+the latest stable release is `1.4.3`. See the
 [latest official Release](https://github.com/HelloThisWorld/winTerm/releases/latest)
 for the complete published asset list and checksums.
 
@@ -42,7 +42,7 @@ Release. No MSIX certificate, Developer Mode, Visual Studio, Windows SDK, or
 `Add-AppxPackage` is required to install a release EXE.
 
 See [installation guidance](docs/user/installation.md), the
-[1.4.2 release notes](docs/releases/1.4.2.md), and the earlier
+[1.4.3 release notes](docs/releases/1.4.3.md), and the earlier
 [1.3.0 notes](docs/releases/1.3.0.md).
 
 ## Core features
@@ -52,9 +52,10 @@ See [installation guidance](docs/user/installation.md), the
   and regex modes, a compact match counter, and a scrollbar overview that
   stays current while output streams;
 - **Click to position cursor** inside the current shell-integrated editable
-  command, enabled by default and available under Profile > Advanced; normal
-  drag, Shift, word/line selection, hyperlinks, and VT mouse applications
-  retain precedence, and an explicit setting of `false` remains respected;
+  command, enabled by default and available under Profile > Advanced; small
+  pointer movement below the drag threshold remains a plain click, while drag,
+  Shift, word/line selection, hyperlinks, and VT mouse applications retain
+  precedence, and an explicit setting of `false` remains respected;
 - a per-pane **Command Timeline** (`Ctrl+Tab`, or the thin handle on the
   terminal's left edge): an in-memory list of the commands that pane has run,
   built from OSC 133 shell integration only, with load-without-executing onto
@@ -109,8 +110,8 @@ Use PowerShell 7 and the Microsoft Terminal toolchain described in
 .\scripts\winterm\build.ps1 -Configuration Release -Platform x64 -IncludeTests
 .\scripts\winterm\test.ps1 -Suite Relevant -Configuration Release -Platform x64
 .\scripts\winterm\build-unpackaged.ps1 -Configuration Release -Platform x64
-.\scripts\winterm\build-installer.ps1 -Version 1.4.2 -Platform x64
-.\scripts\winterm\build-portable.ps1 -Version 1.4.2 -Platform x64
+.\scripts\winterm\build-installer.ps1 -Version 1.4.3 -Platform x64
+.\scripts\winterm\build-portable.ps1 -Version 1.4.3 -Platform x64
 ```
 
 The unpackaged generator uses an unsigned MSIX only as an upstream build

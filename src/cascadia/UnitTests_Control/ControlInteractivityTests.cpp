@@ -44,6 +44,13 @@ namespace ControlUnitTests
         TEST_METHOD(AltBufferClampMouse);
         TEST_METHOD(RightClickCopiesSelectionThenPastes);
         TEST_METHOD(CursorRepositionOccursOnReleaseOnly);
+        TEST_METHOD(CursorRepositionSurvivesSubThresholdMovement);
+        TEST_METHOD(CursorRepositionSurvivesSeveralSubThresholdMovements);
+        TEST_METHOD(CursorRepositionSurvivesRepeatedClicks);
+        TEST_METHOD(CursorRepositionGestureCannotPoisonNextClick);
+        TEST_METHOD(CursorRepositionHonorsDragThresholdBoundary);
+        TEST_METHOD(CursorRepositionCopyOnSelectOwnsOnlyRealSelections);
+        TEST_METHOD(CursorRepositionRecoversFromStaleCopyState);
         TEST_METHOD(CursorRepositionDragAndSelectionPriority);
 
         TEST_CLASS_SETUP(ClassSetup)
@@ -1114,6 +1121,273 @@ namespace ControlUnitTests
         VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
     }
 
+    void ControlInteractivityTests::CursorRepositionSurvivesSubThresholdMovement()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point click{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const Core::Point jitter{ click.X + 1, click.Y };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, click);
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, jitter, true);
+        VERIFY_IS_FALSE(core->HasSelection(), L"Sub-threshold movement must not create a selection");
+        VERIFY_IS_TRUE(interactivity->_cursorRepositionPending, L"Sub-threshold movement must remain a click");
+        VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied, L"Sub-threshold movement must not create a phantom copy candidate");
+
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, jitter);
+        VERIFY_ARE_EQUAL(std::wstring{ L"\x1b[D\x1b[D\x1b[D\x1b[D" }, sent);
+        VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
+        VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied);
+    }
+
+    void ControlInteractivityTests::CursorRepositionSurvivesSeveralSubThresholdMovements()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point click{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const std::array jitter{
+            Core::Point{ click.X + 1, click.Y },
+            Core::Point{ click.X - 1, click.Y },
+            Core::Point{ click.X + 1, click.Y },
+        };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, click);
+        for (const auto& position : jitter)
+        {
+            interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, position, true);
+            VERIFY_IS_FALSE(core->HasSelection());
+            VERIFY_IS_TRUE(interactivity->_cursorRepositionPending);
+            VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied);
+        }
+
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, jitter.back());
+        VERIFY_ARE_EQUAL(std::wstring{ L"\x1b[D\x1b[D\x1b[D\x1b[D" }, sent);
+        VERIFY_IS_FALSE(core->HasSelection());
+    }
+
+    void ControlInteractivityTests::CursorRepositionSurvivesRepeatedClicks()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdefghijklmnopqrst"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto expectedMove = [](const int32_t from, const int32_t to) {
+            std::wstring expected;
+            const auto sequence = to < from ? L"\x1b[D" : L"\x1b[C";
+            for (auto i = 0; i < std::abs(to - from); ++i)
+            {
+                expected.append(sequence);
+            }
+            return expected;
+        };
+        const auto font = core->FontSizeInDips();
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+        uint64_t timestamp = 1;
+
+        for (int32_t target = 0; target < 10; ++target)
+        {
+            const Core::Point click{ static_cast<int32_t>(font.Width * (target + 4.5f)), static_cast<int32_t>(font.Height * 0.5f) };
+            const auto cursorBefore = core->CursorPosition().X;
+            const auto terminalTarget = interactivity->_getTerminalPosition(til::point{ click }, true).x;
+            interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, timestamp, modifiers, click);
+            interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, click);
+
+            VERIFY_ARE_EQUAL(expectedMove(cursorBefore, terminalTarget), sent, L"Every independent click must emit the correct cursor input");
+            VERIFY_IS_FALSE(core->HasSelection());
+            VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
+            VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied);
+
+            sent.clear();
+            timestamp += interactivity->_multiClickTimer + 10;
+        }
+    }
+
+    void ControlInteractivityTests::CursorRepositionGestureCannotPoisonNextClick()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point first{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const Core::Point second{ static_cast<int32_t>(font.Width * 6.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, first);
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, Core::Point{ first.X + 1, first.Y }, true);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, first);
+        VERIFY_ARE_EQUAL(std::wstring{ L"\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D" }, sent);
+
+        sent.clear();
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, interactivity->_multiClickTimer + 10, modifiers, second);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, second);
+        VERIFY_ARE_EQUAL(std::wstring{ L"\x1b[C" }, sent, L"A jittered gesture must not poison the next click");
+        VERIFY_IS_FALSE(core->HasSelection());
+        VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied);
+    }
+
+    void ControlInteractivityTests::CursorRepositionHonorsDragThresholdBoundary()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const auto maxDistanceSquared = font.Width * font.Width / 16.0f;
+        int32_t boundaryDelta = 1;
+        while (static_cast<float>(boundaryDelta * boundaryDelta) < maxDistanceSquared)
+        {
+            ++boundaryDelta;
+        }
+        const auto belowDelta = boundaryDelta - 1;
+        VERIFY_IS_TRUE(static_cast<float>(belowDelta * belowDelta) < maxDistanceSquared);
+        VERIFY_IS_TRUE(static_cast<float>(boundaryDelta * boundaryDelta) >= maxDistanceSquared);
+
+        const Core::Point start{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, start);
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, Core::Point{ start.X + belowDelta, start.Y }, true);
+        VERIFY_IS_FALSE(core->HasSelection(), L"distanceSquared below the threshold remains a click");
+        VERIFY_IS_TRUE(interactivity->_cursorRepositionPending);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, start);
+        VERIFY_IS_FALSE(sent.empty());
+
+        sent.clear();
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, interactivity->_multiClickTimer + 10, modifiers, start);
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, Core::Point{ start.X + boundaryDelta, start.Y }, true);
+        VERIFY_IS_TRUE(core->HasSelection(), L"distanceSquared at the threshold starts selection");
+        VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
+        VERIFY_IS_TRUE(interactivity->_selectionNeedsToBeCopied);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, start);
+        VERIFY_IS_TRUE(sent.empty(), L"A threshold-crossing selection must not reposition the cursor");
+    }
+
+    void ControlInteractivityTests::CursorRepositionCopyOnSelectOwnsOnlyRealSelections()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        settings->CopyOnSelect(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        size_t copyCount = 0;
+        core->WriteToClipboard([&](auto&&, auto&&) {
+            ++copyCount;
+        });
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point start{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const Core::Point dragEnd{ static_cast<int32_t>(font.Width * 9.5f), start.Y };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, start);
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, dragEnd, true);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, dragEnd);
+        VERIFY_IS_TRUE(core->HasSelection());
+        VERIFY_ARE_EQUAL(1u, copyCount, L"CopyOnSelect must copy a real drag selection");
+        VERIFY_IS_TRUE(sent.empty());
+
+        core->ClearSelection();
+        const auto nextTimestamp = interactivity->_multiClickTimer + 10;
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, nextTimestamp, modifiers, start);
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, Core::Point{ start.X + 1, start.Y }, true);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, start);
+        VERIFY_ARE_EQUAL(1u, copyCount, L"Sub-threshold jitter must not create a phantom CopyOnSelect candidate");
+        VERIFY_IS_FALSE(core->HasSelection());
+        VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied);
+        VERIFY_IS_FALSE(sent.empty(), L"CopyOnSelect must not prevent a real plain click");
+    }
+
+    void ControlInteractivityTests::CursorRepositionRecoversFromStaleCopyState()
+    {
+        auto [settings, conn] = _createSettingsAndConnection();
+        settings->RepositionCursorWithMouse(true);
+        auto [core, interactivity] = _createCoreAndInteractivity(*settings, *conn);
+        _standardInit(core, interactivity);
+        conn->WriteInput(winrt_wstring_to_array_view(L"\x1b]133;A\aPS> \x1b]133;B\aabcdef"));
+
+        std::wstring sent;
+        conn->TerminalOutput([&](const winrt::array_view<const char16_t> value) {
+            sent.append(winrt_array_to_wstring_view(value));
+        });
+
+        VERIFY_IS_FALSE(core->HasSelection());
+        interactivity->_selectionNeedsToBeCopied = true;
+
+        const auto font = core->FontSizeInDips();
+        const Core::Point click{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const auto modifiers = ControlKeyStates{};
+        const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
+        const Control::MouseButtonState noMouseDown{};
+
+        interactivity->PointerPressed(leftMouseDown, WM_LBUTTONDOWN, 1, modifiers, click);
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, click);
+        VERIFY_ARE_EQUAL(std::wstring{ L"\x1b[D\x1b[D\x1b[D\x1b[D\x1b[D" }, sent, L"Stale copy state must not veto a real click");
+        VERIFY_IS_FALSE(interactivity->_selectionNeedsToBeCopied, L"No-selection release must normalize stale copy state");
+    }
+
     void ControlInteractivityTests::CursorRepositionDragAndSelectionPriority()
     {
         auto [settings, conn] = _createSettingsAndConnection();
@@ -1130,6 +1404,7 @@ namespace ControlUnitTests
         const auto font = core->FontSizeInDips();
         const Core::Point start{ static_cast<int32_t>(font.Width * 5.5f), static_cast<int32_t>(font.Height * 0.5f) };
         const Core::Point end{ static_cast<int32_t>(font.Width * 8.5f), static_cast<int32_t>(font.Height * 0.5f) };
+        const Core::Point fartherEnd{ static_cast<int32_t>(font.Width * 9.5f), static_cast<int32_t>(font.Height * 0.5f) };
         const auto modifiers = ControlKeyStates{};
         const auto leftMouseDown = Control::MouseButtonState::IsLeftButtonDown;
         const Control::MouseButtonState noMouseDown{};
@@ -1138,7 +1413,10 @@ namespace ControlUnitTests
         interactivity->PointerMoved(leftMouseDown, WM_LBUTTONDOWN, modifiers, true, end, true);
         VERIFY_IS_TRUE(core->HasSelection());
         VERIFY_IS_FALSE(interactivity->_cursorRepositionPending);
-        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, end);
+        const auto firstSelectionEnd = core->_terminal->GetSelectionEnd();
+        interactivity->PointerMoved(leftMouseDown, WM_MOUSEMOVE, modifiers, true, fartherEnd, true);
+        VERIFY_ARE_NOT_EQUAL(firstSelectionEnd.x, core->_terminal->GetSelectionEnd().x, L"Selection end must continue updating after the drag starts");
+        interactivity->PointerReleased(noMouseDown, WM_LBUTTONUP, modifiers, fartherEnd);
         VERIFY_IS_TRUE(sent.empty(), L"A drag selection must never move the command-line cursor first");
 
         core->ClearSelection();
