@@ -1,138 +1,184 @@
 # Current development progress
 
-Last updated: 2026-08-25
+Last updated: 2026-08-27
 
 ## Repository state
 
-- Working branch: `codex/release-v1.4.2`
-- Branch base: `09dc76796725d9b7bd7b0d86a28196bce14698c7` (`origin/main` at
-  release preparation start)
-- Application version: `1.4.2`
-- Package/file version: `1.4.2.0`
-- PowerShell module version: `1.4.2` with an empty prerelease suffix
+- Working branch: `fix/v1.4.3-click-position`
+- Branch base: `0ee3adcb63c9cb028a44badeddb0362db38fa5f7`
+  (`origin/main` at hotfix preparation start)
+- Application version: `1.4.3`
+- Package/file version: `1.4.3.0`
+- PowerShell module version: `1.4.3` with an empty prerelease suffix
 - Release channel: `stable`
-- Intended tag: `v1.4.2`
+- Intended tag: `v1.4.3`
 - Supported target: Windows 11 x64
 
 The source remains based on the repository's pinned Microsoft Terminal
 baseline `release-1.25@1cea42d433253d95c4487a3037db48197b5e72f4`.
-Microsoft Terminal `upstream/main` was separately fetched through
-`86d15aef08e500be34497ff4e3a6f0d099ffb067` (2026-08-24) for a targeted
-cursor-positioning audit; no broad upstream merge was performed.
+Microsoft Terminal `upstream/main` was separately refreshed through
+`c7572cde0c69733e4511787dc963eb336f17adbf` (2026-08-25) for the required
+upstream-state check. No broad upstream merge was performed.
 
-## 1.4.2 release scope
+## 1.4.3 hotfix scope
 
-winTerm 1.4.2 promotes the complete Pane Search development line and adds
-Click to position cursor as a stable, default-enabled winTerm feature. It is
-the combined application delta since stable v1.3.0. The immutable v1.4.1 tag
-reached packaging but did not publish a GitHub Release because its release-note
-signing heading did not match the exact verifier contract; 1.4.2 corrects that
-release-only defect. The earlier 1.4.0 alpha and beta entries remain historical
-records only.
+winTerm 1.4.3 is a focused production regression hotfix for Click to position
+cursor. The feature shipped in the 1.4.1 payload and remained unchanged in
+1.4.2. Real physical mouse testing showed that small movement between
+mouse-down and mouse-up could intermittently reject the first click and could
+leave later clicks unable to reposition the cursor.
 
-### Pane Search
+No unrelated feature work is included. Pane Search, Command Timeline, Visual
+Progress, workspace behavior, package identity, and protocol/schema versions
+remain unchanged.
 
-- `Ctrl+F` opens the focused pane's search overlay; `Ctrl+Shift+F` remains a
-  compatibility alias.
-- Full-scrollback live matching, all-match highlighting, forward/backward
-  navigation, case-sensitive and regular-expression modes, and the compact
-  `current / total` counter are complete.
-- The pane-local scrollbar overview is complete and remains independent of
-  the generic `ShowMarks` setting.
-- Typing coalescing, sustained-output convergence, repaint signatures,
-  reflow, scrollback eviction, alternate-buffer changes, wide characters,
-  and invalid regex handling have regression coverage.
+Visual Progress remains unchanged in 1.4.3; this hotfix does not alter its
+rendering, recognition, accessibility, privacy, or per-pane behavior.
 
-### Click to position cursor
+## Confirmed root cause
 
-- A plain single click is recorded on mouse-down and acted on only at
-  mouse-up. Crossing the existing drag threshold cancels positioning and
-  preserves normal selection without first moving the shell cursor.
-- Ctrl+Click hyperlinks, VT mouse applications, double/triple click,
-  Shift+Click, drag selection, and copy-on-select retain their established
-  precedence.
-- Positioning requires the unfinished final OSC 133 shell mark and accepts
-  only the current editable command. Historical commands, output, scrollback,
-  and untrusted locations safely do nothing.
-- Coordinate translation validates viewport, buffer, inclusive TextBuffer
-  bounds, padding, overflow, resize-era points, and malformed input before any
-  buffer iterator is obtained.
-- Full-width glyph trailing cells are excluded from LEFT/RIGHT event counts,
-  and each split pane sends input only through its own connection.
-- The winTerm default is enabled; an explicit profile value of `false` is
-  preserved. The compatible internal JSON key remains
-  `experimental.repositionCursorWithMouse`, while localized UI describes the
-  stable feature as **Click to position cursor**.
+The press path correctly recorded a plain single left click as a pending cursor
+reposition and saved its touchdown position. The move path calculated the
+existing drag threshold correctly, but then called `SetEndSelectionPoint()`
+even when movement was still below that threshold.
 
-### Visual Progress and Command Timeline
+With no active selection, `ControlCore::SetEndSelectionPoint()` returned
+without changing terminal selection. `ControlInteractivity` nevertheless set
+`_selectionNeedsToBeCopied = true`, producing this invalid state:
 
-- Visual Progress remains stable in 1.4.2, including its determinate and
-  indeterminate renderer, per-pane state, accessibility path, and local-only
-  recognition controls.
-- Command Timeline remains stable and pane-local, with OSC 133-backed command
-  boundaries, filtering, load-without-executing, copy, jump, and status.
-- The 1.4.2 cursor work does not change either feature's settings, protocol,
-  persistence, or privacy boundaries.
+```text
+HasSelection()                 = false
+_cursorRepositionPending      = true
+_selectionNeedsToBeCopied     = true
+```
 
-## Upstream cursor audit
+The release path then required the copy flag to be false before repositioning.
+Normal 1-pixel jitter could therefore reject an otherwise valid click, and the
+stale copy flag could remain set into future gestures.
 
-- Inspected Microsoft Terminal PR #20442 and merged commit
-  `de3fc87d186e5da1d5ccd8731412905f5e2aba30`, which clamps click coordinates
-  before TextBuffer access.
-- Searched subsequent upstream history for changes involving
-  `RepositionCursorWithMouse`, `_repositionCursorWithMouse`, and related click
-  behavior. No later directly applicable cursor-safety fix was found.
-- Also reviewed earlier related cursor-selection commits
-  `4995af3dc1cc600b57fcdd953734a13b9b1a425f` and
-  `d14ff939dc418fa04401304fdef539424dbb5bd5`; their relevant behavior was
-  already present in winTerm.
-- The backport follows current inclusive coordinate contracts rather than
-  copying the upstream clamp literally, and adds stricter editable-mark,
-  overflow, vertical-padding, glyph, and release-time interaction guards.
+The bug was reproduced before production changes with a compiled deterministic
+press, 1-pixel move, release test. It failed exactly on the phantom copy-state
+assertion while confirming no selection existed and cursor reposition remained
+pending.
+
+## State-machine correction
+
+- Pointer movement below the existing drag threshold performs no selection
+  operation. Cursor reposition remains pending and selection-copy state is not
+  modified.
+- Crossing the threshold cancels cursor reposition, establishes the selection
+  anchor once, updates the selection end, and transfers ownership to the drag.
+- Moves after the threshold continue updating only the selection end; the
+  anchor is not re-established.
+- `ControlCore::SetEndSelectionPoint()` now reports whether an active selection
+  was actually updated. Interactivity marks copy state dirty only on success.
+- `PointerReleased()` uses `_cursorRepositionPending` and the established
+  modifier/VT/Core safety checks to decide click ownership. It does not use the
+  selection-copy flag as the primary click proof.
+- A release with no active selection normalizes stale copy state without
+  clearing or damaging legitimate mark-mode or CopyOnSelect state while a real
+  selection exists.
+
+Ctrl+Click hyperlinks, VT mouse reporting, double-click word selection,
+triple-click line selection, Shift+Click, drag selection, and CopyOnSelect keep
+their existing precedence. The 1.4.1/1.4.2 negative-coordinate, padding,
+viewport, buffer-bound, historical-output, finished-mark, editable-range,
+full-width-glyph, and split-pane safeguards are unchanged.
+
+## Regression coverage
+
+New deterministic Control tests cover:
+
+- a 1-pixel move remaining a click with no phantom selection-copy state;
+- several alternating sub-threshold moves remaining a click;
+- ten independent cursor-position clicks at different editable positions;
+- a jittered gesture followed by another successful ordinary click;
+- exact below-threshold and at-threshold behavior;
+- drag selection continuing to update after the threshold without cursor
+  input;
+- CopyOnSelect copying real drag selection but not sub-threshold jitter;
+- recovery from `_selectionNeedsToBeCopied = true` while no selection exists.
+
+The existing cursor tests continue to cover release-only positioning,
+Shift+Click, double/triple click, explicit disablement, editable shell marks,
+historical output, padding, wrapped commands, CJK/full-width glyphs, and
+split-pane connection isolation.
+
+Current local automated results:
+
+- focused cursor-position family: PASS, 11/11;
+- complete Debug x64 compiled Control suite: PASS, 100/100;
+- complete Debug x64 Relevant suite: PASS (Settings Model 245/245,
+  TerminalApp 51/51, Control 100/100);
+- complete Release x64 application and compiled-test build: PASS;
+- complete Release x64 Relevant suite: PASS (Settings Model 245/245,
+  TerminalApp 51/51, Control 100/100);
+- Smoke suite: PASS;
+- version verification: PASS for application 1.4.3, package/file 1.4.3.0,
+  PowerShell module 1.4.3, stable channel, and tag v1.4.3;
+- branding verification with publisher `CN=helloThisWorld`: PASS;
+- source-only Visual Progress verification: PASS;
+- unpackaged Release x64 stage generation and layout verification: PASS.
+
+## Real GUI validation gate
+
+The real Release x64 application was launched in isolated portable mode with
+PowerShell 7 and an unexecuted `git commit --amend --no-edit` command. An
+OS-input validation run used actual absolute mouse-move packets between
+button-down and button-up. It passed 30/30 cursor-position clicks across the
+beginning, middle, and end of the line, alternating left and right, including
+ten rapid far-apart clicks. Every gesture included 1-pixel X and Y movement,
+inserted a temporary marker at the asserted command index, restored the
+original command, and left no selected text. A paced drag selected
+`commit --a`, a double click selected exactly `commit`, and a triple click
+selected the complete line.
+
+This OS-injected real-window evidence is supplemental and is not represented
+as manual physical-mouse validation. The required physical-mouse GUI gate is
+still **NOT RUN**. Five verified execute/new-prompt lifecycles are also not yet
+recorded because the isolated window closed during that attempted sequence.
+Release readiness therefore still requires manual mouse validation with normal
+physical jitter, at least 30 cursor-position clicks, separate click timing
+versus genuine double/triple click, five prompt lifecycles, and PowerShell 7 at
+minimum. PowerShell 5, cmd.exe, WSL, and representative VT mouse applications
+should also be exercised where available.
+
+The 1.4.3 release must not be tagged or described as complete until this gate
+has actual evidence.
 
 ## Release channel and artifacts
 
 The guarded tag workflow must confirm an exact tag/version match, absence of
-an existing Release, a clean checkout, version/branding/security/privacy
-gates, an x64 Release build with compiled tests, artifact generation, and a
-public asset re-download before publication is considered complete.
+an existing Release, a clean checkout, version/branding/security/privacy gates,
+an x64 Release build with compiled tests, artifact generation, Draft Release
+round-trip validation, publication, and public asset re-download.
 
 The expected public Release assets are:
 
-- `winTerm-1.4.2-setup-x64.exe`
-- `winTerm-1.4.2-portable-x64.zip`
+- `winTerm-1.4.3-setup-x64.exe`
+- `winTerm-1.4.3-portable-x64.zip`
 - `SHA256SUMS.txt`
 - `THIRD_PARTY_NOTICES.md`
 - `SBOM.spdx.json`
 - `SBOM.cyclonedx.json`
 - `release-metadata.json`
-- `winTerm-1.4.2-release-notes.md`
+- `winTerm-1.4.3-release-notes.md`
 
-The installer is currently not Authenticode-signed, so Unknown Publisher or
+The installer is not currently Authenticode-signed, so Unknown Publisher or
 SmartScreen warnings remain possible. The Release notes disclose this and
 direct users to verify `SHA256SUMS.txt`.
 
-## Validation state
+## Release plan
 
-Local stable-candidate validation completed on 2026-08-25:
-
-- Debug x64 package and all three unit-test projects built successfully.
-- Smoke and Relevant suites passed.
-- Compiled Settings Model, Terminal App, and Control suites passed with
-  381/381, 51/51, and 93/93 tests respectively.
-- Version, branding, privacy, release-workflow, and PowerShell syntax gates
-  passed as part of those suites.
-
-The formal Release workflow and public asset verification remain authoritative
-for the published installer and Portable ZIP.
-
-## Next steps
-
-1. Merge through the application pull request, synchronize the Wiki ledger,
-   tag the exact merged `main` commit, and monitor the formal Release workflow
-   through public asset validation.
-2. Update and deploy winterm.dev from the real `published_at` timestamp and
-   public v1.4.2 asset URLs, then verify English/Japanese production pages.
-3. Only after both the stable Release and website are verified, remove the
-   published v1.4.0-beta GitHub prerelease entry while retaining its historical
-   git tag.
+1. Complete the final diff audit after all validation records are updated.
+2. Complete and record the manual physical GUI mouse-jitter, repeated-click, selection,
+   prompt-lifecycle, shell, and VT mouse validation gate.
+3. Commit the focused 1.4.3 source/docs change, publish the matching Wiki
+   ledger entry, push the branch, and merge through the application pull
+   request only after it is genuinely release-ready.
+4. Synchronize `main`, create annotated tag `v1.4.3` on the exact merged commit,
+   push only that tag, and monitor the formal Release workflow to a terminal
+   result.
+5. Verify GitHub Latest and every public asset and checksum, then update
+   `winterm-site` from the real Release URL, `published_at`, asset URLs, and
+   filenames. Publish and verify English/Japanese production parity.

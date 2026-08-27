@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.4.3 - 2026-08-27
+
+Stable production hotfix for **Click to position cursor**. This patch restores
+reliable cursor positioning when normal physical mouse jitter occurs between
+left-button press and release. It publishes as GitHub Latest with application
+version `1.4.3`, package/file version `1.4.3.0`, PowerShell module version
+`1.4.3`, and tag `v1.4.3`.
+
+### Fixed
+
+- Fixed Click to position cursor working intermittently when sub-threshold
+  pointer movement occurred between mouse-down and mouse-up.
+- Fixed stale selection-copy state that could keep rejecting later plain
+  cursor-position clicks after one jittered gesture.
+- Pointer movement below the existing drag-selection threshold now remains a
+  click and does not mutate selection or create a phantom copy candidate.
+- Cursor-reposition eligibility and selection-copy eligibility now have
+  independent gesture responsibilities.
+- Added deterministic coverage for 1-pixel and repeated jitter, ten sequential
+  clicks, a poisoned-follow-up gesture, the exact drag-threshold boundary,
+  continued drag selection, CopyOnSelect, and stale-state recovery.
+
 ## 1.4.2 - 2026-08-25
 
 Stable patch release of the **Pane Search** generation and **Click to position

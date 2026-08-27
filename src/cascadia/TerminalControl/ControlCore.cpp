@@ -1427,13 +1427,15 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     // - Sets selection's end position to match supplied cursor position, e.g. while mouse dragging.
     // Arguments:
     // - position: the point in terminal coordinates (in cells, not pixels)
-    void ControlCore::SetEndSelectionPoint(const til::point position)
+    // Return Value:
+    // - true if an active selection was updated; false if no selection exists
+    bool ControlCore::SetEndSelectionPoint(const til::point position)
     {
         const auto lock = _terminal->LockForWriting();
 
         if (!_terminal->IsSelectionActive())
         {
-            return;
+            return false;
         }
 
         // clamp the converted position to be within the viewport bounds
@@ -1447,6 +1449,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         // save location (for rendering) + render
         _terminal->SetSelectionEnd(terminalPosition);
         _updateSelectionUI();
+        return true;
     }
 
     // Method Description:
